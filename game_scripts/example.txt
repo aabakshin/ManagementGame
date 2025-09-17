@@ -1,11 +1,11 @@
 @begin:
-	print  "This is turn",  ?turn  ;
-	buy 2 , ?raw_price ;
+	print "This is turn", ?turn;
+	buy 2, ?raw_price;
 	sell ?production(?my_id), ?production_price;
-	$toprod  := 2 ;
-	$zopa := ?raw( ?my_id );
-	if $zopa<$toprod  then   
-		$toprod  := ?raw(?my_id   );
+	$toprod := 2;
+	$raw_count := ?raw(?my_id);
+	if $raw_count < $toprod then
+		$toprod := ?raw(?my_id);
 	prod $toprod;
 	endturn;
 	goto @begin;
