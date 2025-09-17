@@ -1,9 +1,9 @@
-/* 
+/*
  * Главный клиентский модуль.
  * Запускает программу, инициирует TCP-соединение с сервером.
  * Обеспечивает взаимодействие с сервером.
  *
- * */
+ */
 
 #include "../../includes/clientCore.h"
 #include <termios.h>
@@ -12,6 +12,7 @@
 /* Описан в модуле clientCore */
 extern CommandsHistoryList* chl_list;
 
+
 int main(int argc, char** argv)
 {
 	if ( argc != 3 )
@@ -19,7 +20,7 @@ int main(int argc, char** argv)
 		fprintf(stderr, "usage: tcp_client <hostname> <port>\n");
 		return 1;
 	}
-	
+
 	if ( !isatty(0) )
 	{
 		fprintf(stderr, "%s", "stdin is not a terminal!\n");
@@ -27,7 +28,7 @@ int main(int argc, char** argv)
 	}
 
 	printf("PID = %d\n"
-		   "Terminal name: %s\n\n", getpid(), ttyname(0));
+			"Terminal name: %s\n\n", getpid(), ttyname(0));
 
 	int socket_peer = client_init(argv[1], argv[2]);
 	if ( socket_peer == -1 )
@@ -67,7 +68,7 @@ int main(int argc, char** argv)
 	t1.c_cc[VTIME] = 0;
 
 	tcsetattr(0, TCSANOW, &t1);
-	
+
 
 	while (1)
 	{
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
 		struct timeval timeout;
 		timeout.tv_sec = 0;
 		timeout.tv_usec = TIMEOUT;
-		
+
 		int res = -1;
 		if ( (res = select(socket_peer+1, &reads, 0, 0, &timeout)) < 0 )
 		{
@@ -88,11 +89,11 @@ int main(int argc, char** argv)
 				fprintf(stderr, "%s", "Got some signal.\n");
 				continue;
 			}
-			
+
 			fprintf(stderr, "select() failed. (errno code = %d)\n", errno);
 			continue;
 		}
-		
+
 		if ( res == 0 )
 			continue;
 
@@ -105,7 +106,7 @@ int main(int argc, char** argv)
 				fprintf(stderr, "%s\n", "Connection closed by peer.");
 				break;
 			}
-			
+
 
 			/*--------------------------------------------------------------------------------------*/
 			/*for ( i = 0; i < RECEIVE_BUFFER_SIZE; i++ )
@@ -123,13 +124,13 @@ int main(int argc, char** argv)
 			}
 			putchar('\n');*/
 			/*--------------------------------------------------------------------------------------*/
-			
+
 			int tokens_amount = 0;
 			int i;
 			for ( i = 0; read[i]; i++ )
 				if ( read[i] == '\n' )
 					tokens_amount++;
-			
+
 			/*printf("\ntokens_amount = %d\n", tokens_amount);*/
 
 			int j = 0;
@@ -145,8 +146,8 @@ int main(int argc, char** argv)
 					istr = strtok(NULL, "\n");
 				}
 			}
-			
-			/*printf("\nj = %d\n", j);*/	
+
+			/*printf("\nj = %d\n", j);*/
 
 			/*
 			for ( i = 0; i < bytes_received; i++ )
@@ -155,10 +156,10 @@ int main(int argc, char** argv)
 
 			if ( i < RECEIVE_BUFFER_SIZE )
 				read[i] = '\0';
-			
+
 			printf("\nread = %s\n", read);
 			*/
-			
+
 
 			for ( j = 0; j < tokens_amount; j++ )
 			{
@@ -170,13 +171,13 @@ int main(int argc, char** argv)
 
 				if ( !check_server_response(buffer) )
 					fprintf(stderr, "%s", "\nUnable to process server response\n");
-			} 
-		} 
+			}
+		}
 
 		if ( FD_ISSET(0, &reads) )
 		{
 			char read[SEND_BUFFER_SIZE] = { 0 };
-			
+
 			int mes_len = -1;
 			if ( (mes_len = get_string(read, SEND_BUFFER_SIZE)) < 1 )
 			{
@@ -185,12 +186,12 @@ int main(int argc, char** argv)
 				/*printf("\nmes_len = %d\n", mes_len);*/
 				continue;
 			}
-			
+
 			if ( read[0] == '\n')
 				continue;
 
 			/*printf("\nread = %s\nmes_len = %d\n", read, mes_len);*/
-			
+
 			/*int k;
 			for ( k = 0; k < 20; k++ )
 			{
@@ -201,12 +202,12 @@ int main(int argc, char** argv)
 			*/
 
 			int size = mes_len+1;
-			
+
 			delete_spaces(read, &size);
 			mes_len = strlen(read);
 
 			int bytes_sent = send(socket_peer, read, mes_len, 0);
-			
+
 			if ( read[mes_len-1] == '\n' )
 			{
 				read[mes_len-1] = '\0';
@@ -224,10 +225,10 @@ int main(int argc, char** argv)
 			/*printf("Sent %d bytes.\n", bytes_sent);*/
 		}
 	}
-	
+
 	/* восстановление канонического режима */
 	tcsetattr(0, TCSANOW, &t2);
-	
+
 	/* очистка буфера отправленных команд */
 	chl_clear(&chl_list);
 
@@ -237,7 +238,7 @@ int main(int argc, char** argv)
 
 	printf("%s\n", "Closing socket...");
 	close(socket_peer);
-	
+
 	printf("%s\n", "Finished.");
 
 	return 0;
