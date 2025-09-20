@@ -1,25 +1,35 @@
 CC = gcc
 CXX = g++
+CWD = ../binaries/bot_mg
 LIBS_PATH = ../../libs
-C_SRC_MODULES = $(LIBS_PATH)/MGLib.c
-CPP_SRC_MODULES = $(LIBS_PATH)/MainInfo.cpp $(LIBS_PATH)/botCore.cpp $(LIBS_PATH)/Lexem.cpp $(LIBS_PATH)/LexemList.cpp $(LIBS_PATH)/LexemAnalyzer.cpp $(LIBS_PATH)/OperStack.cpp $(LIBS_PATH)/PolizElem.cpp $(LIBS_PATH)/PolizEx.cpp $(LIBS_PATH)/PolizItem.cpp $(LIBS_PATH)/LabelsList.cpp $(LIBS_PATH)/SA_Additional.cpp $(LIBS_PATH)/SyntaxAnalyzer.cpp
-OBJMODULES = $(C_SRC_MODULES:.c=.o) $(CPP_SRC_MODULES:.cpp=.o)
+SRCS_PATH = ../../srcs
+C_SRCS = MGLib.c
+CPP_SRCS = MainInfo.cpp botCore.cpp Lexem.cpp LexemList.cpp LexemAnalyzer.cpp OperStack.cpp PolizElem.cpp PolizEx.cpp PolizItem.cpp LabelsList.cpp SA_Additional.cpp SyntaxAnalyzer.cpp
+OBJMODULES = $(C_SRCS:.c=.o) $(CPP_SRCS:.cpp=.o)
 CFLAGS = -Wall -g
-ADDRESS = 192.168.50.128
+ADDRESS = 192.168.88.129
 PORT = 7777
 GAME_SCRIPT_FILE = ../../game_scripts/example.txt
 
-MGLib.o: $(LIBS_PATH)/MGLib.c
-	$(CC) $(CFLAGS) -c $< -o $(LIBS_PATH)/$@
-%.o: $(LIBS_PATH)/%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $(LIBS_PATH)/$@
 
-bot_mg: bot_mg.cpp $(OBJMODULES)
+MGLib.o: $(SRCS_PATH)/MGLib.c
+	$(CC) $(CFLAGS) -c $< -o $@
+%.o: $(SRCS_PATH)/%.cpp
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+bot_mg_debug: bot_mg.cpp $(OBJMODULES)
 	$(CXX) $(CFLAGS) $^ -o $@
+	mv *.o $(LIBS_PATH)
 
-run: bot_mg
-	./bot_mg $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
+bot_mg_release: bot_mg.cpp $(OBJMODULES)
+	$(CXX) $^ -o $@
+	mv *.o $(LIBS_PATH)
+
+run: bot_mg_release
+	./$^ $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
+
+debug_run: bot_mg_debug
+	valgrind --leak-check=full -s --track-origins=yes ./$^ $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
 
 clean:
-	rm -rf $(OBJMODULES) bot_mg
-
+	rm $(LIBS_PATH)/*.o bot_mg_debug bot_mg_release

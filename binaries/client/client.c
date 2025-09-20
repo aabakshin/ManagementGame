@@ -2,10 +2,12 @@
  * Главный клиентский модуль.
  * Запускает программу, инициирует TCP-соединение с сервером.
  * Обеспечивает взаимодействие с сервером.
- *
  */
 
+
 #include "../../includes/clientCore.h"
+#include "../../includes/Input.h"
+#include "../../includes/CommandsHistoryList.h"
 #include <termios.h>
 
 
@@ -27,6 +29,11 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+
+
+
+
+
 	printf("PID = %d\n"
 			"Terminal name: %s\n\n", getpid(), ttyname(0));
 
@@ -37,6 +44,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+
 	/* Отправка первичных идентификационных данных на сервер */
 	char id_buf[SEND_BUFFER_SIZE] = { 0 };
 	char argc_buf[10];
@@ -45,8 +53,8 @@ int main(int argc, char** argv)
 	int i;
 	for ( i = 0; argv[0][i]; i++ )
 		id_buf[i] = argv[0][i];
-	int j;
-	for ( j = 0; argc_buf[j]; j++, i++ )
+
+	for (int j = 0; argc_buf[j]; j++, i++ )
 		id_buf[i] = argc_buf[j];
 	id_buf[i] = '\n';
 	id_buf[i+1] = '\0';
@@ -55,8 +63,6 @@ int main(int argc, char** argv)
 	printf("Sent %d\\%d bytes\n", wc, i+1);
 
 
-
-	/* Выключение канонического режима терминала */
 	struct termios t1, t2;
 	tcgetattr(0, &t1);
 	memcpy(&t2, &t1, sizeof(t1));
@@ -67,6 +73,7 @@ int main(int argc, char** argv)
 	t1.c_cc[VMIN] = 0;
 	t1.c_cc[VTIME] = 0;
 
+	/* Выключение канонического режима терминала */
 	tcsetattr(0, TCSANOW, &t1);
 
 
@@ -179,7 +186,7 @@ int main(int argc, char** argv)
 			char read[SEND_BUFFER_SIZE] = { 0 };
 
 			int mes_len = -1;
-			if ( (mes_len = get_string(read, SEND_BUFFER_SIZE)) < 1 )
+			if ( (mes_len = get_str(read, SEND_BUFFER_SIZE)) < 1 )
 			{
 				if ( mes_len == EXIT_CODE )
 					break;
@@ -221,20 +228,17 @@ int main(int argc, char** argv)
 			{
 				chl_delete(&chl_list, chl_list->number);
 			}
-			/*chl_print(chl_list);*/
-			/*printf("Sent %d bytes.\n", bytes_sent);*/
 		}
 	}
+
 
 	/* восстановление канонического режима */
 	tcsetattr(0, TCSANOW, &t2);
 
+
 	/* очистка буфера отправленных команд */
 	chl_clear(&chl_list);
 
-	/*printf("\n--------------------------\n");
-	chl_print(chl_list);
-	printf("\n--------------------------\n");*/
 
 	printf("%s\n", "Closing socket...");
 	close(socket_peer);

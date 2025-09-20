@@ -1,16 +1,14 @@
 /*
- * Модуль clientCore отвечает за правильное взаимодействие клиента и сервера, 
+ * Модуль clientCore отвечает за правильное взаимодействие клиента и сервера,
  * реализуя протокол общения и обработку данных, а также инициализацию сокета
- * Этот модуль используется только в модуле client   
- *
- * */
+ * Этот модуль используется только в модуле client.
+ */
 
 #ifndef CLIENTCORE_H
 #define CLIENTCORE_H
 
 #include "SystemHeaders.h"
 #include "MGLib.h"
-#include "CommandsHistoryList.h"
 
 /*const char* server_codes[] = {
 			"HELP_COMMAND",
@@ -58,7 +56,7 @@
 			NULL
 };*/
 
-/* Системные константы */
+
 enum
 {
 	EXIT_CODE						=								-2,
@@ -69,9 +67,8 @@ enum
 	HISTORY_COMMANDS_LIST_SIZE		=								 5
 };
 
-/* Интерфейс модуля */
+
 int client_init(const char* addr, const char* port);
 int check_server_response(char* buffer);
-int get_string(char* buffer, int buffer_size);
 
 #endif
