@@ -1606,6 +1606,7 @@ int server_run(Banker* banker, int ls)
 						}
 						else
 						{
+							int left_pl_num = p->number;
 							player_left_game(banker, p, i, &readfds);
 							
 							if ( banker->alive_players == 1 )
@@ -1635,7 +1636,6 @@ int server_run(Banker* banker, int ls)
 								mes_tokens[1] = ap_buf;
 
 								char left_p_num_buf[10];
-								int left_pl_num = p->number;
 								itoa(left_pl_num, left_p_num_buf, 9);
 								mes_tokens[2] = left_p_num_buf;
 
@@ -1651,7 +1651,7 @@ int server_run(Banker* banker, int ls)
 				} /* end if FD_ISSET */
 			} /* end server_banker.pl_array[i] != NULL */
 		} /* end for */
-		
+
 		if ( banker->game_started )
 		{
 			if ( banker->ready_players == banker->alive_players )
