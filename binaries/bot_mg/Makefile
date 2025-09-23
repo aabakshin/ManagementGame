@@ -29,7 +29,7 @@ run: bot_mg_release
 	./$^ $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
 
 debug_run: bot_mg_debug
-	valgrind --leak-check=full -s --track-origins=yes ./$^ $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
+	valgrind --leak-check=full -s --track-origins=yes --show-leak-kinds=all ./$^ $(ADDRESS) $(PORT) $(GAME_SCRIPT_FILE)
 
 clean:
-	rm $(LIBS_PATH)/*.o bot_mg_debug bot_mg_release
+	rm -rf $(LIBS_PATH)/*.o bot_mg_debug bot_mg_release

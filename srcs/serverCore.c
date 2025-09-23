@@ -55,6 +55,24 @@ const char* valid_commands[] = {
 				NULL
 };
 
+/* Список сообщений для идентификации бот-клиента */
+const char* bot_identity_messages[] = {
+				"./bot_mg_debug4",
+				"./bot_mg_debug4\n",
+				"./bot_mg_release4",
+				"./bot_mg_release4\n",
+				NULL
+};
+
+int is_correct_identity_msg(const char* identity_msg)
+{
+	for ( int i = 0; bot_identity_messages[i] != NULL; ++i )
+		if ( strcmp(identity_msg, bot_identity_messages[i]) == 0 )
+			return 1;
+
+	return 0;
+}
+
 /* Список функций-обработчиков валидных команд(порядок должен совпадать с порядком следования элементов в valid_commands) */
 void (*commands_handlers[])(Banker*, CommandHandlerParams* ) = {
 					help_command_handler,
@@ -1236,7 +1254,7 @@ int server_run(Banker* banker, int ls)
 						p->wait_factories = START_FACTORIES;
 						p->old_money = p->money;
 						
-						
+						printf("[%s]: p->is_bot: %s\n", p->ip, (p->is_bot) ? "TRUE" : "FALSE");
 						int tokns_amnt = (p->is_bot) ? 14 : 10;
 
 						char* mes_tokens[tokns_amnt];
@@ -1518,7 +1536,8 @@ int server_run(Banker* banker, int ls)
 						{
 							if ( !p->is_ident_message_recv )
 							{
-								if ( (strcmp(read_buf, "./bot_mg4") == 0) || (strcmp(read_buf, "./bot_mg4\n") == 0) )
+								if ( is_correct_identity_msg(read_buf) )
+								//if ( (strcmp(read_buf, "./bot_mg4") == 0) || (strcmp(read_buf, "./bot_mg4\n") == 0) )
 									p->is_bot = 1;
 								else
 									p->is_bot = 0;
