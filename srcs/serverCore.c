@@ -3,11 +3,13 @@
 #ifndef SERVER_CORE_C
 #define SERVER_CORE_C
 
+
 #include "../includes/serverCore.h"
 #include "../includes/MGLib.h"
 #include "../includes/CommandsHandler.h"
 #include "../includes/MarketRequest.h"
 #include "../includes/Player.h"
+
 
 /* Системные константы */
 enum
@@ -70,7 +72,7 @@ void (*commands_handlers[])(Banker*, CommandHandlerParams* ) = {
 
 /* Описаны в модуле Banker */
 extern double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
-extern int price_table[MARKET_LEVEL_NUMBER][2]; 
+extern int price_table[MARKET_LEVEL_NUMBER][2];
 extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
 /* Флаг срабатывания таймера */
@@ -96,7 +98,7 @@ void alrm_handler(int sig_no)
 {
 	int save_errno = errno;
 	signal(SIGALRM, alrm_handler);
-	
+
 	sig_number = sig_no;
 	alrm_flag = 1;
 	alarm(0);
@@ -109,7 +111,7 @@ void exit_handler(int sig_no)
 {
 	int save_errno = errno;
 	signal(SIGINT, exit_handler);
-		
+	
 	sig_number = sig_no;
 	exit_flag = 1;
 
@@ -341,6 +343,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 				
 				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 				
+				int left_pl_num = p->number;
 				player_left_game(banker, p, i, readfds);
 				
 				if ( banker->alive_players == 1 )
@@ -374,7 +377,6 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 					mes_tokens[1] = ap_buf;
 
 					char left_p_num_buf[10];
-					int left_pl_num = p->number;
 					itoa(left_pl_num, left_p_num_buf, 9);
 					mes_tokens[2] = left_p_num_buf;
 
@@ -708,6 +710,7 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 
 						send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 
+						int left_pl_num = p->number;
 						player_left_game(banker, p, i, readfds);
 						
 						if ( banker->alive_players == 1 )
@@ -737,7 +740,6 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 							mes_tokens[1] = ap_buf;
 
 							char left_p_num_buf[10];
-							int left_pl_num = p->number;
 							itoa(left_pl_num, left_p_num_buf, 9);
 							mes_tokens[2] = left_p_num_buf;
 
