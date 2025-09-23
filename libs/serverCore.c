@@ -341,6 +341,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 				
 				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 				
+				int left_pl_num = p->number;
 				player_left_game(banker, p, i, readfds);
 				
 				if ( banker->alive_players == 1 )
@@ -374,7 +375,6 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 					mes_tokens[1] = ap_buf;
 
 					char left_p_num_buf[10];
-					int left_pl_num = p->number;
 					itoa(left_pl_num, left_p_num_buf, 9);
 					mes_tokens[2] = left_p_num_buf;
 
@@ -707,7 +707,8 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 						mes_tokens[1] = charges;
 
 						send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
-
+						
+						int left_pl_num = p->number;
 						player_left_game(banker, p, i, readfds);
 						
 						if ( banker->alive_players == 1 )
@@ -737,7 +738,6 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 							mes_tokens[1] = ap_buf;
 
 							char left_p_num_buf[10];
-							int left_pl_num = p->number;
 							itoa(left_pl_num, left_p_num_buf, 9);
 							mes_tokens[2] = left_p_num_buf;
 
