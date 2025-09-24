@@ -38,11 +38,11 @@ void help_command_handler(Banker* b, CommandHandlerParams* chp)
 	int tokns_amnt = 11;
 
 	mes_tokens[0] = "*INFO_MESSAGE|HELP_COMMAND|";
-	
+
 	int i = 1, j;
 	for ( j = 0; b->valid_commands[j] != NULL; j++, i++ )
 		mes_tokens[i] = (char*) b->valid_commands[j];
-	
+
 	for ( i = 0; i < MAX_PLAYERS; i++ )
 	{
 		Player* p = b->pl_array[i];
@@ -50,7 +50,7 @@ void help_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			if ( p->fd == chp->fd )
 			{
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);			
+				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 				return;
 			}
 		}
@@ -62,7 +62,7 @@ void market_command_handler(Banker* b, CommandHandlerParams* chp)
 	char* mes_tokens[5];
 	int tokns_amnt = 5;
 	mes_tokens[0] = "*INFO_MESSAGE|MARKET_COMMAND|";
-	
+
 	char s_amount[10];
 	itoa(b->cur_market_state->source_amount, s_amount, 9);
 	mes_tokens[1] = s_amount;
@@ -107,7 +107,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 				break;
 	}
 
-	
+
 	Player* cur_p;
 	int j;
 	for ( j = 0; j < MAX_PLAYERS; j++ )
@@ -119,7 +119,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 	}
 	if ( j >= MAX_PLAYERS )
 		return;
-	
+
 
 	if ( i >= MAX_PLAYERS )
 	{
@@ -128,7 +128,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 		send_data(chp->fd, error_message, em_len, cur_p->ip);
 		return;
 	}
-	
+
 	int tokns_amnt = (cur_p->is_bot) ? 10 : 9;
 	char* mes_tokens[tokns_amnt];
 	mes_tokens[0] = "*INFO_MESSAGE|PLAYER_COMMAND|";
@@ -140,7 +140,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 	char p_money[20];
 	itoa(other_p->money, p_money, 19);
 	mes_tokens[2] = p_money;
-	
+
 	char p_income[20];
 	itoa(other_p->income, p_income, 19);
 	mes_tokens[3] = p_income;
@@ -164,7 +164,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 	char p_b_f[10];
 	itoa(other_p->build_factories, p_b_f, 9);
 	mes_tokens[8] = p_b_f;
-	
+
 	char produced[10];
 	if ( cur_p->is_bot )
 	{
@@ -178,7 +178,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 void list_command_handler(Banker* b, CommandHandlerParams* chp)
 {
 	int alive_amount = b->alive_players;
-	
+
 	char* mes_tokens[2];
 	int tokns_amnt = 2;
 	mes_tokens[0] = "*INFO_MESSAGE|LIST_COMMAND|";
@@ -187,7 +187,7 @@ void list_command_handler(Banker* b, CommandHandlerParams* chp)
 	itoa(alive_amount, alive_p, 9);
 	mes_tokens[1] = alive_p;
 
-	int i;		
+	int i;
 	for ( i = 0; i < MAX_PLAYERS; i++ )
 	{
 		Player* p = b->pl_array[i];
@@ -209,14 +209,14 @@ void prod_command_handler(Banker* b, CommandHandlerParams* chp)
 		if ( b->pl_array[i] != NULL )
 			if ( b->pl_array[i]->fd == chp->fd)
 				break;
-	
+
 	if ( i >= MAX_PLAYERS )
 		return;
 
 	Player* p = b->pl_array[i];
 	if ( p->sources >= 1 )
 	{
-		if ( p->money >= PRODUCTION_COST ) 
+		if ( p->money >= PRODUCTION_COST )
 		{
 			if ( p->wait_factories >= 1 )
 			{
@@ -259,7 +259,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 		if ( b->pl_array[i] != NULL )
 			if ( b->pl_array[i]->fd == chp->fd)
 				break;
-	
+
 	if ( i >= MAX_PLAYERS )
 		return;
 
@@ -273,7 +273,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 		for ( j = 0; arg1_p[j]; j++ )
 			arg[j] = arg1_p[j];
 		arg[j] = '\0';
-		
+
 		/*printf("arg = %s\n", arg);*/
 
 		if ( strcmp( arg, "list") != 0 )
@@ -286,9 +286,9 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			BuildList* build_list = p->build_list;
 			if ( build_list != NULL )
-			{				
+			{
 				int list_amount = bl_get_size(build_list);
-				
+
 				char* mes_tokens[list_amount*2+2];
 				int tokns_amnt = list_amount*2+2;
 
@@ -297,7 +297,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 				char la_buf[10];
 				itoa(list_amount, la_buf, 9);
 				mes_tokens[1] = la_buf;
-				
+
 				int i = 2;
 				while ( build_list != NULL )
 				{
@@ -313,7 +313,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 
 					build_list = build_list->next;
 				}
-				
+
 				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 			}
 			else
@@ -376,7 +376,7 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 
 	int source_amount = *( (int*) chp->param1 );
 	int source_price = *( (int*) chp->param2 );
-	int cur_min_source_price = b->cur_market_state->min_source_price; 
+	int cur_min_source_price = b->cur_market_state->min_source_price;
 
 
 	if ( (source_amount > 0) && (source_amount <= b->cur_market_state->source_amount) )
@@ -388,7 +388,7 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 			data.price = source_price;
 			data.success = 0;
 			data.p = p;
-			
+
 			if ( data.p->money < data.price*data.amount )
 			{
 				const char* no_money_mes = "*INFO_MESSAGE|BUY_COMMAND_NO_MONEY\n";
@@ -396,7 +396,7 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 				send_data(chp->fd, no_money_mes, mes_len, data.p->ip);
 				return;
 			}
-			
+
 			mr_insert(&b->sources_requests, &data);
 			p->sent_source_request = 1;
 
@@ -404,7 +404,7 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 			int tokns_amnt = 3;
 
 			mes_tokens[0] = "*INFO_MESSAGE|BUY_COMMAND_SUCCESS|";
-			
+
 			char sa[10];
 			itoa(source_amount, sa, 9);
 			mes_tokens[1] = sa;
@@ -412,7 +412,7 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 			char sp[20];
 			itoa(source_price, sp, 19);
 			mes_tokens[2] = sp;
-			
+
 			send_message(chp->fd, mes_tokens, tokns_amnt, p->ip);
 		}
 		else
@@ -451,7 +451,7 @@ void sell_command_handler(Banker* b, CommandHandlerParams* chp)
 		return;
 	}
 
-	int product_amount = *( (int*) chp->param1 ); 
+	int product_amount = *( (int*) chp->param1 );
 	int product_price = *( (int*) chp->param2 );
 	int cur_max_product_price = b->cur_market_state->max_product_price;
 	/*printf("\nproduct_price = %d\ncur_max_product_price = %d\n", product_price, b->cur_market_state->max_product_price);*/
@@ -468,12 +468,12 @@ void sell_command_handler(Banker* b, CommandHandlerParams* chp)
 
 			mr_insert(&b->products_requests, &data);
 			p->sent_products_request = 1;
-			
+
 			char* mes_tokens[3];
 			int tokns_amnt = 3;
 
 			mes_tokens[0] = "*INFO_MESSAGE|SELL_COMMAND_SUCCESS|";
-			
+
 			char pa[10];
 			itoa(product_amount, pa, 9);
 			mes_tokens[1] = pa;
@@ -506,26 +506,25 @@ void turn_command_handler(Banker* b, CommandHandlerParams* chp)
 		if ( b->pl_array[i] != NULL )
 			if ( b->pl_array[i]->fd == chp->fd)
 				break;
-	
+
 	if ( i >= MAX_PLAYERS )
 		return;
 
 	Player* p = b->pl_array[i];
-
 	p->is_turn = 1;
 	b->ready_players++;
 
-	int wait_yet_players_amount = b->alive_players - b->ready_players; 
-	
+	int wait_yet_players_amount = b->alive_players - b->ready_players;
+
 	char* mes_tokens[2];
 	int tokns_amnt = 2;
-	
+
 	mes_tokens[0] = "*INFO_MESSAGE|TURN_COMMAND_SUCCESS|";
 
 	char w_y_p_a[10];
 	itoa(wait_yet_players_amount, w_y_p_a, 9);
 	mes_tokens[1] = w_y_p_a;
-	
+
 	for ( i = 0; i < MAX_PLAYERS; i++ )
 	{
 		Player* p = b->pl_array[i];
@@ -547,9 +546,9 @@ void quit_command_handler(Banker* b, CommandHandlerParams* chp)
 		return;
 
 	Player* p = b->pl_array[i];
-	
+	int left_pl_num = p->number;
 	player_left_game(b, p, i, (fd_set*) chp->param1);
-	
+
 	if ( b->alive_players == 1 )
 	{
 		for ( i = 0; i < MAX_PLAYERS; i++ )
@@ -558,34 +557,32 @@ void quit_command_handler(Banker* b, CommandHandlerParams* chp)
 
 		if ( i >= MAX_PLAYERS )
 			return;
-		
+
 		Player* p = b->pl_array[i];
-		
 		server_end_work(b, p, i, (fd_set*) chp->param1);
 	}
 	else if ( b->alive_players > 1 )
-	{		
+	{
 		int tokns_amnt = 3;
 		char* mes_tokens[tokns_amnt];
 
 		mes_tokens[0] = "*INFO_MESSAGE|LOST_ALIVE_PLAYER|";
-		
+
 		char ap_buf[10];
 		int ap = b->alive_players;
 		itoa(ap, ap_buf, 9);
 		mes_tokens[1] = ap_buf;
-		
+
 		char left_p_num_buf[10];
-		int left_pl_num = p->number;
 		itoa(left_pl_num, left_p_num_buf, 9);
 		mes_tokens[2] = left_p_num_buf;
 
 		for ( i = 0; i < MAX_PLAYERS; i++ )
 		{
-			Player* p = b->pl_array[i]; 
+			Player* p = b->pl_array[i];
 			if ( p != NULL )
 				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 		}
 	}
 }
-#endif 
+#endif
