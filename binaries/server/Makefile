@@ -23,7 +23,7 @@ run: server_release
 	./$^ $(PORT)
 
 debug_run: server_debug
-	valgrind --leak-check=full -s --track-origins=yes ./$^ $(PORT)
+	valgrind --leak-check=full -s --track-origins=yes --show-leak-kinds=all ./$^ $(PORT)
 
 clean:
 	rm -rf $(LIBS_PATH)/*.o server_release server_debug

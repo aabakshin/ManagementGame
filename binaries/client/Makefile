@@ -24,7 +24,7 @@ run: client_release
 	./$^ $(ADDRESS) $(PORT)
 
 debug_run: client_debug
-	valgrind --leak-check=full -s --track-origins=yes ./$^ $(ADDRESS) $(PORT)
+	valgrind --leak-check=full -s --track-origins=yes --show-leak-kinds=all ./$^ $(ADDRESS) $(PORT)
 
 clean:
 	rm -rf $(LIBS_PATH)/*.o client_release client_debug

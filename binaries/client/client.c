@@ -106,8 +106,8 @@ int main(int argc, char** argv)
 
 		if ( FD_ISSET(socket_peer, &reads) )
 		{
-			char read[RECEIVE_BUFFER_SIZE] = { 0 };
-			int bytes_received = readline(socket_peer, read, RECEIVE_BUFFER_SIZE);
+			char read_buf[RECEIVE_BUFFER_SIZE] = { 0 };
+			int bytes_received = readline(socket_peer, read_buf, RECEIVE_BUFFER_SIZE);
 			if ( bytes_received < 1 )
 			{
 				fprintf(stderr, "%s\n", "Connection closed by peer.");
@@ -118,33 +118,33 @@ int main(int argc, char** argv)
 			/*--------------------------------------------------------------------------------------*/
 			/*for ( i = 0; i < RECEIVE_BUFFER_SIZE; i++ )
 			{
-				printf("%c ", read[i]);
+				printf("%c ", read_buf[i]);
 				if ( ((i+1) % 10) == 0 )
 					putchar('\n');
 			}
 			putchar('\n');
 			for ( i = 0; i < RECEIVE_BUFFER_SIZE; i++ )
 			{
-				printf("%4d ", read[i]);
+				printf("%4d ", read_buf[i]);
 				if ( ((i+1) % 10) == 0 )
 					putchar('\n');
 			}
 			putchar('\n');*/
 			/*--------------------------------------------------------------------------------------*/
 
+
 			int tokens_amount = 0;
 			int i;
-			for ( i = 0; read[i]; i++ )
-				if ( read[i] == '\n' )
+			for ( i = 0; read_buf[i]; i++ )
+				if ( read_buf[i] == '\n' )
 					tokens_amount++;
 
-			/*printf("\ntokens_amount = %d\n", tokens_amount);*/
 
 			int j = 0;
 			char* read_tokens[tokens_amount > 0 ? tokens_amount : 1];
 			if ( tokens_amount > 0 )
 			{
-				char* istr = strtok(read, "\n");
+				char* istr = strtok(read_buf, "\n");
 
 				while ( istr != NULL )
 				{
@@ -154,17 +154,14 @@ int main(int argc, char** argv)
 				}
 			}
 
-			/*printf("\nj = %d\n", j);*/
 
 			/*
 			for ( i = 0; i < bytes_received; i++ )
-				if ( read[i] == '\n' )
+				if ( read_buf[i] == '\n' )
 					break;
 
 			if ( i < RECEIVE_BUFFER_SIZE )
-				read[i] = '\0';
-
-			printf("\nread = %s\n", read);
+				read_buf[i] = '\0';
 			*/
 
 
@@ -183,50 +180,64 @@ int main(int argc, char** argv)
 
 		if ( FD_ISSET(0, &reads) )
 		{
-			char read[SEND_BUFFER_SIZE] = { 0 };
+			char send_buf[SEND_BUFFER_SIZE] = { 0 };
 
 			int mes_len = -1;
-			if ( (mes_len = get_str(read, SEND_BUFFER_SIZE)) < 1 )
+			if ( (mes_len = get_str(send_buf, SEND_BUFFER_SIZE)) < 1 )
 			{
 				if ( mes_len == EXIT_CODE )
 					break;
-				/*printf("\nmes_len = %d\n", mes_len);*/
+
 				continue;
 			}
 
-			if ( read[0] == '\n')
-				continue;
 
-			/*printf("\nread = %s\nmes_len = %d\n", read, mes_len);*/
-
-			/*int k;
-			for ( k = 0; k < 20; k++ )
+			if ( send_buf[0] == '\n')
 			{
-				printf("%3d ", read[k]);
+				send_buf[0] = '\0';
+				continue;
+			}
+
+			/*
+			for ( int k = 0; k < 20; k++ )
+			{
+				printf("%3d ", send_buf[k]);
 				if ( ((k+1) % 10) == 0 )
 					putchar('\n');
 			}
 			*/
 
-			int size = mes_len+1;
+			int send_size = mes_len + 1;
+			delete_spaces(send_buf, &send_size);
+			mes_len = strlen(send_buf);
 
-			delete_spaces(read, &size);
-			mes_len = strlen(read);
-
-			int bytes_sent = send(socket_peer, read, mes_len, 0);
-
-			if ( read[mes_len-1] == '\n' )
+			/*
+			for ( int k = 0; k < 20; k++ )
 			{
-				read[mes_len-1] = '\0';
-				size--;
+				printf("%3d ", send_buf[k]);
+				if ( ((k+1) % 10) == 0 )
+					putchar('\n');
 			}
+			*/
 
-			chl_insert(&chl_list, read, size);
-			int chl_size = chl_get_size(chl_list);
-
-			if ( chl_size > HISTORY_COMMANDS_LIST_SIZE )
+			int bytes_sent = 0;
+			if ( mes_len > 1 )
 			{
-				chl_delete(&chl_list, chl_list->number);
+				bytes_sent = send(socket_peer, send_buf, mes_len, 0);
+
+				if ( send_buf[mes_len-1] == '\n' )
+				{
+					send_buf[mes_len-1] = '\0';
+					send_size--;
+				}
+
+				chl_insert(&chl_list, send_buf, send_size);
+				int chl_size = chl_get_size(chl_list);
+
+				if ( chl_size > HISTORY_COMMANDS_LIST_SIZE )
+				{
+					chl_delete(&chl_list, chl_list->number);
+				}
 			}
 		}
 	}

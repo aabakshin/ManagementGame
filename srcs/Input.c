@@ -108,11 +108,16 @@ int get_str(char* buffer, int buffer_size)
 		{
 			if ( read_sym[0] == CTRL_C )
 			{
-				/* завершение программы */
-				return -1;
+				/* игнорировать сигнал SIGINT */
+				break;
 			}
 
-			if ( (read_sym[0] == CTRL_D) || (read_sym[0] == '\n') )
+			if ( read_sym[0] == CTRL_D )
+			{
+				return -2; // EXIT_CODE
+			}
+
+			if ( (read_sym[0] == '\t') || (read_sym[0] == '\n') )
 			{
 				handle_newline_key(buffer, buffer_size, &i, &left_offset, read_sym);
 				break;

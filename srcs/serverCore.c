@@ -1394,8 +1394,15 @@ int server_run(Banker* banker, int ls)
 				return 1;
 			}
 			
-			getnameinfo((struct sockaddr*) &client_address, client_address_len, address_buffer, sizeof(address_buffer), service_buffer, sizeof(service_buffer), NI_NUMERICHOST | NI_NUMERICSERV );
-			
+			getnameinfo((struct sockaddr*) &client_address, 
+										client_address_len, 
+										 address_buffer,
+									  sizeof(address_buffer),
+										 service_buffer,
+									  sizeof(service_buffer),
+									    NI_NUMERICHOST | NI_NUMERICSERV );
+
+			/////////////////////////////////////////////////////////////
 			int addr_len = strlen(address_buffer);
 			int i, j;
 			i = addr_len;
@@ -1404,20 +1411,27 @@ int server_run(Banker* banker, int ls)
 			for ( j = 0; service_buffer[j]; j++, i++ )
 				address_buffer[i] = service_buffer[j];
 			address_buffer[i] = '\0';
+			/////////////////////////////////////////////////////////////
+
 
 			printf("New client (%s) is connected.\n", address_buffer);
 			
 			if ( banker->game_started )
 			{
+				// поместить в функцию
+				/////////////////////////////////////////////////////////////
 				const char* message = "*INFO_MESSAGE|GAME_ALREADY_STARTED\n";
 				int msg_len = strlen(message);
 				send_data(cs, message, msg_len, address_buffer);				
 				
 				close(cs);
 				printf("Lost connection from (%s)\n", address_buffer);
+				/////////////////////////////////////////////////////////////
 			}
 			else
 			{
+				// get_new_player_index()
+				/////////////////////////////////////////////////////////////
 				int i;
 				for ( i = 0; i < MAX_PLAYERS; i++ )
 				{
@@ -1427,24 +1441,31 @@ int server_run(Banker* banker, int ls)
 				 
 				if ( i >= MAX_PLAYERS )
 				{
+					// поместить в функцию
+					/////////////////////////////////////////////////////////////
 					const char* message = "*INFO_MESSAGE|SERVER_FULL\n";
 					int msg_len = strlen(message);
 					send_data(cs, message, msg_len, address_buffer);
 					
 					close(cs);
 					printf("Lost connection from (%s)\n", address_buffer);
+					/////////////////////////////////////////////////////////////
 				}
+				/////////////////////////////////////////////////////////////
 				else
 				{
 					Player* p = malloc(sizeof(struct Player));
 					if ( p == NULL )
 					{
+						// поместить в функцию
+						/////////////////////////////////////////////////////////////
 						const char* message = "*INFO_MESSAGE|OUT_OF_MEMORY\n";
 						int msg_len = strlen(message);
 						send_data(cs, message, msg_len, address_buffer);
 						
 						close(cs);
 						printf("Lost connection from (%s)\n", address_buffer);
+						/////////////////////////////////////////////////////////////
 					}
 					else
 					{
@@ -1478,6 +1499,9 @@ int server_run(Banker* banker, int ls)
 						int lp = banker->lobby_players;
 						int max_pl = MAX_PLAYERS;
 
+
+						// поместить в функцию
+						/////////////////////////////////////////////////////////////
 						char* mes_tokens[3];
 						int tokns_amnt = 3;
 
@@ -1490,13 +1514,18 @@ int server_run(Banker* banker, int ls)
 						char max_pl_buf[10];
 						itoa(max_pl, max_pl_buf, 9);
 						mes_tokens[2] = max_pl_buf;
+						//////////////////////////////////////////////////////////////
 
+
+						// поместить в функцию
+						/////////////////////////////////////////////////////////////
 						for ( i = 0; i < MAX_PLAYERS; i++ )
 						{
 							Player* p = banker->pl_array[i];
 							if ( p != NULL )
 								send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
 						}
+						/////////////////////////////////////////////////////////////
 					}
 				}
 			}
@@ -1529,15 +1558,14 @@ int server_run(Banker* banker, int ls)
 						
 						
 						int size = strlen(read_buf)+1;
-	
 						delete_spaces(read_buf, &size);
+
 
 						if ( !banker->game_started )
 						{
 							if ( !p->is_ident_message_recv )
 							{
 								if ( is_correct_identity_msg(read_buf) )
-								//if ( (strcmp(read_buf, "./bot_mg4") == 0) || (strcmp(read_buf, "./bot_mg4\n") == 0) )
 									p->is_bot = 1;
 								else
 									p->is_bot = 0;
