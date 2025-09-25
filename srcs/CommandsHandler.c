@@ -254,6 +254,7 @@ void prod_command_handler(Banker* b, CommandHandlerParams* chp)
 
 void build_command_handler(Banker* b, CommandHandlerParams* chp)
 {
+	//////////////////////////////////////////////////////////
 	int i;
 	for ( i = 0; i < MAX_PLAYERS; i++ )
 		if ( b->pl_array[i] != NULL )
@@ -262,6 +263,8 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 
 	if ( i >= MAX_PLAYERS )
 		return;
+	//////////////////////////////////////////////////////////
+
 
 	Player* p = b->pl_array[i];
 
@@ -285,12 +288,16 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 		else
 		{
 			BuildList* build_list = p->build_list;
+
 			if ( build_list != NULL )
 			{
 				int list_amount = bl_get_size(build_list);
+				int tokns_amnt = list_amount * 2 + 2;
+				char* mes_tokens[tokns_amnt];
+				
+				for ( int j = 0; j < tokns_amnt; ++j )
+					mes_tokens[j] = NULL;
 
-				char* mes_tokens[list_amount*2+2];
-				int tokns_amnt = list_amount*2+2;
 
 				mes_tokens[0] = "*INFO_MESSAGE|BUILDING_FACTORIES_LIST|";
 
@@ -301,20 +308,29 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 				int i = 2;
 				while ( build_list != NULL )
 				{
-					char bn_buf[10];
-					itoa(build_list->build_number, bn_buf, 9);
-					mes_tokens[i] = bn_buf;
-					i++;
+					mes_tokens[i] = malloc( 10 );
+					itoa(build_list->build_number, mes_tokens[i], 9);
+					++i;
 
-					char tl_buf[10];
-					itoa(build_list->turns_left, tl_buf, 9);
-					mes_tokens[i] = tl_buf;
-					i++;
+
+					mes_tokens[i] = malloc( 10 );
+					itoa(build_list->turns_left, mes_tokens[i], 9);
+					++i;
+
 
 					build_list = build_list->next;
 				}
 
 				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+
+				for ( int j = 2; j < tokns_amnt; ++j )
+				{
+					if ( mes_tokens[j] != NULL )
+					{
+						free( mes_tokens[j] );
+						mes_tokens[j] = NULL;
+					}
+				}
 			}
 			else
 			{

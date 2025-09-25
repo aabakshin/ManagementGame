@@ -6,6 +6,8 @@
 #include "../includes/BuildList.h"
 #include <stdlib.h>
 
+extern int printf(const char*, ...);
+
 /* Пуст контейнер */
 int bl_is_empty(BuildList* node)
 {
@@ -20,9 +22,7 @@ int bl_insert(BuildList** nodePtr)
 
 	if ( *nodePtr == NULL )
 	{
-		BuildList* newPtr = NULL;
-
-		newPtr = malloc(sizeof(struct BuildList));
+		BuildList* newPtr = malloc(sizeof(struct BuildList));
 		if ( newPtr == NULL )
 			return 0;
 
@@ -37,10 +37,11 @@ int bl_insert(BuildList** nodePtr)
 		int cur_num = (*nodePtr)->build_number;
 		BuildList* prevPtr = NULL;
 		BuildList* curPtr = *nodePtr;
-		BuildList* newPtr = NULL;
-		newPtr = malloc(sizeof(struct BuildList));
+
+		BuildList* newPtr = malloc(sizeof(struct BuildList));
 		if ( newPtr == NULL )
 			return 0;
+
 		newPtr->turns_left = TURNS_TO_BUILD;
 		newPtr->next = NULL;
 
@@ -50,7 +51,7 @@ int bl_insert(BuildList** nodePtr)
 			curPtr = curPtr->next;
 			cur_num++;
 		}
-		
+
 		newPtr->prev = prevPtr;
 		newPtr->build_number = cur_num;
 		prevPtr->next = newPtr;
@@ -59,11 +60,10 @@ int bl_insert(BuildList** nodePtr)
 	return 1;
 }
 
-/* 
- * Удаление последнего эл-та из контейнера 
+/*
+ * Удаление последнего эл-та из контейнера
  * При установке параметра clear при вызове функции bl_clear очищается список с первого эл-та.
  * Если нужно удалить конкретный эл-т этот параметр должен быть равен 0
- * 
  */
 int bl_delete(BuildList** nodePtr, int clear)
 {
@@ -72,14 +72,14 @@ int bl_delete(BuildList** nodePtr, int clear)
 
 	if ( *nodePtr == NULL )
 		return 0;
-	
+
 	BuildList* curPtr = *nodePtr;
-	
+
 	if ( !clear )
 	{
 		while ( (curPtr != NULL) && (curPtr->turns_left != 0) )
 			curPtr = curPtr->next;
-	
+
 		if ( curPtr == NULL )
 			return 0;
 	}
@@ -87,14 +87,14 @@ int bl_delete(BuildList** nodePtr, int clear)
 	int deleteValue = curPtr->build_number;
 
 	if ( curPtr->prev == NULL )
-	{			
+	{
 		if ( curPtr->next == NULL )
 		{
 			free(curPtr);
 			*nodePtr = NULL;
 			return deleteValue;
 		}
-		
+
 		curPtr->next->prev = NULL;
 		*nodePtr = curPtr->next;
 		curPtr->next = NULL;
@@ -102,7 +102,7 @@ int bl_delete(BuildList** nodePtr, int clear)
 
 		return deleteValue;
 	}
-	
+
 	if ( curPtr->next == NULL )
 	{
 		curPtr->prev->next = NULL;
@@ -117,7 +117,7 @@ int bl_delete(BuildList** nodePtr, int clear)
 		curPtr->prev = NULL;
 		free(curPtr);
 	}
-	
+
 	return deleteValue;
 }
 
@@ -130,14 +130,14 @@ int bl_clear(BuildList** nodePtr)
 
 	if ( *nodePtr == NULL )
 		return 0;
-	
+
 	BuildList* node = *nodePtr;
 	int size = bl_get_size(node);
-	
+
 	/*int result;*/
 	int i;
 	for ( i = 1; i <= size; i++ )
-			bl_delete(nodePtr, 1);
+		bl_delete(nodePtr, 1);
 		/*if ( (result = bl_delete(nodePtr, (*nodePtr)->build_number)) )
 			printf("Deleted node #%d\n", result);
 		else
@@ -165,6 +165,24 @@ int bl_get_size(BuildList* node)
 	}
 
 	return size;
+}
+
+/* Выводит содержимое списка на экран */
+void bl_print(BuildList* node)
+{
+	if ( node == NULL )
+	{
+		printf("%s", "BuildList is empty\n");
+		return;
+	}
+
+	printf("%s", "List is: ");
+	while ( node != NULL )
+	{
+		printf("(build_number:%d, turn_left:%d) --> ", node->build_number, node->turns_left);
+		node = node->next;
+	}
+	printf("%s", "NULL\n");
 }
 
 #endif

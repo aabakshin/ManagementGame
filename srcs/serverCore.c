@@ -15,7 +15,7 @@
 enum
 {
 	LISTEN_QUEUE_LEN			=						  5,
-	START_MONEY					=					  10000,
+	START_MONEY					=					 100000,
 	START_SOURCES				=						  4,
 	START_PRODUCTS				=					      2,
 	START_FACTORIES				=					      2,
@@ -64,7 +64,7 @@ const char* bot_identity_messages[] = {
 				NULL
 };
 
-int is_correct_identity_msg(const char* identity_msg)
+static int is_correct_identity_msg(const char* identity_msg)
 {
 	for ( int i = 0; bot_identity_messages[i] != NULL; ++i )
 		if ( strcmp(identity_msg, bot_identity_messages[i]) == 0 )
@@ -419,8 +419,8 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 static int report_on_turn(Banker* banker, AuctionReport* ar, MarketRequest* new_source_request, MarketRequest* new_prod_request)
 {
 	if ( 
-			(banker == NULL)	||
-			(ar == NULL)
+			( banker == NULL )	||
+			( ar == NULL )
 		)
 		return 0;
 
@@ -780,6 +780,9 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 					const char* factory_built_mes = "*INFO_MESSAGE|FACTORY_BUILT\n";
 					int f_b_len = strlen(factory_built_mes);
 					send_data(p->fd, factory_built_mes, f_b_len, p->ip);
+
+					list = p->build_list;
+					continue;
 				}
 
 				list = list->next;
@@ -795,7 +798,12 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 /* очистка сведений о покинувшем игру игроке */
 int player_left_game(Banker* banker, Player* p, int i, fd_set* readfds)
 {
-	if ( (banker == NULL) || (p == NULL) || (i < 0) || (readfds == NULL) )
+	if ( 
+						( banker == NULL )			||
+						( p == NULL )				||
+						( i < 0 )					||
+						( readfds == NULL )
+	   )
 		return 0;
 	
 	if ( !banker->game_started)
@@ -853,7 +861,11 @@ static int process_command(ProcessCommandParams* pcp)
 	int tokens_amount = pcp->tokens_amount;
 	
 
-	if ( (command_tokens == NULL) || (*command_tokens == NULL) || (tokens_amount < 1) )
+	if ( 
+					( command_tokens == NULL )			||
+					( *command_tokens == NULL )			||
+					( tokens_amount < 1 )
+	   )
 		return 0;
 		
 
@@ -1582,9 +1594,8 @@ int server_run(Banker* banker, int ls)
 							continue;
 						}	
 						
+
 						/* Обработка данных от игрока, когда игра началась */
-						
-						
 						char* tokens[3] = {
 								NULL,
 								NULL,

@@ -18,12 +18,12 @@ enum
 /* 
  * Автореферентная структура хранит порядковый номер заявки
  * и кол-во оставшихся ходов до появления нового завода
- *
  */
 struct BuildList
 {
 	int build_number; 
 	int turns_left;
+
 	struct BuildList* next;
 	struct BuildList* prev;
 };
@@ -35,5 +35,6 @@ int bl_insert(BuildList** nodePtr);
 int bl_delete(BuildList** nodePtr, int clear);
 int bl_clear(BuildList** nodePtr);
 int bl_get_size(BuildList* node);
+void bl_print(BuildList* node);
 
 #endif
