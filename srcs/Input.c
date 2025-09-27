@@ -5,16 +5,17 @@
 #include "../includes/Input.h"
 #include "../includes/CommandsHistoryList.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-#include <termios.h>
 
+
+extern void* memset(void* s, int c, size_t n);
+extern size_t strlen(const char* s);
 
 
 enum
 {
-			MAX_SYM_CODE_SIZE	=   10,
+			// 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12)
+			MAX_SYM_CODE_SIZE	=   6,
 };
 
 
@@ -48,17 +49,17 @@ extern CommandsHistoryList* chl_list;
 static CommandsHistoryList* cur_pos = NULL;
 
 /* UTF-16LE */
-const char rus_alpha_codes[] = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
+static const char rus_alpha_codes[] = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
 
 
 
 int get_any_key(void)
 {
-	char read_sym[MAX_SYM_CODE_SIZE] = { 0 };
+	char read_sym[MAX_SYM_CODE_SIZE+1] = { 0 };
 
 	while ( 1 )
 	{
-		int rc = read(0, read_sym, 6);	/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		int rc = read(0, read_sym, MAX_SYM_CODE_SIZE);
 
 		if ( rc < 1 )
 			continue;
@@ -70,7 +71,6 @@ int get_any_key(void)
 }
 
 /*
- * Обработка терминального ввода в ручном режиме при помощи termios
  * Реализация некоторых возможностей терминала(backspace, удаление последнего слова, del, стрелка влево-вправо)
  * Получение строки из станд.потока ввода через низкоуровненые функции и
  * обработка содержимого с учётом использования многобайтных символов
@@ -84,37 +84,34 @@ int get_str(char* buffer, int buffer_size)
 
 	memset(buffer, 0, buffer_size);
 
-	/* буфер под прочитанный символ */
+	// буфер под прочитанный символ
 	char read_sym[MAX_SYM_CODE_SIZE] = { 0 };
 
-	/* текущая длина buffer */
+	// текущая длина buffer
 	int i = 0;
 
-	/* смещение слева относительно конца строки */
+	// смещение слева относительно конца строки
 	int left_offset = 0;
 
 	while ( 1 )
 	{
-		int rc = read(0, read_sym, 6);	/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		int rc = read(0, read_sym, MAX_SYM_CODE_SIZE);
 
 		if ( rc < 1 )
 			continue;
-
-#ifdef DEBUG_INPUT
-		show_dec_sym(read_sym);
-#endif
 
 		if ( rc == 1 )
 		{
 			if ( read_sym[0] == CTRL_C )
 			{
-				/* игнорировать сигнал SIGINT */
+				// игнорировать сигнал SIGINT
 				break;
 			}
 
 			if ( read_sym[0] == CTRL_D )
 			{
-				return -2; // EXIT_CODE
+				// EXIT_CODE
+				return -2;
 			}
 
 			if ( (read_sym[0] == '\t') || (read_sym[0] == '\n') )
@@ -139,7 +136,7 @@ int get_str(char* buffer, int buffer_size)
 				continue;
 			}
 
-			/* обработка 1-байтного ascii символа */
+			// обработка 1-байтного ascii символа
 			if ( !handle_alphabet_key(buffer, buffer_size, &i, &left_offset, read_sym) )
 			{
 				break;
@@ -151,11 +148,7 @@ int get_str(char* buffer, int buffer_size)
 		}
 		else if ( rc == 2 )
 		{
-			/* Обработка 2-байтных значений кириллицы */
-
-			/* вывод кода текущего введённого символа */
-			/*printf("\n--> %04x %04x\n", read_sym[0], read_sym[1]);
-			fflush(stdout);*/
+			// Обработка 2-байтных значений кириллицы
 
 			if ( is_cyrillic_sym(read_sym) )
 			{
@@ -171,7 +164,7 @@ int get_str(char* buffer, int buffer_size)
 		}
 		else if ( rc == 3 )
 		{
-			/* обработка клавиши ARROW_LEFT с 3-байтным кодом */
+			// обработка клавиши ARROW_LEFT с 3-байтным кодом
 			if	(
 						( read_sym[0] == 0x1b )		&&			/* 27 */
 						( read_sym[1] == 0x5b )		&&			/* 91 */
@@ -181,7 +174,7 @@ int get_str(char* buffer, int buffer_size)
 				handle_arrow_left_key(buffer, buffer_size, &i, &left_offset, read_sym);
 			}
 
-			/* обработка клавиши ARROW_RIGHT с 3-байтным кодом */
+			// обработка клавиши ARROW_RIGHT с 3-байтным кодом
 			else if (
 							( read_sym[0] == 0x1b )		&&		/* 27 */
 							( read_sym[1] == 0x5b )		&&		/* 91 */
@@ -191,7 +184,7 @@ int get_str(char* buffer, int buffer_size)
 				handle_arrow_right_key(buffer, buffer_size, &i, &left_offset, read_sym);
 			}
 
-			/* обработка клавиши ARROW_UP с 3-байтным кодом */
+			// обработка клавиши ARROW_UP с 3-байтным кодом
 			else if (
 							( read_sym[0] == 0x1b )		&&		/* 27 */
 							( read_sym[1] == 0x5b )		&&		/* 91 */
@@ -201,7 +194,7 @@ int get_str(char* buffer, int buffer_size)
 				handle_arrow_up_key(buffer, buffer_size, &i, &left_offset, read_sym);
 			}
 
-			/* обработка клавиши ARROW_DOWN с 3-байтным кодом */
+			// обработка клавиши ARROW_DOWN с 3-байтным кодом
 			else if (
 							( read_sym[0] == 0x1b )		&&		/* 27 */
 							( read_sym[1] == 0x5b )		&&		/* 91 */
@@ -215,7 +208,7 @@ int get_str(char* buffer, int buffer_size)
 		}
 		else if ( rc == 4 )
 		{
-			/* обработка клавиши DEL с 4-х байтным кодом */
+			// обработка клавиши DEL с 4-х байтным кодом
 			if
 				(
 						( read_sym[0] == 0x1b )		&&		/* 27 */
@@ -233,7 +226,7 @@ int get_str(char* buffer, int buffer_size)
 		memset(read_sym, 0, sizeof(read_sym));
 	}
 
-	/* длина строки buffer в байтах */
+	// длина строки buffer в байтах
 	return i;
 }
 
@@ -259,7 +252,6 @@ static int is_cyrillic_sym(char* ch_buf)
 	int j;
 	for ( j = 0; j < len/2; j++ )
 	{
-		/* printf("[%3d] %3d %3d\n", j, rus_alpha_codes[j*2], rus_alpha_codes[j*2+1]); */
 		if ( ch_buf[0] == rus_alpha_codes[j*2] )
 		{
 			if ( ch_buf[1] == rus_alpha_codes[j*2+1] )
@@ -281,8 +273,6 @@ static int ascii_cnt_str(const char* buffer, int buffer_size)
 
 	int counter = 0;
 
-	/*print_buffer(buffer, buffer_size);*/
-
 	int i;
 	for ( i = 0; buffer[i]; i++ )
 	{
@@ -298,9 +288,6 @@ static int handle_alphabet_key(char* buffer, int buffer_size, int* i, int* left_
 	int cyril_flag = 0;
 	if ( is_cyrillic_sym(ch_buf) )
 		cyril_flag = 1;
-
-	/*printf("\ncyril_flag = %d\n", cyril_flag);
-	fflush(stdout);*/
 
 	int save_pos = 0;
 
@@ -370,15 +357,9 @@ static int handle_alphabet_key(char* buffer, int buffer_size, int* i, int* left_
 
 	if ( *left_offset > 0 )
 	{
-		/*printf("\n*left_offset = %d\n"
-				"*i = %d\n"
-				"save_pos = %d\n", *left_offset, *i, save_pos);
-		fflush(stdout);*/
-
 		int last_ch_pos = *i-1;
 
-		/* вывод содержимого buffer начиная с вставленного элемента */
-
+		// вывод содержимого buffer начиная с вставленного элемента
 		for ( int cur_pos = save_pos; cur_pos <= last_ch_pos; cur_pos++ )
 		{
 			putchar(buffer[cur_pos]);
@@ -393,17 +374,7 @@ static int handle_alphabet_key(char* buffer, int buffer_size, int* i, int* left_
 		int total_cnt = ascii_cnt + cyril_cnt;
 
 
-		/*printf("\nlen_in_bytes = %d\n"
-				"ascii_cnt = %d\n"
-				"cyril_cnt = %d\n"
-				"total_cnt = %d\n"
-				"save_pos = %d\n"
-				"*left_offset = %d\n", len_in_bytes, ascii_cnt, cyril_cnt, total_cnt, save_pos, *left_offset);
-		fflush(stdout);*/
-
-
-		/* возвращение курсора в прежнее положение после вставки очереднего символа */
-
+		// возвращение курсора в прежнее положение после вставки очереднего символа
 		int prev_left_offset = *left_offset;
 		int x = 0;
 		while ( x < total_cnt )
@@ -430,9 +401,6 @@ static int handle_alphabet_key(char* buffer, int buffer_size, int* i, int* left_
 		if ( cyril_flag )
 			write(1, &ch_buf[1], 1);
 	}
-
-	/* check buffer memory */
-	/*print_buffer(buffer, buffer_size);*/
 
 	return 1;
 }
@@ -478,8 +446,6 @@ static int handle_ctrlw_key(char* buffer, int buffer_size, int* i, int* left_off
 		int cyril_cnt = (buf_len - ascii_cnt) / 2;
 		int buf_cnt = ascii_cnt + cyril_cnt;
 
-		/*printf("\ndel_bytes = %d\n"
-					"buf_cnt = %d\n", del_bytes, buf_cnt);*/
 
 		for ( k = 1; k <= buf_cnt; k++ )
 		{
@@ -496,8 +462,6 @@ static int handle_ctrlw_key(char* buffer, int buffer_size, int* i, int* left_off
 			x++;
 		}
 		buf[x] = '\0';
-
-		/* printf("\nbuf = %s\n", buf); */
 
 		buf_len = strlen(buf);
 		ascii_cnt = ascii_cnt_str(buf, strlen(buf)+1);
@@ -526,8 +490,6 @@ static int handle_ctrlw_key(char* buffer, int buffer_size, int* i, int* left_off
 
 		*i -= del_bytes;
 	}
-
-	/*print_buffer(buffer, buffer_size);*/
 
 	return 1;
 }
@@ -558,7 +520,8 @@ static int handle_backspace_key(char* buffer, int buffer_size, int* i, int* left
 	if ( (*left_offset >= 0) && (*left_offset < *i) )
 	{
 		char buf[buffer_size];
-		int is_cyril_flag = 0;	// проверка, является ли удаляемый символ кириллическим
+		// проверка, является ли удаляемый символ кириллическим
+		int is_cyril_flag = 0;
 		int last_ch_pos = *i - 1;
 
 		if ( *left_offset <= 0 )
@@ -643,39 +606,15 @@ static int handle_backspace_key(char* buffer, int buffer_size, int* i, int* left
 			if ( is_cyril_flag )
 				(*i)--;
 		}
-
-		/*
-		printf("\nis_cyril_flag = %d\n"
-				"*i = %d\n"
-				"buf_len = %d\n"
-				"ascii_cnt = %d\n"
-				"cyril_cnt = %d\n"
-				"total_cnt = %d\n"
-				"cur_pos = %d\n"
-				"*left_offset = %d\n", is_cyril_flag, *i, buf_len, ascii_cnt, cyril_cnt, total_cnt, cur_pos, *left_offset);
-		fflush(stdout);
-		*/
 	}
-
-	/* check buffer memory */
-
-	/*printf("\nbuffer:\n");
-	for ( int x = 0; x < buffer_size; x++ )
-	{
-		printf("%4d ", buffer[x]);
-		if ( ((x+1) % 10) == 0 )
-			putchar('\n');
-	}
-	putchar('\n');
-	fflush(stdout);*/
-
 
 	return 1;
 }
 
 static int handle_arrow_left_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf)
 {
-	if ( *left_offset < *i )	/* если текущая позиция буфера не в начале строки - перемещать курсор влево */
+	// если текущая позиция буфера не в начале строки - перемещать курсор влево
+	if ( *left_offset < *i )
 	{
 		putchar('\b');
 		fflush(stdout);
@@ -714,7 +653,8 @@ static int handle_arrow_left_key(char* buffer, int buffer_size, int* i, int* lef
 
 static int handle_arrow_right_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf)
 {
-	if ( *left_offset > 0 )		/* если не конец строки - перемещать курсор вправо */
+	// если не конец строки - перемещать курсор вправо
+	if ( *left_offset > 0 )
 	{
 		int x = *i - *left_offset;
 
@@ -834,9 +774,11 @@ static int handle_arrow_down_key(char* buffer, int buffer_size, int* i, int* lef
 
 static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf)
 {
-	if ( *left_offset > 0 )		/* если не конец строки */
+	// если не конец строки
+	if ( *left_offset > 0 )
 	{
-		int is_cyril_flag = 0;	/* проверка, является ли удаляемый символ кириллическим */
+		// проверка, является ли удаляемый символ кириллическим
+		int is_cyril_flag = 0;
 
 		char buf[buffer_size];
 		int last_ch_pos = *i - 1;
@@ -855,8 +797,6 @@ static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offse
 			{
 				is_cyril_flag = 1;
 			}
-
-			/*printf("\nis_cyril_flag = %d\n", is_cyril_flag);*/
 		}
 
 		int k = cur_pos + 1;
@@ -872,7 +812,6 @@ static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offse
 		}
 		buf[x] = '\0';
 
-		/* printf("\nbuf = %s\n", buf); */
 
 		x = 0;
 		for ( k = cur_pos; buf[x]; x++, k++ )
@@ -908,17 +847,6 @@ static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offse
 
 		if ( is_cyril_flag )
 			(*left_offset)--;
-
-		/*
-		printf("\nbuf = %s\n"
-				"buf_len = %d\n"
-				"ascii_cnt = %d\n"
-				"cyril_cnt = %d\n"
-				"total_cnt = %d\n"
-				"*i = %d\n"
-				"*left_offset = %d\n", buf, buf_len, ascii_cnt, cyril_cnt, total_cnt, *i, *left_offset);
-		fflush(stdout);
-		*/
 	}
 
 	return 1;
