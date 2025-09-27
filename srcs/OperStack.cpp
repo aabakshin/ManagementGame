@@ -7,9 +7,13 @@
 #define __CPP_FILE__
 #endif
 
+
 #include "../includes/OperStack.hpp"
-#include <cstdlib>
 #include <cstdio>
+
+
+extern void free(void* ptr);
+
 
 void op_push(OperStack** stack_ptr, const char* data, int data_size)
 {
@@ -18,7 +22,7 @@ void op_push(OperStack** stack_ptr, const char* data, int data_size)
 		fprintf(stderr, "%s", "\n[OperStack]: ch_push() stack_ptr is NULL\n");
 		return;
 	}
-	
+
 	OperStack* newPtr = NULL;
 	newPtr = new OperStack;
 	if ( !newPtr )
@@ -26,12 +30,15 @@ void op_push(OperStack** stack_ptr, const char* data, int data_size)
 		fprintf(stderr, "%s", "\n[OperStack]: ch_push() newPtr memory error\n");
 		return;
 	}
+
 	newPtr->data = new char[data_size];
 	if ( !newPtr->data )
 	{
+		delete newPtr;
 		fprintf(stderr, "%s", "\n[OperStack]: ch_push() newPtr->data memory error\n");
 		return;
 	}
+
 	int i;
 	for ( i = 0; i < data_size-1; i++ )
 		newPtr->data[i] = data[i];
@@ -44,7 +51,7 @@ void op_push(OperStack** stack_ptr, const char* data, int data_size)
 		*stack_ptr = newPtr;
 		return;
 	}
-	
+
 	newPtr->next = *stack_ptr;
 	*stack_ptr = newPtr;
 }
@@ -53,7 +60,7 @@ char* op_pop(OperStack** stack_ptr)
 {
 	if ( (stack_ptr == NULL) || (*stack_ptr == NULL) )
 		return NULL;
-	
+
 	OperStack* tempPtr = NULL;
 	char* popValue = (*stack_ptr)->data;
 	tempPtr = *stack_ptr;
@@ -67,13 +74,14 @@ void op_print(OperStack* stack)
 {
 	if ( stack == NULL )
 		return;
-	
+
 	putchar('\n');
 	while ( stack != NULL )
 	{
 		printf("%s --> ", stack->data);
 		stack = stack->next;
 	}
+
 	printf("%s", "NULL\n");
 }
 

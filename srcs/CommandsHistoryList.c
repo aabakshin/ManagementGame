@@ -5,8 +5,11 @@
 
 #include "../includes/CommandsHistoryList.h"
 #include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+// #include <string.h>
+
+
+extern int printf(const char*, ...);
+
 
 int chl_print(CommandsHistoryList* node)
 {
@@ -48,10 +51,13 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 			return 0;
 
 		newPtr->number = 1;
-		
+
 		newPtr->command = malloc(sizeof(char) * str_size);
 		if ( newPtr->command == NULL )
+		{
+			free(newPtr);
 			return 0;
+		}
 		newPtr->command_size = str_size;
 
 		int i;
@@ -67,7 +73,7 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 	{
 		int cur_num = (*nodePtr)->number;
 		CommandsHistoryList* curPtr = *nodePtr;
-		
+
 		/* Убрать дубликаты */
 		/*int k = chl_get_size(*nodePtr);
 		int i;
@@ -87,10 +93,13 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 
 		newPtr->command = malloc(sizeof(char) * str_size);
 		if ( newPtr->command == NULL )
+		{
+			free(newPtr);
 			return 0;
+		}
 
 		newPtr->command_size = str_size;
-		
+
 		int i;
 		for ( i = 0; i < str_size-1; i++ )
 			newPtr->command[i] = str[i];
@@ -104,7 +113,7 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 			cur_num++;
 			curPtr = curPtr->next;
 		}
-		
+
 		cur_num++;
 		newPtr->prev = curPtr;
 		newPtr->number = cur_num;
@@ -121,11 +130,11 @@ int chl_delete(CommandsHistoryList** nodePtr, int num)
 
 	if ( *nodePtr == NULL )
 		return 0;
-	
+
 	CommandsHistoryList* curPtr = *nodePtr;
-	
+
 	if ( curPtr->prev == NULL )
-	{	
+	{
 		int deleteValue = curPtr->number;
 
 		if ( curPtr->command != NULL )
@@ -133,7 +142,7 @@ int chl_delete(CommandsHistoryList** nodePtr, int num)
 		free(curPtr);
 		return deleteValue;
 	}
-	
+
 	while ( curPtr->number != num )
 	{
 		if ( curPtr->next->number == (*nodePtr)->number )
@@ -157,14 +166,14 @@ int chl_delete(CommandsHistoryList** nodePtr, int num)
 			curPtr->prev->next = NULL;
 			curPtr->prev->prev = NULL;
 		}
-		
+
 		if ( curPtr->command != NULL )
 			free(curPtr->command);
 		free(curPtr);
 
 		return deleteValue;
 	}
-	
+
 	if ( deleteValue == (*nodePtr)->number )
 		*nodePtr = curPtr->next;
 
@@ -175,7 +184,7 @@ int chl_delete(CommandsHistoryList** nodePtr, int num)
 	if ( curPtr->command != NULL )
 		free(curPtr->command);
 	free(curPtr);
-	
+
 	return deleteValue;
 }
 
@@ -186,10 +195,10 @@ int chl_clear(CommandsHistoryList** nodePtr)
 
 	if ( *nodePtr == NULL )
 		return 0;
-	
+
 	CommandsHistoryList* node = *nodePtr;
 	int size = chl_get_size(node);
-	
+
 	/*int result;*/
 	int i;
 	for ( i = 1; i <= size; i++ )
@@ -210,7 +219,7 @@ int chl_get_size(CommandsHistoryList* node)
 {
 	if ( node == NULL )
 		return 0;
-	
+
 	int first_num = node->number;
 	int size = 1;
 	while ( (node->next != NULL) && (node->next->number != first_num) )

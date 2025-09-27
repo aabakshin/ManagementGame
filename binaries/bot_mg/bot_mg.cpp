@@ -38,10 +38,10 @@ int main(int argc, char** argv)
 		fprintf(stderr, "usage: ./bot_mg <hostname> <port> <script_filename>\n");
 		return 1;
 	}
-	
+
 	mi_init(&main_info);
 	main_info.pid = getpid();
-	
+
 	FILE* fd;
 	if ( (fd = fopen(argv[3], "r")) == NULL )
 	{
@@ -58,19 +58,19 @@ int main(int argc, char** argv)
 	ll_print(lexem_list);
 
 	fclose(fd);
-	
+
 	/* Cинтаксический анализ */
-	
+
 	SyntaxAnalyzer sa;
-	PolizItem* operators_list = sa.Run(&lexem_list);																		
+	PolizItem* operators_list = sa.Run(&lexem_list);
 	PolizItem* op_list_ptr = operators_list;
 
 	label_print(labels_list);
 	pi_print(operators_list);
 	pi_print(vars_list);
-	
+
 	ll_clear(&lexem_list, 1);
-	
+
 
 
 	/*pi_clear(&operators_list, 1);
@@ -78,15 +78,13 @@ int main(int argc, char** argv)
 	label_clear(&labels_list, 1);
 
 	return 0;*/
-	
 
-	/* Установка соединения */
 
 	int socket_peer = bot_connect(argv[1], argv[2]);
 	if ( socket_peer == -1 )
 	{
-		fprintf(stderr, "%s", "An error has occured while executing initialization procedure.\n");	
-	
+		fprintf(stderr, "%s", "An error has occured while executing initialization procedure.\n");
+
 		mi_clear(&main_info);
 		pi_clear(&operators_list, 1);
 		pi_clear(&vars_list, 1);
@@ -96,7 +94,7 @@ int main(int argc, char** argv)
 	}
 	main_info.fd = socket_peer;
 
-	
+
 	char id_buf[SEND_BUFFER_SIZE];
 	char argc_buf[10];
 	itoa(argc, argc_buf, 9);
@@ -115,7 +113,7 @@ int main(int argc, char** argv)
 
 
 	/* Интерпретация сценария */
-	
+
 	PolizItem* stack = NULL;
 
 	struct timeval tv;
@@ -134,12 +132,13 @@ int main(int argc, char** argv)
 			for (x = 1; x <= vars_size; x++ )
 			{
 				PolizVar* var = dynamic_cast<PolizVar*>(vl->p);
-				printf("Variable [%d]:\n"
-					   "- name: %s\n"
-					   "- address: %d\n"
-					   "- value: %d\n"
-					   "------------\n",
-					   x, var->GetVarName(), var->GetVarAddr()->Get(), var->GetVarValue());
+				printf(
+					"Variable [%d]:\n"
+					"- name: %s\n"
+					"- address: %d\n"
+					"- value: %d\n"
+					"------------\n",
+					x, var->GetVarName(), var->GetVarAddr()->Get(), var->GetVarValue());
 
 				vl = vl->next;
 			}
@@ -153,7 +152,7 @@ int main(int argc, char** argv)
 		fd_set reads;
 		FD_ZERO(&reads);
 		FD_SET(socket_peer, &reads);
-		
+
 		int res = -1;
 		if ( (res = select(socket_peer+1, &reads, 0, 0, &tv)) < 0 )
 		{
@@ -162,7 +161,7 @@ int main(int argc, char** argv)
 				fprintf(stderr, "%s", "Got some signal.\n");
 				continue;
 			}
-			
+
 			fprintf(stderr, "select() failed. (errno code = %d)\n", errno);
 			continue;
 		}
@@ -176,7 +175,7 @@ int main(int argc, char** argv)
 				fprintf(stderr, "%s\n", "Connection closed by peer.");
 				break;
 			}
-			
+
 
 			/*--------------------------------------------------------------------------------------*/
 			/*for ( i = 0; i < RECEIVE_BUFFER_SIZE; i++ )
@@ -194,15 +193,15 @@ int main(int argc, char** argv)
 			}
 			putchar('\n');*/
 			/*--------------------------------------------------------------------------------------*/
-			
+
 			int tokens_amount = 0;
 			int i;
 			for ( i = 0; read[i]; i++ )
 				if ( read[i] == '\n' )
 					tokens_amount++;
-			
+
 			/*printf("\ntokens_amount = %d\n", tokens_amount);*/
-		
+
 			int j = 0;
 			char* read_tokens[tokens_amount > 0 ? tokens_amount : 1];
 			if ( tokens_amount > 0 )
@@ -216,8 +215,8 @@ int main(int argc, char** argv)
 					istr = strtok(NULL, "\n");
 				}
 			}
-			
-			/*printf("\nj = %d\n", j);*/	
+
+			/*printf("\nj = %d\n", j);*/
 
 			/*
 			for ( i = 0; i < bytes_received; i++ )
@@ -226,10 +225,10 @@ int main(int argc, char** argv)
 
 			if ( i < RECEIVE_BUFFER_SIZE )
 				read[i] = '\0';
-			
+
 			printf("\nread = %s\n", read);
 			*/
-			
+
 			for ( j = 0; j < tokens_amount; j++ )
 			{
 				char buffer[RECV_BUFFER_SIZE];
@@ -245,18 +244,18 @@ int main(int argc, char** argv)
 					break;
 				}
 			}
-			
+
 			if ( break_flag )
 				break;
-		} 
-		
+		}
+
 		/*printf("\nmain_info.execute_script = %d\n", main_info.execute_script);*/
 
 		if ( main_info.execute_script )
 			if ( (operators_list != NULL) && (operators_list->p != NULL) )
 				operators_list->p->Evaluate(&stack, &operators_list);
 	}
-	
+
 	/* Очистка всех игровых структур */
 	mi_clear(&main_info);
 	pi_clear(&stack, 1);

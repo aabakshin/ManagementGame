@@ -6,11 +6,12 @@ int main(int argc, char** argv)
 {
 	if ( argc < 2 )
 	{
-		fprintf(stderr, "%s", "Incorrect arguments num.\n"
-							  "Usage: ./<program_name> <port>\n");
+		fprintf(stderr, "%s",
+				"Incorrect arguments num.\n"
+				"Usage: ./<program_name> <port>\n");
 		return 1;
 	}
-	
+
 	printf("%s", "Initialization server banker...\n");
 	Banker server_banker;
 	if ( !banker_init(&server_banker) )
@@ -18,7 +19,7 @@ int main(int argc, char** argv)
 		fprintf(stderr, "%s", "\"server_banker\" address returns NULL pointer\n");
 		return 1;
 	}
-	
+
 	int ls;
 	if ( (ls = server_init(argv[1])) == -1 )
 	{
@@ -26,5 +27,5 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	return server_run(&server_banker, ls);	
-} 
+	return server_run(&server_banker, ls);
+}
