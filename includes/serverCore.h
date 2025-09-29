@@ -2,7 +2,7 @@
  *	Модуль serverCore содержит основные функции для организации работы сервера.
  *	Отвечает за подготовку данных к отправке, проверку игровых событий и реагирование на них.
  *	Передаёт команды и параметры на обработку в модуль CommandsHandler.
- *	Этот модуль вызывается только в модуле server. 
+ *	Этот модуль вызывается только в модуле server.
  */
 
 #ifndef SERVER_CORE_H
@@ -25,8 +25,8 @@ typedef struct ProcessCommandParams ProcessCommandParams;
 
 int server_init( char* port );
 int server_run( Banker* banker, int ls );
-int send_data(int fd, const char* send_buf, int mes_len, const char* ip);
-int send_message(int fd, char** message_tokens, int tokens_amount, const char* ip);
+//int send_data(int fd, const char* send_buf, int mes_len, const char* ip);
+int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip);
 int player_left_game(Banker*, Player*, int, fd_set*);
 int server_end_work(Banker* banker, Player* p, int i, fd_set* readfds);
 

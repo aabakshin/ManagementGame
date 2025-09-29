@@ -21,10 +21,7 @@ enum
 extern int log_info_count;
 
 /* Описана в модуле serverCore */
-extern int send_data(int fd, const char* send_buf, int mes_len, const char* ip);
-
-/* Описана в модуле serverCore */
-extern int send_message(int fd, char** message_tokens, int tokens_amount, const char* ip);
+extern int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip);
 
 /* Описана в модуле serverCore */
 extern int player_left_game(Banker*, Player*, int, fd_set*);
@@ -50,7 +47,7 @@ void help_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			if ( p->fd == chp->fd )
 			{
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 				return;
 			}
 		}
@@ -87,7 +84,7 @@ void market_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			if ( p->fd == chp->fd )
 			{
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 				return;
 			}
 		}
@@ -123,9 +120,12 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 
 	if ( i >= MAX_PLAYERS )
 	{
-		const char* error_message = "*INFO_MESSAGE|PLAYER_COMMAND_NOT_FOUND\n";
-		int em_len = strlen(error_message);
-		send_data(chp->fd, error_message, em_len, cur_p->ip);
+		const char* error_message[] =
+		{
+					"*INFO_MESSAGE|PLAYER_COMMAND_NOT_FOUND\n",
+					NULL
+		};
+		send_message(chp->fd, error_message, 1, cur_p->ip);
 		return;
 	}
 
@@ -172,7 +172,7 @@ void player_command_handler(Banker* b, CommandHandlerParams* chp)
 		mes_tokens[9] = produced;
 	}
 
-	send_message(chp->fd, mes_tokens, tokns_amnt, cur_p->ip);
+	send_message(chp->fd, (const char**)mes_tokens, tokns_amnt, cur_p->ip);
 }
 
 void list_command_handler(Banker* b, CommandHandlerParams* chp)
@@ -195,7 +195,7 @@ void list_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			if ( p->fd == chp->fd )
 			{
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 				return;
 			}
 		}
@@ -226,29 +226,41 @@ void prod_command_handler(Banker* b, CommandHandlerParams* chp)
 				p->money -= PRODUCTION_COST;
 				p->is_prod = 1;
 
-				const char* success_message = "*INFO_MESSAGE|PROD_COMMAND_SUCCESS\n";
-				int sm_len = strlen(success_message);
-				send_data(chp->fd, success_message, sm_len, p->ip);
+				const char* success_message[] =
+				{
+							"*INFO_MESSAGE|PROD_COMMAND_SUCCESS\n",
+							NULL
+				};
+				send_message(chp->fd, success_message, 1, p->ip);
 			}
 			else
 			{
-				const char* factories_message = "*INFO_MESSAGE|PROD_COMMAND_NO_FACTORIES\n";
-				int sm_len = strlen(factories_message);
-				send_data(chp->fd, factories_message, sm_len, p->ip);
+				const char* factories_message[] =
+				{
+								"*INFO_MESSAGE|PROD_COMMAND_NO_FACTORIES\n",
+								NULL
+				};
+				send_message(chp->fd, factories_message, 1, p->ip);
 			}
 		}
 		else
 		{
-			const char* money_message = "*INFO_MESSAGE|PROD_COMMAND_NO_MONEY\n";
-			int sm_len = strlen(money_message);
-			send_data(chp->fd, money_message, sm_len, p->ip);
+			const char* money_message[] =
+			{
+							"*INFO_MESSAGE|PROD_COMMAND_NO_MONEY\n",
+							NULL
+			};
+			send_message(chp->fd, money_message, 1, p->ip);
 		}
 	}
 	else
 	{
-		const char* sources_message = "*INFO_MESSAGE|PROD_COMMAND_NO_SOURCE\n";
-		int sm_len = strlen(sources_message);
-		send_data(chp->fd, sources_message, sm_len, p->ip);
+		const char* sources_message[] =
+		{
+						"*INFO_MESSAGE|PROD_COMMAND_NO_SOURCE\n",
+						NULL
+		};
+		send_message(chp->fd, sources_message, 1, p->ip);
 	}
 }
 
@@ -281,9 +293,12 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 
 		if ( strcmp( arg, "list") != 0 )
 		{
-			const char* err_msg = "*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n";
-			int mes_len = strlen(err_msg);
-			send_data(p->fd, err_msg, mes_len, p->ip);
+			const char* err_msg[] =
+			{
+							"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
+							NULL
+			};
+			send_message(p->fd, err_msg, 1, p->ip);
 		}
 		else
 		{
@@ -294,7 +309,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 				int list_amount = bl_get_size(build_list);
 				int tokns_amnt = list_amount * 2 + 2;
 				char* mes_tokens[tokns_amnt];
-				
+
 				for ( int j = 0; j < tokns_amnt; ++j )
 					mes_tokens[j] = NULL;
 
@@ -321,7 +336,7 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 					build_list = build_list->next;
 				}
 
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 
 				for ( int j = 2; j < tokns_amnt; ++j )
 				{
@@ -334,9 +349,12 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 			}
 			else
 			{
-				const char* bl_empty_mes = "*INFO_MESSAGE|BUILDING_FACTORIES_LIST_EMPTY\n";
-				int mes_len = strlen(bl_empty_mes);
-				send_data(p->fd, bl_empty_mes, mes_len, p->ip);
+				const char* bl_empty_mes[] =
+				{
+								"*INFO_MESSAGE|BUILDING_FACTORIES_LIST_EMPTY\n",
+								NULL
+				};
+				send_message(p->fd, bl_empty_mes, 1, p->ip);
 			}
 		}
 	}
@@ -349,22 +367,31 @@ void build_command_handler(Banker* b, CommandHandlerParams* chp)
 				p->money -= NEW_FACTORY_COST/2;
 				p->build_factories += 1;
 
-				const char* success_message = "*INFO_MESSAGE|BUILD_COMMAND_SUCCESS\n";
-				int mes_len = strlen(success_message);
-				send_data(chp->fd, success_message, mes_len, p->ip);
+				const char* success_message[] =
+				{
+								"*INFO_MESSAGE|BUILD_COMMAND_SUCCESS\n",
+								NULL
+				};
+				send_message(chp->fd, success_message, 1, p->ip);
 			}
 			else
 			{
-				const char* error_message = "*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR\n";
-				int em_len = strlen(error_message);
-				send_data(chp->fd, error_message, em_len, p->ip);
+				const char* error_message[] =
+				{
+								"*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR\n",
+								NULL
+				};
+				send_message(chp->fd, error_message, 1, p->ip);
 			}
 		}
 		else
 		{
-			const char* no_money_mes = "*INFO_MESSAGE|BUILD_COMMAND_NO_MONEY\n";
-			int mes_len = strlen(no_money_mes);
-			send_data(chp->fd, no_money_mes, mes_len, p->ip);
+			const char* no_money_mes[] =
+			{
+							"*INFO_MESSAGE|BUILD_COMMAND_NO_MONEY\n",
+							NULL
+			};
+			send_message(chp->fd, no_money_mes, 1, p->ip);
 		}
 	}
 }
@@ -384,9 +411,12 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 
 	if ( p->sent_source_request )
 	{
-		const char* message = "*INFO_MESSAGE|BUY_COMMAND_ALREADY_SENT\n";
-		int mes_len = strlen(message);
-		send_data(chp->fd, message, mes_len, p->ip);
+		const char* message[] =
+		{
+						"*INFO_MESSAGE|BUY_COMMAND_ALREADY_SENT\n",
+						NULL
+		};
+		send_message(chp->fd, message, 1, p->ip);
 		return;
 	}
 
@@ -407,9 +437,12 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 
 			if ( data.p->money < data.price*data.amount )
 			{
-				const char* no_money_mes = "*INFO_MESSAGE|BUY_COMMAND_NO_MONEY\n";
-				int mes_len = strlen(no_money_mes);
-				send_data(chp->fd, no_money_mes, mes_len, data.p->ip);
+				const char* no_money_mes[] =
+				{
+								"*INFO_MESSAGE|BUY_COMMAND_NO_MONEY\n",
+								NULL
+				};
+				send_message(chp->fd, no_money_mes, 1, data.p->ip);
 				return;
 			}
 
@@ -429,20 +462,26 @@ void buy_command_handler(Banker* b, CommandHandlerParams* chp)
 			itoa(source_price, sp, 19);
 			mes_tokens[2] = sp;
 
-			send_message(chp->fd, mes_tokens, tokns_amnt, p->ip);
+			send_message(chp->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 		}
 		else
 		{
-			const char* incorrect_price_mes = "*INFO_MESSAGE|BUY_COMMAND_INCORRECT_PRICE\n";
-			int mes_len = strlen(incorrect_price_mes);
-			send_data(chp->fd, incorrect_price_mes, mes_len, p->ip);
+			const char* incorrect_price_mes[] =
+			{
+							"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_PRICE\n",
+							NULL
+			};
+			send_message(chp->fd, incorrect_price_mes, 1, p->ip);
 		}
 	}
 	else
 	{
-		const char* incorrect_amount_mes = "*INFO_MESSAGE|BUY_COMMAND_INCORRECT_AMOUNT\n";
-		int mes_len = strlen(incorrect_amount_mes);
-		send_data(chp->fd, incorrect_amount_mes, mes_len, p->ip);
+		const char* incorrect_amount_mes[] =
+		{
+						"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_AMOUNT\n",
+						NULL
+		};
+		send_message(chp->fd, incorrect_amount_mes, 1, p->ip);
 	}
 }
 
@@ -461,16 +500,19 @@ void sell_command_handler(Banker* b, CommandHandlerParams* chp)
 
 	if ( p->sent_products_request )
 	{
-		const char* message = "*INFO_MESSAGE|SELL_COMMAND_ALREADY_SENT\n";
-		int mes_len = strlen(message);
-		send_data(chp->fd, message, mes_len, p->ip);
+		const char* message[] =
+		{
+						"*INFO_MESSAGE|SELL_COMMAND_ALREADY_SENT\n",
+						NULL
+		};
+		send_message(chp->fd, message, 1, p->ip);
 		return;
 	}
 
 	int product_amount = *( (int*) chp->param1 );
 	int product_price = *( (int*) chp->param2 );
 	int cur_max_product_price = b->cur_market_state->max_product_price;
-	/*printf("\nproduct_price = %d\ncur_max_product_price = %d\n", product_price, b->cur_market_state->max_product_price);*/
+
 
 	if ( ( product_amount > 0 ) && ( product_amount <= p->products ) )
 	{
@@ -498,20 +540,26 @@ void sell_command_handler(Banker* b, CommandHandlerParams* chp)
 			itoa(product_price, pp, 19);
 			mes_tokens[2] = pp;
 
-			send_message(chp->fd, mes_tokens, tokns_amnt, p->ip);
+			send_message(chp->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 		}
 		else
 		{
-			const char* incorrect_price_mes = "*INFO_MESSAGE|SELL_COMMAND_INCORRECT_PRICE\n";
-			int mes_len = strlen(incorrect_price_mes);
-			send_data(chp->fd, incorrect_price_mes, mes_len, p->ip);
+			const char* incorrect_price_mes[] =
+			{
+							"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_PRICE\n",
+							NULL
+			};
+			send_message(chp->fd, incorrect_price_mes, 1, p->ip);
 		}
 	}
 	else
 	{
-		const char* incorrect_amount_mes = "*INFO_MESSAGE|SELL_COMMAND_INCORRECT_AMOUNT\n";
-		int mes_len = strlen(incorrect_amount_mes);
-		send_data(chp->fd, incorrect_amount_mes, mes_len, p->ip);
+		const char* incorrect_amount_mes[] =
+		{
+						"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_AMOUNT\n",
+						NULL
+		};
+		send_message(chp->fd, incorrect_amount_mes, 1, p->ip);
 	}
 }
 
@@ -546,7 +594,7 @@ void turn_command_handler(Banker* b, CommandHandlerParams* chp)
 		Player* p = b->pl_array[i];
 		if ( p != NULL )
 			if ( p->is_turn )
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 	}
 }
 
@@ -597,7 +645,7 @@ void quit_command_handler(Banker* b, CommandHandlerParams* chp)
 		{
 			Player* p = b->pl_array[i];
 			if ( p != NULL )
-				send_message(p->fd, mes_tokens, tokns_amnt, p->ip);
+				send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 		}
 	}
 }
