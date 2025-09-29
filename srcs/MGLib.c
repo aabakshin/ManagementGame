@@ -5,18 +5,87 @@
 
 #include "../includes/MGLib.h"
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdio.h>
 
-/* Системная константа */
-enum
+
+extern ssize_t read(int fd, void* buf, size_t count);
+extern size_t strlen(const char* s);
+extern char* strncpy(char* dest, const char* src, size_t n);
+
+
+enum { BUFSIZE = 1024 };
+
+
+const char* info_game_messages[] =
 {
-	BUFSIZE = 1024
+				"*INFO_MESSAGE|AUCTION_RESULTS|",
+				"*INFO_MESSAGE|SUCCESS_CHARGES_PAY|",
+				"*INFO_MESSAGE|PLAYER_BANKROT|",
+				"*INFO_MESSAGE|LOST_ALIVE_PLAYER|",
+				"*INFO_MESSAGE|WAIT_FOR_NEXT_TURN|",
+				"*INFO_MESSAGE|PRODUCED|",
+				"*INFO_MESSAGE|STARTINSECONDS|",
+				"*INFO_MESSAGE|GAME_STARTED\n",
+				"*INFO_MESSAGE|STARTING_GAME_INFORMATION|",
+				"*INFO_MESSAGE|STARTCANCELLED\n",
+				"*INFO_MESSAGE|PAY_FACTORY_SUCCESS\n",
+				"*INFO_MESSAGE|FACTORY_BUILT\n",
+				"*INFO_MESSAGE|UNKNOWN_COMMAND\n",
+				"*INFO_MESSAGE|VICTORY_MESSAGE\n",
+				"*INFO_MESSAGE|GAME_ALREADY_STARTED\n",
+				"*INFO_MESSAGE|SERVER_FULL\n",
+				"*INFO_MESSAGE|NEW_PLAYER_CONNECT|",
+				"*INFO_MESSAGE|GAME_NOT_STARTED\n",
+				"*INFO_MESSAGE|LOST_LOBBY_PLAYER|",
+				"*INFO_MESSAGE|NEW_TURN|",
+				"*INFO_MESSAGE|HELP_COMMAND|",
+				"*INFO_MESSAGE|MARKET_COMMAND|",
+				"*INFO_MESSAGE|PLAYER_COMMAND_NOT_FOUND\n",
+				"*INFO_MESSAGE|PLAYER_COMMAND|",
+				"*INFO_MESSAGE|LIST_COMMAND|",
+				"*INFO_MESSAGE|PROD_COMMAND_SUCCESS\n",
+				"*INFO_MESSAGE|PROD_COMMAND_NO_FACTORIES\n",
+				"*INFO_MESSAGE|PROD_COMMAND_NO_MONEY\n",
+				"*INFO_MESSAGE|PROD_COMMAND_NO_SOURCE\n",
+				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST|",
+				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST_EMPTY\n",
+				"*INFO_MESSAGE|BUILD_COMMAND_SUCCESS\n",
+				"*INFO_MESSAGE|BUILD_COMMAND_NO_MONEY\n",
+				"*INFO_MESSAGE|BUY_COMMAND_ALREADY_SENT\n",
+				"*INFO_MESSAGE|BUY_COMMAND_NO_MONEY\n",
+				"*INFO_MESSAGE|BUY_COMMAND_SUCCESS|",
+				"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_PRICE\n",
+				"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_AMOUNT\n",
+				"*INFO_MESSAGE|SELL_COMMAND_ALREADY_SENT\n",
+				"*INFO_MESSAGE|SELL_COMMAND_SUCCESS|",
+				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_PRICE\n",
+				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_AMOUNT\n",
+				"*INFO_MESSAGE|TURN_COMMAND_SUCCESS|",
+				NULL
 };
 
-/* Вспомогательная ф-я для heap_sort. Превращает массив целых в древовидную структуру "куча" */
-static void heap_make(int* values, int size, int ascending)	/* ascending = 1 => по убыванию*/
+const char* error_game_messages[] =
+{
+				"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
+				"*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR\n",
+				NULL
+};
+
+
+// Вспомогательная ф-я для heap_sort. Превращает массив целых в древовидную структуру "куча"
+// ascending: 1(по убыванию), 0(по возрастанию)
+static void heap_make(int* values, int size, int ascending);
+
+// Вспомогательная ф-я для itoa. Делает реверс строки
+static void reverse(char* s);
+
+// Вспомогательная функция для itoa. Подсчитывает кол-во цифр в числе
+static int num_digit_cnt(int number);
+
+
+
+
+
+static void heap_make(int* values, int size, int ascending)
 {
 	int i;
 	for ( i = size-1; i > 0; i-- )
@@ -25,7 +94,7 @@ static void heap_make(int* values, int size, int ascending)	/* ascending = 1 => 
 		while ( idx != 0 )
 		{
 			int parent = (idx - 1) / 2;
-			
+
 			if ( ascending )
 			{
 				if ( values[idx] > values[parent] )
@@ -36,11 +105,11 @@ static void heap_make(int* values, int size, int ascending)	/* ascending = 1 => 
 				if ( values[idx] <= values[parent])
 					break;
 			}
-			
+
 			int temp = values[idx];
 			values[idx] = values[parent];
 			values[parent] = temp;
-				
+
 			idx = parent;
 		}
 	}
@@ -49,23 +118,23 @@ static void heap_make(int* values, int size, int ascending)	/* ascending = 1 => 
 void heap_sort(int* values, int size, int ascending)
 {
 	heap_make(values, size, ascending);
-	
+
 	int i;
 	for ( i = size-1; i > 0; i-- )
 	{
 		int temp = values[i];
 		values[i] = values[0];
 		values[0] = temp;
-		
+
 		heap_make(values, i, ascending);
 	}
 }
 
 void delete_spaces(char* buffer, int* bufsize)
 {
-	if ( buffer == NULL )	
+	if ( buffer == NULL )
 		return;
-	
+
 	if ( (*bufsize < 2) || (*bufsize > BUFSIZE) )
 		return;
 
@@ -97,7 +166,7 @@ void delete_spaces(char* buffer, int* bufsize)
 	*bufsize = strlen(buffer)+1;
 	/* ---------------------------Удаление слева--------------------------- */
 
-	
+
 	/* ---------------------------Удаление справа--------------------------- */
 	for ( i = (*bufsize)-2; i > 0; i-- )
 	{
@@ -107,7 +176,7 @@ void delete_spaces(char* buffer, int* bufsize)
 	buffer[i+1] = '\0';
 	*bufsize = strlen(buffer)+1;
 	/* ---------------------------Удаление справа--------------------------- */
-	
+
 	for ( i = 0; i < (*bufsize-1); i++ )
 		if ( (buffer[i] == '\t') || (buffer[i] == '\r') )
 			buffer[i] = ' ';
@@ -131,17 +200,16 @@ void delete_spaces(char* buffer, int* bufsize)
 				spaces_count = 0;
 			}
 		}
-		else 
+		else
 		{
 			spaces_count++;
 			continue;
 		}
 	}
-	
+
 	*bufsize = i+1;
 }
 
-/* Вспомогательная ф-я для itoa. Делает реверс строки */
 static void reverse(char* s)
 {
 	int i = 0;
@@ -155,11 +223,10 @@ static void reverse(char* s)
 	}
 }
 
-/* Вспомогательная функция для itoa. Подсчитывает кол-во цифр в числе */
 static int num_digit_cnt(int number)
 {
 	int counter = 0;
-	
+
 	if ( number == 0 )
 		return 1;
 
@@ -174,6 +241,7 @@ static int num_digit_cnt(int number)
 
 	return counter;
 }
+
 void itoa(int number, char* num_buf, int max_buf_len)
 {
 	if ( number == 0 )
@@ -187,14 +255,14 @@ void itoa(int number, char* num_buf, int max_buf_len)
 
 	if ( cnt > (max_buf_len-1) )
 		cnt = max_buf_len-1;
-	
+
 	int flag = 0;
 	if ( number < 0 )
 	{
 		number *= -1;
 		flag = 1;
 	}
-	
+
 	int i = 0;
 	while ( number > 0 && (i < cnt) )
 	{
@@ -215,7 +283,7 @@ void itoa(int number, char* num_buf, int max_buf_len)
 
 int readline(int fd, char* buf, int bufsize)
 {
-	unsigned int total_read = 0; 
+	unsigned int total_read = 0;
 	char buffer[bufsize];
 	int rc = 0;
 	int lf_flag = 0;
@@ -239,7 +307,7 @@ int readline(int fd, char* buf, int bufsize)
 		}
 	}
 	while ( !lf_flag );
-	
+
 	strncpy(buf, buffer, total_read);
 
 	return total_read;

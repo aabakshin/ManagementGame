@@ -166,6 +166,10 @@ extern double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
 extern int price_table[MARKET_LEVEL_NUMBER][2];
 extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
+// Описаны в модуле MGLib
+extern const char* info_game_messages[];
+extern const char* error_game_messages[];
+
 /* Флаг срабатывания таймера */
 static int alrm_flag = 0;
 
@@ -318,7 +322,7 @@ static int make_auction_report(Banker* b, AuctionReport* ar)
 	player_report pr[MAX_PLAYERS] = { 0 };
 
 
-	mes_tokens[0] = "*INFO_MESSAGE|AUCTION_RESULTS|";
+	mes_tokens[0] = (char*)info_game_messages[AUCTION_RESULTS];
 	int k = 1;
 
 	for ( j = 0; j < b->ready_players; j++ )
@@ -404,7 +408,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 
 				char* mes_tokens[2];
 				int tokns_amnt = 2;
-				mes_tokens[0] = "*INFO_MESSAGE|SUCCESS_CHARGES_PAY|";
+				mes_tokens[0] = (char*)info_game_messages[SUCCESS_CHARGES_PAY];
 
 				char charges[20];
 				itoa(total_charges, charges, 19);
@@ -416,8 +420,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 			{
 				char* mes_tokens[2];
 				int tokns_amnt = 2;
-
-				mes_tokens[0] = "*INFO_MESSAGE|PLAYER_BANKROT|";
+				mes_tokens[0] = (char*)info_game_messages[PLAYER_BANKROT];
 
 				char charges[20];
 				itoa(total_charges, charges, 19);
@@ -450,8 +453,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 				{
 					int tokns_amnt = 3;
 					char* mes_tokens[tokns_amnt];
-
-					mes_tokens[0] = "*INFO_MESSAGE|LOST_ALIVE_PLAYER|";
+					mes_tokens[0] = (char*)info_game_messages[LOST_ALIVE_PLAYER];
 
 					char ap_buf[10];
 					int ap = banker->alive_players;
@@ -469,7 +471,6 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 							send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 					}
 				}
-
 			} /* end else */
 		} /* end if */
 	} /* end for */
@@ -771,7 +772,7 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 
 						const char* success_pay_mes[] =
 						{
-								"*INFO_MESSAGE|PAY_FACTORY_SUCCESS\n",
+								info_game_messages[PAY_FACTORY_SUCCESS],
 								NULL
 						};
 						send_message(p->fd, success_pay_mes, 1, p->ip);
@@ -781,7 +782,7 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 						char* mes_tokens[2];
 						int tokns_amnt = 2;
 
-						mes_tokens[0] = "*INFO_MESSAGE|PLAYER_BANKROT|";
+						mes_tokens[0] = (char*)info_game_messages[PLAYER_BANKROT];
 
 						char charges[20];
 						itoa(NEW_FACTORY_UNIT_COST/2, charges, 19);
@@ -811,7 +812,7 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 							int tokns_amnt = 3;
 							char* mes_tokens[tokns_amnt];
 
-							mes_tokens[0] = "*INFO_MESSAGE|LOST_ALIVE_PLAYER|";
+							mes_tokens[0] = (char*)info_game_messages[LOST_ALIVE_PLAYER];
 
 							char ap_buf[10];
 							int ap = banker->alive_players;
@@ -840,7 +841,7 @@ static int check_building_factories(Banker* banker, fd_set* readfds)
 
 					const char* factory_built_mes[] =
 					{
-							"*INFO_MESSAGE|FACTORY_BUILT\n",
+							info_game_messages[FACTORY_BUILT],
 							NULL
 					};
 					send_message(p->fd, factory_built_mes, 1, p->ip);
@@ -870,7 +871,7 @@ int player_left_game(Banker* banker, Player* p, int i, fd_set* readfds)
 		)
 		return 0;
 
-	if ( !banker->game_started)
+	if ( !banker->game_started )
 	{
 		banker->lobby_players--;
 	}
@@ -902,7 +903,7 @@ static int send_wfnt_message(Banker* banker, Player* p)
 
 	char* mes_tokens[2];
 	int tokns_amnt = 2;
-	mes_tokens[0] = "*INFO_MESSAGE|WAIT_FOR_NEXT_TURN|";
+	mes_tokens[0] = (char*)info_game_messages[WAIT_FOR_NEXT_TURN];
 
 	char w_y_p_a[10];
 	itoa(wait_yet_players_amount, w_y_p_a, 9);
@@ -958,7 +959,7 @@ static int process_command(ProcessCommandParams* pcp)
 				{
 					const char* error_message[] =
 					{
-								"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
+								error_game_messages[COMMAND_INCORRECT_ARGUMENTS_NUM],
 								NULL
 					};
 					send_message(p->fd, error_message, 1, p->ip);
@@ -980,7 +981,7 @@ static int process_command(ProcessCommandParams* pcp)
 					{
 						const char* error_message[] =
 						{
-									"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
+									error_game_messages[COMMAND_INCORRECT_ARGUMENTS_NUM],
 									NULL
 						};
 						send_message(p->fd, error_message, 1, p->ip);
@@ -1013,7 +1014,7 @@ static int process_command(ProcessCommandParams* pcp)
 					{
 						const char* error_message[] =
 						{
-									"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
+									error_game_messages[COMMAND_INCORRECT_ARGUMENTS_NUM],
 									NULL
 						};
 						send_message(p->fd, error_message, 1, p->ip);
@@ -1093,7 +1094,7 @@ static int process_command(ProcessCommandParams* pcp)
 	{
 		const char* unknown_cmd_message[] =
 		{
-					"*INFO_MESSAGE|UNKNOWN_COMMAND\n",
+					info_game_messages[UNKNOWN_COMMAND],
 					NULL
 		};
 		send_message(p->fd, unknown_cmd_message, 1, p->ip);
@@ -1107,7 +1108,7 @@ int server_end_work(Banker* banker, Player* p, int i, fd_set* readfds)
 {
 	const char* victory_message[] =
 	{
-				"*INFO_MESSAGE|VICTORY_MESSAGE\n",
+				info_game_messages[VICTORY_MESSAGE],
 				NULL
 	};
 	send_message(p->fd, victory_message, 1, p->ip);
@@ -1250,7 +1251,7 @@ int server_run(Banker* banker, int ls)
 
 						char* mes_tokens[2];
 						int tokns_amnt = 2;
-						mes_tokens[0] = "*INFO_MESSAGE|PRODUCED|";
+						mes_tokens[0] = (char*)info_game_messages[PRODUCED];
 
 						char am_prd[10];
 						itoa(p->produced_on_turn, am_prd, 9);
@@ -1277,7 +1278,7 @@ int server_run(Banker* banker, int ls)
 
 				char* mes_tokens[2];
 				int tokns_amnt = 2;
-				mes_tokens[0] = "*INFO_MESSAGE|STARTINSECONDS|";
+				mes_tokens[0] = (char*)info_game_messages[STARTINSECONDS];
 
 				char tts[10];
 				itoa(TIME_TO_START, tts, 9);
@@ -1303,7 +1304,7 @@ int server_run(Banker* banker, int ls)
 
 				const char* message[] =
 				{
-							"*INFO_MESSAGE|GAME_STARTED\n",
+							info_game_messages[GAME_STARTED],
 							NULL
 				};
 
@@ -1349,7 +1350,7 @@ int server_run(Banker* banker, int ls)
 						int tokns_amnt = (p->is_bot) ? 14 : 10;
 
 						char* mes_tokens[tokns_amnt];
-						mes_tokens[0] = "*INFO_MESSAGE|STARTING_GAME_INFORMATION|";
+						mes_tokens[0] = (char*)info_game_messages[STARTING_GAME_INFORMATION];
 
 						char p_num[10];
 						itoa(p->number, p_num, 9);
@@ -1415,7 +1416,7 @@ int server_run(Banker* banker, int ls)
 
 		int res = select(max_fd+1, &readfds, NULL, NULL, NULL);
 
-		if ( res == -1)
+		if ( res == -1 )
 		{
 			if ( errno == EINTR )
 			{
@@ -1428,7 +1429,7 @@ int server_run(Banker* banker, int ls)
 					{
 						const char* message[] =
 						{
-									"*INFO_MESSAGE|STARTCANCELLED\n",
+									info_game_messages[STARTCANCELLED],
 									NULL
 						};
 
@@ -1450,16 +1451,18 @@ int server_run(Banker* banker, int ls)
 
 							const char* message[] =
 							{
-										"*INFO_MESSAGE|GAME_STARTED\n",
+										info_game_messages[GAME_STARTED],
 										NULL
 							};
 
+							///////////////////////////////////////////////////////////////////
 							for ( int i = 0; i < MAX_PLAYERS; i++ )
 							{
 								Player* p = banker->pl_array[i];
 								if ( p != NULL )
 									send_message(p->fd, message, 1, p->ip);
 							}
+							///////////////////////////////////////////////////////////////////
 						}
 						continue;
 					}
@@ -1498,6 +1501,7 @@ int server_run(Banker* banker, int ls)
 					sizeof(service_buffer),
 					NI_NUMERICHOST | NI_NUMERICSERV);
 
+
 			/////////////////////////////////////////////////////////////
 			int addr_len = strlen(address_buffer);
 			int i, j;
@@ -1514,18 +1518,15 @@ int server_run(Banker* banker, int ls)
 
 			if ( banker->game_started )
 			{
-				// поместить в функцию
-				/////////////////////////////////////////////////////////////
 				const char* message[] =
 				{
-							"*INFO_MESSAGE|GAME_ALREADY_STARTED\n",
+							info_game_messages[GAME_ALREADY_STARTED],
 							NULL
 				};
 				send_message(cs, message, 1, address_buffer);
 
 				close(cs);
 				printf("Lost connection from (%s)\n", address_buffer);
-				/////////////////////////////////////////////////////////////
 			}
 			else
 			{
@@ -1540,18 +1541,15 @@ int server_run(Banker* banker, int ls)
 
 				if ( i >= MAX_PLAYERS )
 				{
-					// поместить в функцию
-					/////////////////////////////////////////////////////////////
 					const char* message[] =
 					{
-								"*INFO_MESSAGE|SERVER_FULL\n",
+								info_game_messages[SERVER_FULL],
 								NULL
 					};
 					send_message(cs, message, 1, address_buffer);
 
 					close(cs);
 					printf("Lost connection from (%s)\n", address_buffer);
-					/////////////////////////////////////////////////////////////
 				}
 				/////////////////////////////////////////////////////////////
 				else
@@ -1559,18 +1557,15 @@ int server_run(Banker* banker, int ls)
 					Player* p = malloc(sizeof(struct Player));
 					if ( p == NULL )
 					{
-						// поместить в функцию
-						/////////////////////////////////////////////////////////////
 						const char* message[] =
 						{
-									"*INFO_MESSAGE|OUT_OF_MEMORY\n",
+									error_game_messages[COMMAND_INTERNAL_ERROR],
 									NULL
 						};
 						send_message(cs, message, 1, address_buffer);
 
 						close(cs);
 						printf("Lost connection from (%s)\n", address_buffer);
-						/////////////////////////////////////////////////////////////
 					}
 					else
 					{
@@ -1610,7 +1605,7 @@ int server_run(Banker* banker, int ls)
 						char* mes_tokens[3];
 						int tokns_amnt = 3;
 
-						mes_tokens[0] = "*INFO_MESSAGE|NEW_PLAYER_CONNECT|";
+						mes_tokens[0] = (char*)info_game_messages[NEW_PLAYER_CONNECT];
 
 						char lp_buf[10];
 						itoa(lp, lp_buf, 9);
@@ -1622,7 +1617,7 @@ int server_run(Banker* banker, int ls)
 						//////////////////////////////////////////////////////////////
 
 
-						// поместить в функцию
+
 						/////////////////////////////////////////////////////////////
 						for ( i = 0; i < MAX_PLAYERS; i++ )
 						{
@@ -1681,7 +1676,7 @@ int server_run(Banker* banker, int ls)
 							{
 								const char* message[] =
 								{
-											"*INFO_MESSAGE|GAME_NOT_STARTED\n",
+											info_game_messages[GAME_NOT_STARTED],
 											NULL
 								};
 								send_message(p->fd, message, 1, p->ip);
@@ -1733,7 +1728,7 @@ int server_run(Banker* banker, int ls)
 							char* mes_tokens[3];
 							int tokns_amnt = 3;
 
-							mes_tokens[0] = "*INFO_MESSAGE|LOST_LOBBY_PLAYER|";
+							mes_tokens[0] = (char*)info_game_messages[LOST_LOBBY_PLAYER];
 
 							char lp_buf[10];
 							itoa(lp, lp_buf, 9);
@@ -1743,12 +1738,14 @@ int server_run(Banker* banker, int ls)
 							itoa(max_pl, max_pl_buf, 9);
 							mes_tokens[2] = max_pl_buf;
 
+							///////////////////////////////////////////////
 							for ( i = 0; i < MAX_PLAYERS; i++ )
 							{
 								Player* p = banker->pl_array[i];
 								if ( p != NULL )
 									send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 							}
+							///////////////////////////////////////////////
 						}
 						else
 						{
@@ -1774,7 +1771,7 @@ int server_run(Banker* banker, int ls)
 								int tokns_amnt = 3;
 								char* mes_tokens[tokns_amnt];
 
-								mes_tokens[0] = "*INFO_MESSAGE|LOST_ALIVE_PLAYER|";
+								mes_tokens[0] = (char*)info_game_messages[LOST_ALIVE_PLAYER];
 
 								char ap_buf[10];
 								int ap = banker->alive_players;
@@ -1785,12 +1782,14 @@ int server_run(Banker* banker, int ls)
 								itoa(left_pl_num, left_p_num_buf, 9);
 								mes_tokens[2] = left_p_num_buf;
 
+								//////////////////////////////////////////////////////////
 								for ( i = 0; i < MAX_PLAYERS; i++ )
 								{
 									Player* p = banker->pl_array[i];
 									if ( p != NULL )
 										send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 								}
+								//////////////////////////////////////////////////////////
 							}
 						} /* end else */
 					} /* end else */
@@ -1879,7 +1878,7 @@ int server_run(Banker* banker, int ls)
 						int tokns_amnt = (p->is_bot) ? 6 : 2;
 						char* mes_tokens[tokns_amnt];
 
-						mes_tokens[0] = "*INFO_MESSAGE|NEW_TURN|";
+						mes_tokens[0] = (char*)info_game_messages[NEW_TURN];
 
 						char new_turn[10];
 						itoa(banker->turn_number, new_turn, 9);
