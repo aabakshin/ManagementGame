@@ -36,9 +36,6 @@ enum
 // проверяет, является ли отправитель ботом, а не игроком
 static int is_correct_identity_msg(const char* identity_msg);
 
-// Вспомогательная функция для функций-обработчиков команд
-static int make_cmd_param(char* buf, int buf_size, char* str);
-
 // отправка специального сообщения игроку
 // static int send_wfnt_message(int wypa, int fd, char* ip) <-- эта функция должна выглядеть так
 static int send_wfnt_message(Banker* banker, Player* p);
@@ -247,21 +244,15 @@ int send_message(int fd, const char** message_tokens, int tokens_amount, const c
 		return 0;
 
 
-	char buffer[BUFSIZE];
-	int i, j, k;
+	char buffer[BUFSIZE] = { 0 };
 
-	for ( i = 0; message_tokens[0][i]; i++ )
-		buffer[i] = message_tokens[0][i];
-
-	if ( tokens_amount > 1 )
+	int i = 0;
+	for ( int j = 0; j < tokens_amount; j++ )
 	{
-		for ( j = 1; j < tokens_amount; j++ )
-		{
-			for ( k = 0; message_tokens[j][k]; k++, i++ )
-				buffer[i] = message_tokens[j][k];
-			buffer[i] = '|';
-			i++;
-		}
+		for ( int k = 0; message_tokens[j][k]; k++, i++ )
+			buffer[i] = message_tokens[j][k];
+		buffer[i] = '|';
+		i++;
 	}
 
 	buffer[i-1] = '\n';
@@ -274,100 +265,78 @@ int send_message(int fd, const char** message_tokens, int tokens_amount, const c
 	return 1;
 }
 
-static int make_cmd_param(char* buf, int buf_size, char* str)
-{
-	if ( (buf == NULL) || (str == NULL) || (buf_size < 1) )
-		return 0;
-
-	int k;
-	for ( k = 0; str[k]; k++ )
-	{
-		if ( k >= buf_size-1 )
-			break;
-
-		buf[k] = str[k];
-	}
-
-	if ( buf[k-1] == '\n' )
-		buf[k-1] = '\0';
-	else
-		buf[k] = '\0';
-
-	return 1;
-}
-
 static int make_auction_report(Banker* b, AuctionReport* ar)
 {
-	if ( (b == NULL) || (ar == NULL) || (b->ready_players < 1) )
+	if (
+			( b == NULL )					||
+			( ar == NULL )					||
+			( b->ready_players < 1 )
+		)
 		return 0;
 
-	char* mes_tokens[6 * MAX_PLAYERS + 1];
-	int tokns_amnt = 6*MAX_PLAYERS+1;
+	enum
+	{
+			PL_REP_FIELDS_NUM		=		6,
+			TURN_SIZE				=		16,
+			PLAYER_NUM_SIZE			=		16,
+			SOLD_SOURCES_SIZE		=		16,
+			SOLD_PRICE_SIZE			=		24,
+			BOUGHT_PRODS_SIZE		=		16,
+			BOUGHT_PRICE_SIZE		=		24
 
-	int j;
-	for ( j = 0; j < tokns_amnt; j++ )
-		mes_tokens[j] = NULL;
-
+	};
 	struct player_report
 	{
-		char tn[16];
-		char pnum[16];
-		char ssnum[16];
-		char spnum[24];
-		char bpnum[16];
-		char bprnum[24];
+		char tn[TURN_SIZE];
+		char pnum[PLAYER_NUM_SIZE];
+		char ssnum[SOLD_SOURCES_SIZE];
+		char spnum[SOLD_PRICE_SIZE];
+		char bpnum[BOUGHT_PRODS_SIZE];
+		char bprnum[BOUGHT_PRICE_SIZE];
 	};
 	typedef struct player_report player_report;
-
 	player_report pr[MAX_PLAYERS] = { 0 };
 
 
-	mes_tokens[0] = (char*)info_game_messages[AUCTION_RESULTS];
-	int k = 1;
+	int tokns_amnt = PL_REP_FIELDS_NUM * MAX_PLAYERS + 1;
+	char* mes_tokens[tokns_amnt];
 
-	for ( j = 0; j < b->ready_players; j++ )
+	for ( int j = 0; j < tokns_amnt; j++ )
+		mes_tokens[j] = NULL;
+
+	mes_tokens[0] = (char*)info_game_messages[AUCTION_RESULTS];
+
+	int k = 1;
+	for ( int j = 0; j < b->ready_players; j++ )
 	{
-		/*printf("ar[%d].turn = %d\n", j, ar[j].turn);*/
-		int turn_number = ar[j].turn;
-		itoa(turn_number, pr[j].tn, 15);
+		itoa(ar[j].turn, pr[j].tn, TURN_SIZE);
 		mes_tokens[k] = pr[j].tn;
 		k++;
 
-		/*printf("ar[%d].p->number = %d\n", j, ar[j].p->number);*/
-		int p_num = ar[j].p->number;
-		itoa(p_num, pr[j].pnum, 15);
+		itoa(ar[j].p->number, pr[j].pnum, PLAYER_NUM_SIZE);
 		mes_tokens[k] = pr[j].pnum;
 		k++;
 
-		/*printf("ar[%d].sold_sources = %d\n", j, ar[j].sold_sources);*/
-		int ss_num = ar[j].sold_sources;
-		itoa(ss_num, pr[j].ssnum, 15);
+		itoa(ar[j].sold_sources, pr[j].ssnum, SOLD_SOURCES_SIZE);
 		mes_tokens[k] = pr[j].ssnum;
 		k++;
 
-		/*printf("ar[%d].sold_price = %d\n", j, ar[j].sold_price);*/
-		int sp_num = ar[j].sold_price;
-		itoa(sp_num, pr[j].spnum, 23);
+		itoa(ar[j].sold_price, pr[j].spnum, SOLD_PRICE_SIZE);
 		mes_tokens[k] = pr[j].spnum;
 		k++;
 
-		/*printf("ar[%d].bought_prods = %d\n", j, ar[j].bought_prods);*/
-		int bp_num = ar[j].bought_prods;
-		itoa(bp_num, pr[j].bpnum, 15);
+		itoa(ar[j].bought_prods, pr[j].bpnum, BOUGHT_PRODS_SIZE);
 		mes_tokens[k] = pr[j].bpnum;
 		k++;
 
-		/*printf("ar[%d].bought_price = %d\n", j, ar[j].bought_price);*/
-		int bpr_num = ar[j].bought_price;
-		itoa(bpr_num, pr[j].bprnum, 23);
+		itoa(ar[j].bought_price, pr[j].bprnum, BOUGHT_PRICE_SIZE);
 		mes_tokens[k] = pr[j].bprnum;
 		k++;
 	}
 	tokns_amnt = k;
 
 
-	int i;
-	for ( i = 0; i < MAX_PLAYERS; i++ )
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		Player* p = b->pl_array[i];
 		if ( p != NULL )
@@ -379,7 +348,10 @@ static int make_auction_report(Banker* b, AuctionReport* ar)
 
 static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr)
 {
-	if ( (banker == NULL) || (readfds == NULL) )
+	if (
+				( banker == NULL )			||
+				( readfds == NULL )
+		)
 		return 0;
 
 	int i;
@@ -420,6 +392,7 @@ static int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, Marke
 			{
 				char* mes_tokens[2];
 				int tokns_amnt = 2;
+
 				mes_tokens[0] = (char*)info_game_messages[PLAYER_BANKROT];
 
 				char charges[20];
@@ -488,8 +461,7 @@ static int report_on_turn(Banker* banker, AuctionReport* ar, MarketRequest* new_
 
 	printf("\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker->turn_number);
 	printf("\n%s\n", "Players statistics:");
-	int i;
-	for ( i = 0; i < MAX_PLAYERS; i++ )
+	for ( int i = 0; i < MAX_PLAYERS; i++ )
 	{
 		Player* p = banker->pl_array[i];
 		if ( p != NULL )
@@ -517,7 +489,7 @@ static int report_on_turn(Banker* banker, AuctionReport* ar, MarketRequest* new_
 	}
 
 	MarketRequest* npr = new_prod_request;
-	printf("\n%s\n", "Products auction");
+	printf("\n%s\n", "Products auction:");
 	while ( npr != NULL )
 	{
 		printf("Request of Player #%d:\n", npr->market_data.p->number);
@@ -967,9 +939,13 @@ static int process_command(ProcessCommandParams* pcp)
 				else
 				{
 					char param1_str[100];
-					make_cmd_param(param1_str, 100, command_tokens[1]);
+					strcpy(param1_str, command_tokens[1]);
+					cut_str(param1_str, 100, '\n');
+
 					int player_number = atoi(param1_str);
 					cmd_hdl_params.param1 = (void*) &player_number;
+
+
 					commands_handlers[j](banker, &cmd_hdl_params);
 				}
 			}
@@ -989,14 +965,20 @@ static int process_command(ProcessCommandParams* pcp)
 					else
 					{
 						char param1_str[100];
-						make_cmd_param(param1_str, 100, command_tokens[1]);
+						strcpy(param1_str, command_tokens[1]);
+						cut_str(param1_str, 100, '\n');
+
 						int sources_amount = atoi(param1_str);
 						cmd_hdl_params.param1 = (void*) &sources_amount;
 
+
 						char param2_str[100];
-						make_cmd_param(param2_str, 100, command_tokens[2]);
+						strcpy(param2_str, command_tokens[2]);
+						cut_str(param2_str, 100, '\n');
+
 						int sources_price = atoi(param2_str);
 						cmd_hdl_params.param2 = (void*) &sources_price;
+
 
 						commands_handlers[j](banker, &cmd_hdl_params);
 					}
@@ -1022,14 +1004,20 @@ static int process_command(ProcessCommandParams* pcp)
 					else
 					{
 						char param1_str[100];
-						make_cmd_param(param1_str, 100, command_tokens[1]);
+						strcpy(param1_str, command_tokens[1]);
+						cut_str(param1_str, 100, '\n');
+
 						int products_amount = atoi(param1_str);
 						cmd_hdl_params.param1 = (void*) &products_amount;
 
+
 						char param2_str[100];
-						make_cmd_param(param2_str, 100, command_tokens[2]);
+						strcpy(param2_str, command_tokens[2]);
+						cut_str(param2_str, 100, '\n');
+
 						int products_price = atoi(param2_str);
 						cmd_hdl_params.param2 = (void*) &products_price;
+
 
 						commands_handlers[j](banker, &cmd_hdl_params);
 					}
@@ -1057,7 +1045,9 @@ static int process_command(ProcessCommandParams* pcp)
 					if ( tokens_amount >= 2 )
 					{
 						char param1_str[100];
-						make_cmd_param(param1_str, 100, command_tokens[1]);
+						strcpy(param1_str, command_tokens[1]);
+						cut_str(param1_str, 100, '\n');
+
 						char* list_subcommand = param1_str;
 						cmd_hdl_params.param1 = (void*) list_subcommand;
 					}
