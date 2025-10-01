@@ -573,7 +573,7 @@ void turn_command_handler(Banker* b, CommandHandlerParams* chp)
 	int i;
 	for ( i = 0; i < MAX_PLAYERS; i++ )
 		if ( b->pl_array[i] != NULL )
-			if ( b->pl_array[i]->fd == chp->fd)
+			if ( b->pl_array[i]->fd == chp->fd )
 				break;
 
 	if ( i >= MAX_PLAYERS )

@@ -1,12 +1,12 @@
-/* 
+/*
  * Модуль SystemHeaders содержит основные заголовочные файлы
  * для обеспечения клиент-серверного взаимодействия, а также
  * некоторые ф-и для работы со строками, временем и пр.
  * Этот модуль включается в след. модули: botCore, clientCore, serverCore, PolizElem
- * */
+ */
 
-#ifndef NET_HEADERS_H
-#define NET_HEADERS_H
+#ifndef SYSTEM_HEADERS_H
+#define SYSTEM_HEADERS_H
 
 #include <asm-generic/socket.h>
 #include <sys/types.h>

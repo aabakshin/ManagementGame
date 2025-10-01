@@ -1229,12 +1229,14 @@ int server_run(Banker* banker, int ls)
 				{
 					int amount_products_prev = p->products;
 					int w_f = p->work_factories;
+
 					while ( p->work_factories > 0 )
 					{
 						p->work_factories--;
 						p->products++;
 						p->wait_factories++;
 					}
+
 					if ( w_f > 0 )
 					{
 						p->produced_on_turn = p->products - amount_products_prev;
