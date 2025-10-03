@@ -19,7 +19,7 @@ struct Player
 	int number;
 	int fd;
 	char ip[IPV4_ADDRESS_SIZE];
-	
+
 	int money;
 	int old_money;
 	int income;

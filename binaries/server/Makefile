@@ -2,7 +2,7 @@ CC = gcc
 CWD = ../binaries/server
 LIBS_PATH = ../../libs
 SRCS_PATH = ../../srcs
-C_SRCS = BuildList.c MarketRequest.c MGLib.c Banker.c CommandsHandler.c serverCore.c
+C_SRCS = BuildList.c MarketRequest.c MGLib.c Banker.c serverCore.c
 OBJMODULES = $(C_SRCS:.c=.o)
 CFLAGS = -Wall -g
 PORT = 7777
