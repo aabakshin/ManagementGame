@@ -8,6 +8,8 @@
 
 #include "MarketRequest.h"
 #include "Player.h"
+#include "CommandsHandler.h"
+#include "MGLib.h"
 #include <stdlib.h>
 
 
@@ -37,31 +39,6 @@ enum
 	FACTORY_UNIT_CHARGE				=						  1000,
 	NEW_FACTORY_UNIT_COST			=						  5000,
 	PRODUCTION_PRODUCT_COST			=						  2000
-};
-
-
-struct CommandHandlerParams
-{
-	void* param1;
-	void* param2;
-};
-typedef struct CommandHandlerParams CommandHandlerParams;
-
-/* Константы для нумерации индексов валидных команд(порядок должен совпадать с порядком следования элементов в valid_commands) */
-enum
-{
-	ERROR_COMMAND_NUM		=		-1,
-	HELP_COMMAND_NUM,
-	MARKET_COMMAND_NUM,
-	PLAYER_COMMAND_NUM,
-	LIST_COMMAND_NUM,
-	PROD_COMMAND_NUM,
-	BUILD_COMMAND_NUM,
-	BUY_COMMAND_NUM,
-	SELL_COMMAND_NUM,
-	TURN_COMMAND_NUM,
-	QUIT_COMMAND_NUM,
-	UNKNOWN_COMMAND_NUM
 };
 
 
@@ -107,7 +84,31 @@ typedef struct Banker Banker;
 
 
 int banker_init(Banker* b);
+
 int last_man_stand(Banker* b);
+
+int process_command(Banker* b, Player* p, const char** command_tokens, int tokens_amount);
+
+// формирование и отправка отчёта каждому игроку по прошедшему аукциону
+int make_auction_report(Banker* b, AuctionReport* ar);
+
+// расчёт и оплата игровых издержек каждым игроком
+int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr);
+
+// формирование отчёта о прошедших событиях на текущем ходе
+int report_on_turn(Banker* banker, AuctionReport* ar, MarketRequest* new_source_request, MarketRequest* new_prod_request);
+
+// вычисление нового значения состояния рынка
+int change_market_state(Banker* banker);
+
+// запуск аукционов, auction_type принимает два значения: 0(аукцион сырья), 1(аукцион продукции)
+MarketRequest* start_auction(Banker* banker, AuctionReport* ar, int auction_type);
+
+// проверка строящихся заводов у игроков
+int check_building_factories(Banker* banker, fd_set* readfds);
+
+// очистка сведений о покинувшем игру игроке
+int player_left_game(Banker* banker, Player* p);
 
 
 #endif

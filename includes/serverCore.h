@@ -15,8 +15,6 @@
 
 int server_init( char* );
 int server_run( Banker*, int );
-int send_message( int, const char**, int, const char* );
-int player_left_game( Banker*, Player* );
 
 
 #endif

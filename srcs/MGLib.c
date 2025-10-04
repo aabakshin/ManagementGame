@@ -8,9 +8,11 @@
 
 
 extern ssize_t read(int fd, void* buf, size_t count);
+extern ssize_t write(int fd, const void* buf, size_t count);
 extern size_t strlen(const char* s);
 extern char* strncpy(char* dest, const char* src, size_t n);
 extern void* memset(void* s, int c, size_t n);
+extern int printf(const char*, ...);
 
 
 enum { BUFSIZE = 1024 };
@@ -81,6 +83,13 @@ static void reverse(char* s);
 
 // Вспомогательная функция для itoa. Подсчитывает кол-во цифр в числе
 static int num_digit_cnt(int number);
+
+// Низкоуровневая функция отправки данных в виде строки на клиентский сокет
+static int send_data(int fd, const char* send_buf, int mes_len, const char* ip);
+
+
+
+
 
 
 
@@ -341,5 +350,54 @@ int readline(int fd, char* buf, int bufsize)
 	return total_read;
 }
 
+static int send_data(int fd, const char* send_buf, int mes_len, const char* ip)
+{
+	//log_info_count++;
+	//printf("\n==================== (%d) ====================\n", log_info_count);
+	printf("send_buf = %s\n", send_buf);
+
+	int wc = write(fd, send_buf, mes_len);
+
+	printf("Sent to [%s] %d\\%d bytes\n", ip, wc, mes_len);
+	//printf("==================== (%d) ====================\n\n", log_info_count);
+
+	if ( wc < 0 )
+		return 0;
+
+	return 1;
+}
+
+int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip)
+{
+	if (
+			( fd < 0 )						||
+			( message_tokens == NULL )		||
+			( *message_tokens == NULL )		||
+			( tokens_amount < 1 )			||
+			( ip == NULL )
+		)
+		return 0;
+
+
+	char buffer[BUFSIZE] = { 0 };
+
+	int i = 0;
+	for ( int j = 0; j < tokens_amount; j++ )
+	{
+		for ( int k = 0; message_tokens[j][k]; k++, i++ )
+			buffer[i] = message_tokens[j][k];
+		buffer[i] = '|';
+		i++;
+	}
+
+	buffer[i-1] = '\n';
+	buffer[i] = '\0';
+	int mes_len = i;
+
+	if ( !send_data(fd, buffer, mes_len, ip) )
+		return 0;
+
+	return 1;
+}
 
 #endif
