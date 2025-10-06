@@ -100,8 +100,8 @@ int banker_init(Banker* b)
 	b->products_requests = NULL;
 	b->sources_requests = NULL;
 	b->turn_number = 0;
-	int i;
-	for ( i = 0; i < MAX_PLAYERS; i++ )
+
+	for ( int i = 0; i < MAX_PLAYERS; i++ )
 		b->pl_array[i] = NULL;
 
 	cur_ms.max_product_price = 0;
@@ -281,7 +281,7 @@ int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketReques
 
 				int left_pl_num = p->number;
 				int p_fd = p->fd;
-				if ( player_left_game(banker, p) )
+				if ( clean_player_record(banker, p) )
 				{
 					banker->pl_array[i] = NULL;
 					FD_CLR(p_fd, readfds);
@@ -641,7 +641,7 @@ int check_building_factories(Banker* banker, fd_set* readfds)
 
 						int left_pl_num = p->number;
 						int p_fd = p->fd;
-						if ( player_left_game(banker, p) )
+						if ( clean_player_record(banker, p) )
 						{
 							banker->pl_array[i] = NULL;
 							FD_CLR(p_fd, readfds);
@@ -710,7 +710,7 @@ int check_building_factories(Banker* banker, fd_set* readfds)
 	return 1;
 }
 
-int player_left_game(Banker* banker, Player* p)
+int clean_player_record(Banker* banker, Player* p)
 {
 	if (
 						( banker == NULL )			||

@@ -108,7 +108,7 @@ MarketRequest* start_auction(Banker* banker, AuctionReport* ar, int auction_type
 int check_building_factories(Banker* banker, fd_set* readfds);
 
 // очистка сведений о покинувшем игру игроке
-int player_left_game(Banker* banker, Player* p);
+int clean_player_record(Banker* banker, Player* p);
 
 
 #endif
