@@ -6,7 +6,7 @@
 
 #include "../includes/serverCore.h"
 #include "../includes/MGLib.h"
-
+#include "../includes/CommandsHandler.h"
 
 
 enum
@@ -24,6 +24,9 @@ extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 extern const char* info_game_messages[];
 extern const char* error_game_messages[];
 
+// Описаны в модуле CommandsHandler
+extern char* command_tokens[3];
+extern int cmd_tokens_amount;
 
 // проверяет, является ли отправитель ботом, а не игроком
 static int is_correct_identity_msg(const char* identity_msg);
@@ -422,6 +425,7 @@ static int send_cmdinternalerror_message( int cs, const char* address_buffer )
 	return 1;
 }
 
+// Banker module
 static int send_newplayerconnect_message(Banker* b, Player* p)
 {
 	if (
@@ -449,6 +453,7 @@ static int send_newplayerconnect_message(Banker* b, Player* p)
 	return 1;
 }
 
+// Banker module
 static int send_gamenotstarted_message(Banker* b, Player* p)
 {
 	if (
@@ -467,6 +472,7 @@ static int send_gamenotstarted_message(Banker* b, Player* p)
 	return 1;
 }
 
+// Banker module
 static int send_lostlobbyplayer_message(Banker* b, Player* p)
 {
 	if (
@@ -495,6 +501,7 @@ static int send_lostlobbyplayer_message(Banker* b, Player* p)
 	return 1;
 }
 
+// Banker module
 static int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p)
 {
 	if (
@@ -525,6 +532,7 @@ static int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p)
 	return 1;
 }
 
+// Banker module
 static int send_newturn_message(Banker* b, Player* p)
 {
 	if (
@@ -566,6 +574,45 @@ static int send_newturn_message(Banker* b, Player* p)
 	return 1;
 }
 
+// Server module
+static int send_cmdincorrectargsnum_message(Banker* b, Player* p)
+{
+	if (
+						( b == NULL )			||
+						( p == NULL )
+		)
+		return 0;
+
+	const char* error_message[] =
+	{
+				error_game_messages[COMMAND_INCORRECT_ARGUMENTS_NUM],
+				NULL
+	};
+
+	send_message(p->fd, error_message, 1, p->ip);
+
+	return 1;
+}
+
+// Server module
+static int send_unknowncmd_message(Banker* b, Player* p)
+{
+	if (
+						( b == NULL )			||
+						( p == NULL )
+		)
+		return 0;
+
+	const char* unknown_cmd_message[] =
+	{
+				info_game_messages[UNKNOWN_COMMAND],
+				NULL
+	};
+	send_message(p->fd, unknown_cmd_message, 1, p->ip);
+
+	return 1;
+}
+
 static int concat_addr_port(char* address_buffer, const char* service_buffer)
 {
 	if (
@@ -585,6 +632,7 @@ static int concat_addr_port(char* address_buffer, const char* service_buffer)
 	return 1;
 }
 
+// Server module
 static int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 {
 	if (
@@ -612,8 +660,8 @@ static int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 			{
 				if ( b->alive_players == 1 )
 				{
-					int winner_number = last_man_stand(b);
-					printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", winner_number);
+					send_victory_message(b, p);
+					printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->number);
 					server_stop(b, readfds, 0);
 				}
 				else
@@ -626,6 +674,7 @@ static int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 
 	return 1;
 }
+
 
 /* запуск главного игрового цикла */
 int server_run(Banker* banker, int ls)
@@ -934,33 +983,16 @@ int server_run(Banker* banker, int ls)
 							{
 								send_gamenotstarted_message(banker, p);
 							}
-
 							continue;
 						}
 
 
 						// Обработка данных от игрока, когда игра началась
-						char* command_tokens[3] = {
-								NULL,
-								NULL,
-								NULL
-						};
-						int tokens_amnt = 0;
-						char* istr = strtok(read_buf, " ");
-						int j = 0;
-						while ( (istr != NULL) && ( j < 3 ) )
-						{
-							command_tokens[j] = istr;
-							j++;
-							istr = strtok(NULL, " ");
-						}
-						tokens_amnt = j;
-
-						if ( tokens_amnt < 1 )
+						make_cmd_tokens(read_buf, command_tokens, &cmd_tokens_amount, 3);
+						if ( cmd_tokens_amount < 1 )
 							continue;
 
-
-						int result_code = process_command(banker, p, (const char**)command_tokens, tokens_amnt);
+						int result_code = process_command(banker, p, (const char**)command_tokens, cmd_tokens_amount);
 						switch ( result_code )
 						{
 							case QUIT_COMMAND_NUM:
@@ -1006,7 +1038,13 @@ int server_run(Banker* banker, int ls)
 				MarketRequest* new_source_request = start_auction(banker, ar, 0);			/* 0 - аукцион сырья */
 				MarketRequest* new_prod_request = start_auction(banker, ar, 1);			/* 1 - аукцион продукции */
 
-				make_auction_report(banker, ar);
+				for ( int i = 0; i < MAX_PLAYERS; ++i )
+				{
+					Player* p = banker->pl_array[i];
+					if ( p != NULL )
+						send_auctionreport_message(banker, p, ar);
+				}
+
 				pay_charges(banker, &readfds, ar, &new_source_request, &new_prod_request);
 				report_on_turn(banker, ar, new_source_request, new_prod_request);
 

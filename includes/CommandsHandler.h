@@ -1,6 +1,8 @@
 #ifndef COMMANDS_HANDLER_H
 #define COMMANDS_HANDLER_H
 
+#include "Banker.h"
+
 struct CommandHandlerParams
 {
 	void* param1;
@@ -24,5 +26,8 @@ enum
 	QUIT_COMMAND_NUM,
 	UNKNOWN_COMMAND_NUM
 };
+
+int process_command(Banker* b, Player* p, const char** command_tokens, int tokens_amount);
+int make_cmd_tokens(char* read_buf, char** command_tokens, int* cmd_tokens_amount, int max_cmd_tokens_amount);
 
 #endif

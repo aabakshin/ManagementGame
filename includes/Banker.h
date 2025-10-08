@@ -6,9 +6,9 @@
 #ifndef BANKER_H
 #define BANKER_H
 
+
 #include "MarketRequest.h"
 #include "Player.h"
-#include "CommandsHandler.h"
 #include "MGLib.h"
 #include <stdlib.h>
 
@@ -77,7 +77,6 @@ struct Banker
 	MarketState* cur_market_state;
 	MarketRequest* sources_requests;
 	MarketRequest* products_requests;
-	const char** valid_commands;
 };
 typedef struct Banker Banker;
 
@@ -85,12 +84,7 @@ typedef struct Banker Banker;
 
 int banker_init(Banker* b);
 
-int last_man_stand(Banker* b);
-
-int process_command(Banker* b, Player* p, const char** command_tokens, int tokens_amount);
-
-// формирование и отправка отчёта каждому игроку по прошедшему аукциону
-int make_auction_report(Banker* b, AuctionReport* ar);
+int get_player_idx_by_num(Banker* b, int player_number);
 
 // расчёт и оплата игровых издержек каждым игроком
 int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr);
