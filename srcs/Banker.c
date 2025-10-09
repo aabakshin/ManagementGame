@@ -10,16 +10,38 @@
 extern const char* info_game_messages[];
 extern const char* error_game_messages[];
 
-
-// Описаны в модуле serverCore
-extern int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip);
-
 // Описаны в <string.h>
 extern int strcmp(const char* s1, const char* s2);
 extern char* strcpy(char* dest, const char* src);
 
 // Описана в <stdio.h>
 extern int printf(const char*, ...);
+
+// Описана в модуле serverCore
+extern int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
+
+
+int send_wfnt_message(Banker*, Player*);
+int send_victory_message(Banker* b, Player* p);
+int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar);
+static int send_successchargespay_message(int total_charges, Banker* b, Player* p);
+static int send_playerbankrot_message(int total_charges, Banker* b, Player* p);
+static int send_payfactorysuccess_message(Banker* b, Player* p);
+static int send_factorybuilt_message(Banker* b, Player* p);
+int send_produced_message(Banker* b, Player* p);
+int send_startinseconds_message(Banker* b, Player* p);
+int send_gamestarted_message(Banker* b, Player* p);
+int send_startgameinfo_message(Banker* b, Player* p);
+int send_startcancelled_message(Banker* b, Player* p);
+int send_newplayerconnect_message(Banker* b, Player* p);
+int send_gamenotstarted_message(Banker* b, Player* p);
+int send_lostlobbyplayer_message(Banker* b, Player* p);
+int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p);
+int send_newturn_message(Banker* b, Player* p);
+
+
+
+
 
 
 /* Таблица множителей для формулы вычисления нового состояния рынка в соответствии с текущим уровнем */
@@ -52,8 +74,8 @@ const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER] = {
 /* Параметры рынка */
 MarketState cur_ms;
 
-// Banker module
-static int send_wfnt_message(Banker* b, Player* p)
+
+int send_wfnt_message(Banker* b, Player* p)
 {
 	if (
 				( b == NULL )				||
@@ -78,8 +100,7 @@ static int send_wfnt_message(Banker* b, Player* p)
 	return 1;
 }
 
-// Banker module
-static int send_victory_message(Banker* b, Player* p)
+int send_victory_message(Banker* b, Player* p)
 {
 	if (
 				( b == NULL )			||
@@ -97,8 +118,7 @@ static int send_victory_message(Banker* b, Player* p)
 	return 1;
 }
 
-// Banker module
-static int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar)
+int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar)
 {
 	if (
 			( b == NULL )					||
@@ -168,13 +188,12 @@ static int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar)
 		k++;
 	}
 	tokns_amnt = k;
-	
+
 	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 
 	return 1;
 }
 
-// Banker module
 static int send_successchargespay_message(int total_charges, Banker* b, Player* p)
 {
 	if (
@@ -199,7 +218,6 @@ static int send_successchargespay_message(int total_charges, Banker* b, Player* 
 	return 1;
 }
 
-// Banker module
 static int send_playerbankrot_message(int total_charges, Banker* b, Player* p)
 {
 	if (
@@ -207,7 +225,7 @@ static int send_playerbankrot_message(int total_charges, Banker* b, Player* p)
 				( p == NULL )
 		)
 		return 0;
-	
+
 	char charges[20];
 	itoa(total_charges, charges, 19);
 
@@ -224,7 +242,6 @@ static int send_playerbankrot_message(int total_charges, Banker* b, Player* p)
 	return 1;
 }
 
-// Banker module
 static int send_payfactorysuccess_message(Banker* b, Player* p)
 {
 	if (
@@ -243,7 +260,6 @@ static int send_payfactorysuccess_message(Banker* b, Player* p)
 	return 1;
 }
 
-// Banker module
 static int send_factorybuilt_message(Banker* b, Player* p)
 {
 	if (
@@ -258,6 +274,309 @@ static int send_factorybuilt_message(Banker* b, Player* p)
 			NULL
 	};
 	send_message(p->fd, factory_built_mes, 1, p->ip);
+
+	return 1;
+}
+
+int send_produced_message(Banker* b, Player* p)
+{
+	if (
+			( b == NULL )			||
+			( p == NULL )
+		)
+		return 0;
+
+	char am_prd[10];
+	itoa(p->produced_on_turn, am_prd, 9);
+
+	int tokns_amnt = 2;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[PRODUCED],
+				am_prd,
+				NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_startinseconds_message(Banker* b, Player* p)
+{
+	if (
+			( b == NULL )			||
+			( p == NULL )
+		)
+		return 0;
+
+	char tts[10];
+	itoa(TIME_TO_START, tts, 9);
+
+	int tokns_amnt = 2;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[STARTINSECONDS],
+				tts,
+				NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_gamestarted_message(Banker* b, Player* p)
+{
+	if (
+			( b == NULL )					||
+			( p == NULL )
+		)
+		return 0;
+
+	const char* message[] =
+	{
+				info_game_messages[GAME_STARTED],
+				NULL
+	};
+
+	send_message(p->fd, message, 1, p->ip);
+
+	return 1;
+}
+
+int send_startgameinfo_message(Banker* b, Player* p)
+{
+	if (
+			( b == NULL )					||
+			( p == NULL )
+		)
+		return 0;
+
+	char p_num[10];
+	itoa(p->number, p_num, 9);
+
+	char ap[10];
+	itoa(b->alive_players, ap, 9);
+
+	char tn[10];
+	itoa(b->turn_number, tn, 9);
+
+	char p_money[20];
+	itoa(p->money, p_money, 19);
+
+	char p_sources[10];
+	itoa(p->sources, p_sources, 9);
+
+	char p_products[10];
+	itoa(p->products, p_products, 9);
+
+	char p_wf[10];
+	itoa(p->wait_factories, p_wf, 9);
+
+	char p_wrkf[10];
+	itoa(p->work_factories, p_wrkf, 9);
+
+	char p_bf[10];
+	itoa(p->build_factories, p_bf, 9);
+
+	char sa[10];
+	char msp[10];
+	char pa[10];
+	char mpp[10];
+
+	if ( p->is_bot )
+	{
+		itoa(b->cur_market_state->source_amount, sa, 9);
+		itoa(b->cur_market_state->min_source_price, msp, 9);
+		itoa(b->cur_market_state->product_amount, pa, 9);
+		itoa(b->cur_market_state->max_product_price, mpp, 9);
+	}
+
+	int tokns_amnt = (p->is_bot) ? 14 : 10;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[STARTING_GAME_INFORMATION],
+				p_num,
+				ap,
+				tn,
+				p_money,
+				p_sources,
+				p_products,
+				p_wf,
+				p_wrkf,
+				p_bf,
+				sa,
+				msp,
+				pa,
+				mpp,
+				NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_startcancelled_message(Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+
+	const char* mes_tokens[] =
+	{
+				info_game_messages[STARTCANCELLED],
+				NULL
+	};
+	send_message(p->fd, mes_tokens, 1, p->ip);
+
+	return 1;
+}
+
+int send_newplayerconnect_message(Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+	char lp_buf[10];
+	itoa(b->lobby_players, lp_buf, 9);
+
+	char max_pl_buf[10];
+	itoa(MAX_PLAYERS, max_pl_buf, 9);
+
+	int tokns_amnt = 3;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[NEW_PLAYER_CONNECT],
+				lp_buf,
+				max_pl_buf,
+				NULL
+	};
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_gamenotstarted_message(Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+	const char* message[] =
+	{
+				info_game_messages[GAME_NOT_STARTED],
+				NULL
+	};
+	send_message(p->fd, message, 1, p->ip);
+
+	return 1;
+}
+
+int send_lostlobbyplayer_message(Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+	char lp_buf[10];
+	itoa(b->lobby_players, lp_buf, 9);
+
+	char max_pl_buf[10];
+	itoa(MAX_PLAYERS, max_pl_buf, 9);
+
+	int tokns_amnt = 3;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[LOST_LOBBY_PLAYER],
+				lp_buf,
+				max_pl_buf,
+				NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+
+	char ap_buf[10];
+	itoa(b->alive_players, ap_buf, 9);
+
+	char left_p_num_buf[10];
+	itoa(left_pl_num, left_p_num_buf, 9);
+
+	int tokns_amnt = 3;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[LOST_ALIVE_PLAYER],
+				ap_buf,
+				left_p_num_buf,
+				NULL
+	};
+
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
+
+	return 1;
+}
+
+int send_newturn_message(Banker* b, Player* p)
+{
+	if (
+					( b == NULL )			||
+					( p == NULL )
+		)
+		return 0;
+
+	char nt[10];
+	itoa(b->turn_number, nt, 9);
+
+	char sa[10];
+	char msp[10];
+	char pa[10];
+	char mpp[10];
+
+	if ( p->is_bot )
+	{
+		itoa(b->cur_market_state->source_amount, sa, 9);
+		itoa(b->cur_market_state->min_source_price, msp, 9);
+		itoa(b->cur_market_state->product_amount, pa, 9);
+		itoa(b->cur_market_state->max_product_price, mpp, 9);
+	}
+
+	int tokns_amnt = (p->is_bot) ? 6 : 2;
+	char* mes_tokens[] =
+	{
+				(char*)info_game_messages[NEW_TURN],
+				nt,
+				sa,
+				msp,
+				pa,
+				mpp,
+				NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 
 	return 1;
 }
@@ -287,7 +606,7 @@ int banker_init(Banker* b)
 	b->cur_market_state = &cur_ms;
 
 	return 1;
-} 
+}
 
 int get_player_idx_by_num(Banker* b, int player_number)
 {
@@ -338,47 +657,10 @@ int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketReques
 			else
 			{
 				send_playerbankrot_message(total_charges, banker, p);
-
-
-				int left_pl_num = p->number;
-				int p_fd = p->fd;
-				if ( clean_player_record(banker, p) )
-				{
-					banker->pl_array[i] = NULL;
-					FD_CLR(p_fd, readfds);
-				}
-
-
-				if ( banker->alive_players == 1 )
-				{
-					Player* p = NULL;
-					int i;
-					for ( i = 0; i < MAX_PLAYERS; i++ )
-					{
-						p = banker->pl_array[i];
-						if ( p != NULL )
-							break;
-					}
-
-					if ( i >= MAX_PLAYERS )
-						return 0;
-					
-					send_victory_message(banker, p);
-					printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->number);
-					server_stop(banker, readfds, 0);
-				}
-				else
-				{
-					for ( i = 0; i < MAX_PLAYERS; i++ )
-					{
-						Player* p = banker->pl_array[i];
-						if ( p != NULL )
-							send_lostaliveplayer_message(left_pl_num, banker, p);
-					}
-				}
-			} /* end else */
-		} /* end if */
-	} /* end for */
+				server_quit_player(banker, i, readfds, p);
+			}
+		}
+	}
 
 	return 1;
 }
@@ -678,34 +960,7 @@ int check_building_factories(Banker* banker, fd_set* readfds)
 					else
 					{
 						send_playerbankrot_message(total_charges, banker, p);
-
-
-						int left_pl_num = p->number;
-						int p_fd = p->fd;
-						if ( clean_player_record(banker, p) )
-						{
-							banker->pl_array[i] = NULL;
-							FD_CLR(p_fd, readfds);
-						}
-
-
-
-						if ( banker->alive_players == 1 )
-						{
-							send_victory_message(banker, p);
-							printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->number);
-							server_stop(banker, readfds, 0);
-						}
-						else
-						{
-							for ( i = 0; i < MAX_PLAYERS; i++ )
-							{
-								Player* p = banker->pl_array[i];
-								if ( p != NULL )
-									send_lostaliveplayer_message(left_pl_num, banker, p);
-							}
-						}
-
+						server_quit_player(banker, i, readfds, p);
 					}
 				}
 				else if ( list->turns_left == 0 )
@@ -713,7 +968,7 @@ int check_building_factories(Banker* banker, fd_set* readfds)
 					bl_delete(&p->build_list, 0);
 					p->build_factories--;
 					p->wait_factories++;
-					
+
 					send_factorybuilt_message(banker, p);
 
 					list = p->build_list;
@@ -722,9 +977,7 @@ int check_building_factories(Banker* banker, fd_set* readfds)
 
 				list = list->next;
 			}
-			/* while list != NULL */
 		}
-		/* p != NULL */
 	}
 
 	return 1;
@@ -737,7 +990,7 @@ int clean_player_record(Banker* banker, Player* p)
 						( p == NULL )
 		)
 		return 0;
-	
+
 	int record_num = p->number;
 
 	if ( !banker->game_started )
@@ -758,7 +1011,7 @@ int clean_player_record(Banker* banker, Player* p)
 		mr_delete(&banker->products_requests, p);
 	}
 	free(p);
-	
+
 	printf("[+] Player #%d record has deleted\n", record_num);
 
 	return 1;

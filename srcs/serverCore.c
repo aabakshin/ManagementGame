@@ -15,7 +15,7 @@ enum
 };
 
 
-/* Описаны в модуле Banker */
+// Описаны в модуле Banker
 extern double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
 extern int price_table[MARKET_LEVEL_NUMBER][2];
 extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
@@ -28,6 +28,23 @@ extern const char* error_game_messages[];
 extern char* command_tokens[3];
 extern int cmd_tokens_amount;
 
+// Описаны в модуле Banker
+extern int send_victory_message(Banker* b, Player* p);
+extern int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar);
+extern int send_lostlobbyplayer_message(Banker* b, Player* p);
+extern int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p);
+extern int send_produced_message(Banker* b, Player* p);
+extern int send_startinseconds_message(Banker* b, Player* p);
+extern int send_gamestarted_message(Banker* b, Player* p);
+extern int send_startgameinfo_message(Banker* b, Player* p);
+extern int send_startcancelled_message(Banker* b, Player* p);
+extern int send_newplayerconnect_message(Banker* b, Player* p);
+extern int send_gamenotstarted_message(Banker* b, Player* p);
+extern int send_newturn_message(Banker* b, Player* p);
+
+
+
+
 // проверяет, является ли отправитель ботом, а не игроком
 static int is_correct_identity_msg(const char* identity_msg);
 
@@ -36,6 +53,17 @@ static int server_close_connection(Banker* b, fd_set* readfds, Player* p);
 
 // остановка сервера
 static void server_stop(Banker* banker, fd_set* readfds, int forcely);
+
+static int send_gamealreadystarted_message( int cs, const char* address_buffer );
+static int send_serverfull_message( int cs, const char* address_buffer );
+static int concat_addr_port(char* address_buffer, const char* service_buffer);
+
+int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
+int send_cmdinternalerror_message( int cs, const char* address_buffer );
+int send_cmdincorrectargsnum_message(int fd, const char* ip);
+int send_unknowncmd_message(int fd, const char* ip);
+
+
 
 
 /* Список сообщений для идентификации бот-клиента */
@@ -204,171 +232,6 @@ int server_init(char* port)
 	return ls;
 }
 
-// Banker module
-static int send_produced_message(Banker* b, Player* p)
-{
-	if (
-			( b == NULL )			||
-			( p == NULL )
-		)
-		return 0;
-
-	char am_prd[10];
-	itoa(p->produced_on_turn, am_prd, 9);
-
-	int tokns_amnt = 2;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[PRODUCED],
-				am_prd,
-				NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_startinseconds_message(Banker* b, Player* p)
-{
-	if (
-			( b == NULL )			||
-			( p == NULL )
-		)
-		return 0;
-
-	char tts[10];
-	itoa(TIME_TO_START, tts, 9);
-
-	int tokns_amnt = 2;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[STARTINSECONDS],
-				tts,
-				NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_gamestarted_message(Banker* b, Player* p)
-{
-	if (
-			( b == NULL )					||
-			( p == NULL )
-		)
-		return 0;
-
-	const char* message[] =
-	{
-				info_game_messages[GAME_STARTED],
-				NULL
-	};
-
-	send_message(p->fd, message, 1, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_startgameinfo_message(Banker* b, Player* p)
-{
-	if (
-			( b == NULL )					||
-			( p == NULL )
-		)
-		return 0;
-
-	char p_num[10];
-	itoa(p->number, p_num, 9);
-
-	char ap[10];
-	itoa(b->alive_players, ap, 9);
-
-	char tn[10];
-	itoa(b->turn_number, tn, 9);
-
-	char p_money[20];
-	itoa(p->money, p_money, 19);
-
-	char p_sources[10];
-	itoa(p->sources, p_sources, 9);
-
-	char p_products[10];
-	itoa(p->products, p_products, 9);
-
-	char p_wf[10];
-	itoa(p->wait_factories, p_wf, 9);
-
-	char p_wrkf[10];
-	itoa(p->work_factories, p_wrkf, 9);
-
-	char p_bf[10];
-	itoa(p->build_factories, p_bf, 9);
-
-	char sa[10];
-	char msp[10];
-	char pa[10];
-	char mpp[10];
-
-	if ( p->is_bot )
-	{
-		itoa(b->cur_market_state->source_amount, sa, 9);
-		itoa(b->cur_market_state->min_source_price, msp, 9);
-		itoa(b->cur_market_state->product_amount, pa, 9);
-		itoa(b->cur_market_state->max_product_price, mpp, 9);
-	}
-
-	int tokns_amnt = (p->is_bot) ? 14 : 10;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[STARTING_GAME_INFORMATION],
-				p_num,
-				ap,
-				tn,
-				p_money,
-				p_sources,
-				p_products,
-				p_wf,
-				p_wrkf,
-				p_bf,
-				sa,
-				msp,
-				pa,
-				mpp,
-				NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_startcancelled_message(Banker* b, Player* p)
-{
-	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-
-	const char* mes_tokens[] =
-	{
-				info_game_messages[STARTCANCELLED],
-				NULL
-	};
-	send_message(p->fd, mes_tokens, 1, p->ip);
-
-	return 1;
-}
-
-// Server module
 static int send_gamealreadystarted_message(int cs, const char* address_buffer)
 {
 	if (
@@ -387,7 +250,6 @@ static int send_gamealreadystarted_message(int cs, const char* address_buffer)
 	return 1;
 }
 
-// Server module
 static int send_serverfull_message(int cs, const char* address_buffer)
 {
 	if (
@@ -406,8 +268,7 @@ static int send_serverfull_message(int cs, const char* address_buffer)
 	return 1;
 }
 
-// Server module
-static int send_cmdinternalerror_message( int cs, const char* address_buffer )
+int send_cmdinternalerror_message( int cs, const char* address_buffer )
 {
 	if (
 					( cs < 0 )							||
@@ -425,161 +286,12 @@ static int send_cmdinternalerror_message( int cs, const char* address_buffer )
 	return 1;
 }
 
-// Banker module
-static int send_newplayerconnect_message(Banker* b, Player* p)
+int send_cmdincorrectargsnum_message(int fd, const char* ip)
 {
 	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-	char lp_buf[10];
-	itoa(b->lobby_players, lp_buf, 9);
-
-	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
-
-	int tokns_amnt = 3;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[NEW_PLAYER_CONNECT],
-				lp_buf,
-				max_pl_buf,
-				NULL
-	};
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_gamenotstarted_message(Banker* b, Player* p)
-{
-	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-	const char* message[] =
-	{
-				info_game_messages[GAME_NOT_STARTED],
-				NULL
-	};
-	send_message(p->fd, message, 1, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_lostlobbyplayer_message(Banker* b, Player* p)
-{
-	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-	char lp_buf[10];
-	itoa(b->lobby_players, lp_buf, 9);
-
-	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
-
-	int tokns_amnt = 3;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[LOST_LOBBY_PLAYER],
-				lp_buf,
-				max_pl_buf,
-				NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p)
-{
-	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-
-	char ap_buf[10];
-	itoa(b->alive_players, ap_buf, 9);
-
-	char left_p_num_buf[10];
-	itoa(left_pl_num, left_p_num_buf, 9);
-
-	int tokns_amnt = 3;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[LOST_ALIVE_PLAYER],
-				ap_buf,
-				left_p_num_buf,
-				NULL
-	};
-
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Banker module
-static int send_newturn_message(Banker* b, Player* p)
-{
-	if (
-					( b == NULL )			||
-					( p == NULL )
-		)
-		return 0;
-
-	char nt[10];
-	itoa(b->turn_number, nt, 9);
-
-	char sa[10];
-	char msp[10];
-	char pa[10];
-	char mpp[10];
-
-	if ( p->is_bot )
-	{
-		itoa(b->cur_market_state->source_amount, sa, 9);
-		itoa(b->cur_market_state->min_source_price, msp, 9);
-		itoa(b->cur_market_state->product_amount, pa, 9);
-		itoa(b->cur_market_state->max_product_price, mpp, 9);
-	}
-
-	int tokns_amnt = (p->is_bot) ? 6 : 2;
-	char* mes_tokens[] =
-	{
-				(char*)info_game_messages[NEW_TURN],
-				nt,
-				sa,
-				msp,
-				pa,
-				mpp,
-				NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
-
-// Server module
-static int send_cmdincorrectargsnum_message(Banker* b, Player* p)
-{
-	if (
-						( b == NULL )			||
-						( p == NULL )
+						( fd < 0 )			||
+						( ip == NULL )		||
+						( *ip == '\0' )
 		)
 		return 0;
 
@@ -589,17 +301,17 @@ static int send_cmdincorrectargsnum_message(Banker* b, Player* p)
 				NULL
 	};
 
-	send_message(p->fd, error_message, 1, p->ip);
+	send_message(fd, error_message, 1, ip);
 
 	return 1;
 }
 
-// Server module
-static int send_unknowncmd_message(Banker* b, Player* p)
+int send_unknowncmd_message(int fd, const char* ip)
 {
 	if (
-						( b == NULL )			||
-						( p == NULL )
+						( fd < 0 )			||
+						( ip == NULL )		||
+						( *ip == '\0' )
 		)
 		return 0;
 
@@ -608,7 +320,7 @@ static int send_unknowncmd_message(Banker* b, Player* p)
 				info_game_messages[UNKNOWN_COMMAND],
 				NULL
 	};
-	send_message(p->fd, unknown_cmd_message, 1, p->ip);
+	send_message(fd, unknown_cmd_message, 1, ip);
 
 	return 1;
 }
@@ -632,8 +344,7 @@ static int concat_addr_port(char* address_buffer, const char* service_buffer)
 	return 1;
 }
 
-// Server module
-static int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
+int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 {
 	if (
 					( b == NULL )							||
@@ -674,7 +385,6 @@ static int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 
 	return 1;
 }
-
 
 /* запуск главного игрового цикла */
 int server_run(Banker* banker, int ls)

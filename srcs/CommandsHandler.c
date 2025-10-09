@@ -4,21 +4,24 @@
 
 
 #include "../includes/CommandsHandler.h"
-#include "../includes/Banker.h"
 #include "../includes/MGLib.h"
-#include <stdlib.h>
-#include <string.h>
 
+// Описаны в модуле <string.h>
+extern char* strcpy(char*, const char*);
+extern char* strncpy(char*, const char*, size_t);
+extern char* strtok(char*, const char*);
+extern int strcmp(const char*, const char*);
 
 // Описаны в модуле MGLib
 extern const char* info_game_messages[];
-extern const char* error_game_messages[];
 
-
-extern int send_cmdincorrectargsnum_message( Banker*, Player* );
-extern int send_wfnt_message( Banker*, Player* );
-extern int send_unknowncmd_message( Banker*, Player* );
+// Описаны в модуле ServerCore
+extern int send_cmdincorrectargsnum_message( int, const char* );
+extern int send_unknowncmd_message( int, const char* );
 extern int send_cmdinternalerror_message( int, const char* );
+
+// Описана в модуле Banker
+extern int send_wfnt_message( Banker*, Player* );
 
 
 static int send_helpcmd_message( Banker*, Player* );
@@ -43,10 +46,6 @@ static int send_sellcmdsuccess_message( Banker* b, Player* p, int product_amount
 static int send_sellcmdincorrectprice_message( Banker* b, Player* p );
 static int send_sellcmdincorrectamount_message(Banker* b, Player* p);
 static int send_turn_command_message(Banker* b, Player* p);
-
-
-
-
 
 static int help_command_handler(Banker*, Player*, CommandHandlerParams*);
 static int market_command_handler(Banker*, Player*, CommandHandlerParams*);
@@ -138,7 +137,7 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 			{
 				if ( tokens_amount < 2 )
 				{
-					send_cmdincorrectargsnum_message(b, p);
+					send_cmdincorrectargsnum_message(p->fd, p->ip);
 				}
 				else
 				{
@@ -162,7 +161,7 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 				{
 					if ( tokens_amount < 3 )
 					{
-						send_cmdincorrectargsnum_message(b, p);
+						send_cmdincorrectargsnum_message(p->fd, p->ip);
 					}
 					else
 					{
@@ -199,7 +198,7 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 				{
 					if ( tokens_amount < 3 )
 					{
-						send_cmdincorrectargsnum_message(b, p);
+						send_cmdincorrectargsnum_message(p->fd, p->ip);
 					}
 					else
 					{
@@ -291,7 +290,7 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 		}
 	}
 
-	send_unknowncmd_message(b, p);
+	send_unknowncmd_message(p->fd, p->ip);
 
 	return UNKNOWN_COMMAND_NUM;
 }
@@ -1017,7 +1016,7 @@ static int build_command_handler(Banker* b, Player* p, CommandHandlerParams* chp
 
 		if ( strcmp( arg, "list") != 0 )
 		{
-			send_cmdincorrectargsnum_message(b, p);
+			send_cmdincorrectargsnum_message(p->fd, p->ip);
 		}
 		else
 		{
