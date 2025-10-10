@@ -13,7 +13,14 @@ typedef struct CommandHandlerParams CommandHandlerParams;
 /* Константы для нумерации индексов валидных команд(порядок должен совпадать с порядком следования элементов в valid_commands) */
 enum
 {
-	ERROR_COMMAND_NUM		=		-1,
+	INTERNAL_COMMAND_ERROR,
+	INCORRECT_ARGS_COMMAND_ERROR,
+	WFNT_COMMAND_ERROR,
+	UNKNOWN_COMMAND_ERROR
+};
+
+enum
+{
 	HELP_COMMAND_NUM,
 	MARKET_COMMAND_NUM,
 	PLAYER_COMMAND_NUM,
@@ -23,8 +30,7 @@ enum
 	BUY_COMMAND_NUM,
 	SELL_COMMAND_NUM,
 	TURN_COMMAND_NUM,
-	QUIT_COMMAND_NUM,
-	UNKNOWN_COMMAND_NUM
+	QUIT_COMMAND_NUM
 };
 
 int process_command(Banker* b, Player* p, const char** command_tokens, int tokens_amount);

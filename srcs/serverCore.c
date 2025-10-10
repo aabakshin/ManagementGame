@@ -43,26 +43,16 @@ extern int send_gamenotstarted_message(Banker* b, Player* p);
 extern int send_newturn_message(Banker* b, Player* p);
 
 
-
-
-// проверяет, является ли отправитель ботом, а не игроком
 static int is_correct_identity_msg(const char* identity_msg);
-
-// закрыть соединение с определённым игроком
 static int server_close_connection(Banker* b, fd_set* readfds, Player* p);
-
-// остановка сервера
 static void server_stop(Banker* banker, fd_set* readfds, int forcely);
-
 static int send_gamealreadystarted_message( int cs, const char* address_buffer );
 static int send_serverfull_message( int cs, const char* address_buffer );
 static int concat_addr_port(char* address_buffer, const char* service_buffer);
 
-int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
-int send_cmdinternalerror_message( int cs, const char* address_buffer );
-int send_cmdincorrectargsnum_message(int fd, const char* ip);
-int send_unknowncmd_message(int fd, const char* ip);
 
+int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
+int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip);
 
 
 
@@ -91,7 +81,7 @@ static int players_prepared = 0;
 static int timer_set = 0;
 
 /* Счётчик событий в логе сервера */
-//static int log_info_count = 0;
+static int log_info_count = 0;
 
 /* Ф-я-обработчик сигнала SIGALRM */
 void alrm_handler(int sig_no)
@@ -116,6 +106,60 @@ void exit_handler(int sig_no)
 	exit_flag = 1;
 
 	errno = save_errno;
+}
+
+int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip)
+{
+	if (
+					( fd < 0 )						||
+					( message_tokens == NULL )		||
+					( *message_tokens == NULL )		||
+					( tokens_amount < 1 )			||
+					( ip == NULL )
+		)
+		return 0;
+
+
+	char send_buf[BUFSIZE] = { 0 };
+
+	int i = 0;
+	for ( int j = 0; j < tokens_amount; j++ )
+	{
+		for ( int k = 0; message_tokens[j][k]; k++, i++ )
+			send_buf[i] = message_tokens[j][k];
+		send_buf[i] = '|';
+		i++;
+	}
+
+	send_buf[i-1] = '\n';
+	send_buf[i] = '\0';
+	int mes_len = i;
+
+	int wc = write(fd, send_buf, mes_len);
+	if ( wc < 0 )
+		return 0;
+
+	++log_info_count;
+
+
+
+	printf("\n==================== (%d) ====================\n", log_info_count);
+
+	for ( int i = 0; i < 50; ++i )
+	{
+		printf("%3d ", send_buf[i]);
+		if ( ((i+1) % 10) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf(
+			//"\n==================== (%d) ====================\n"
+					"send_buf = %s\n"
+					"Sent to [%s] %d\\%d bytes\n"
+					"==================== (%d) ====================\n\n", /*log_info_count,*/ send_buf, ip, wc, mes_len, log_info_count);
+
+	return 1;
 }
 
 static int is_correct_identity_msg(const char* identity_msg)
@@ -268,7 +312,7 @@ static int send_serverfull_message(int cs, const char* address_buffer)
 	return 1;
 }
 
-int send_cmdinternalerror_message( int cs, const char* address_buffer )
+static int send_cmdinternalerror_message( int cs, const char* address_buffer )
 {
 	if (
 					( cs < 0 )							||
@@ -286,7 +330,7 @@ int send_cmdinternalerror_message( int cs, const char* address_buffer )
 	return 1;
 }
 
-int send_cmdincorrectargsnum_message(int fd, const char* ip)
+static int send_cmdincorrectargsnum_message(int fd, const char* ip)
 {
 	if (
 						( fd < 0 )			||
@@ -306,7 +350,7 @@ int send_cmdincorrectargsnum_message(int fd, const char* ip)
 	return 1;
 }
 
-int send_unknowncmd_message(int fd, const char* ip)
+static int send_unknowncmd_message(int fd, const char* ip)
 {
 	if (
 						( fd < 0 )			||
@@ -321,6 +365,31 @@ int send_unknowncmd_message(int fd, const char* ip)
 				NULL
 	};
 	send_message(fd, unknown_cmd_message, 1, ip);
+
+	return 1;
+}
+
+static int send_wfnt_message(Banker* b, Player* p)
+{
+	if (
+				( b == NULL )				||
+				( p == NULL )
+		)
+		return 0;
+
+	char w_y_p_a[10];
+	int wait_yet_players_amount = b->alive_players - b->ready_players;
+	itoa(wait_yet_players_amount, w_y_p_a, 9);
+
+	int tokns_amnt = 2;
+	char* mes_tokens[] =
+	{
+			(char*)info_game_messages[WAIT_FOR_NEXT_TURN],
+			w_y_p_a,
+			NULL
+	};
+
+	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
 
 	return 1;
 }
@@ -708,8 +777,17 @@ int server_run(Banker* banker, int ls)
 							case QUIT_COMMAND_NUM:
 								server_quit_player(banker, i, &readfds, p);
 								break;
-							case ERROR_COMMAND_NUM:
+							case INTERNAL_COMMAND_ERROR:
 								send_cmdinternalerror_message(p->fd, p->ip);
+								break;
+							case INCORRECT_ARGS_COMMAND_ERROR:
+								send_cmdincorrectargsnum_message(p->fd, p->ip);
+								break;
+							case UNKNOWN_COMMAND_ERROR:
+								send_unknowncmd_message(p->fd, p->ip);
+								break;
+							case WFNT_COMMAND_ERROR:
+								send_wfnt_message(banker, p);
 						}
 					} /* end of if (rc > 0) */
 					else

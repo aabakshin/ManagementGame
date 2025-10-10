@@ -40,6 +40,7 @@ enum
 					PROD_COMMAND_NO_SOURCE,
 					BUILDING_FACTORIES_LIST,
 					BUILDING_FACTORIES_LIST_EMPTY,
+					BUILD_COMMAND_INCORRECT_ARG,
 					BUILD_COMMAND_SUCCESS,
 					BUILD_COMMAND_NO_MONEY,
 					BUY_COMMAND_ALREADY_SENT,
@@ -72,9 +73,6 @@ void itoa(int number, char* num_buf, int max_buf_len);
 
 /* Читает строку из станд. потока ввода. Является аналогом fgets */
 int readline(int fd, char* buf, int bufsize);
-
-/* Отправка сообщения конкретному игроку */
-int send_message( int fd, const char** message_tokens, int tokens_amount, const char* ip );
 
 /* Обрезать строку по символу ch, затирая его. Область памяти s должна быть изменяемая! */
 int cut_str(char* s, int s_size, int ch);

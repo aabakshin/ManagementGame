@@ -16,12 +16,7 @@ extern int strcmp(const char*, const char*);
 extern const char* info_game_messages[];
 
 // Описаны в модуле ServerCore
-extern int send_cmdincorrectargsnum_message( int, const char* );
-extern int send_unknowncmd_message( int, const char* );
-extern int send_cmdinternalerror_message( int, const char* );
-
-// Описана в модуле Banker
-extern int send_wfnt_message( Banker*, Player* );
+extern int send_message( int, const char**, int, const char* );
 
 
 static int send_helpcmd_message( Banker*, Player* );
@@ -39,28 +34,39 @@ static int send_buildcmdnomoney_message( Banker*, Player* );
 static int send_buycmdalreadysent_message( Banker*, Player* );
 static int send_buycmdnomoney_message( Banker*, Player* );
 static int send_buycmdsuccess_message( Banker* b, Player* p, int source_amount, int source_price );
-static int send_buycmdincorrectprice_message( Banker* b, Player* p );
-static int send_buycmdincorrectamount_message(Banker* b, Player* p);
-static int send_sellcmdalreadysent_message( Banker* b, Player* p );
+static int send_buycmdincorrectprice_message( Banker*, Player* );
+static int send_buycmdincorrectamount_message(Banker*, Player* );
+static int send_sellcmdalreadysent_message( Banker*, Player* );
 static int send_sellcmdsuccess_message( Banker* b, Player* p, int product_amount, int product_price );
-static int send_sellcmdincorrectprice_message( Banker* b, Player* p );
-static int send_sellcmdincorrectamount_message(Banker* b, Player* p);
-static int send_turn_command_message(Banker* b, Player* p);
+static int send_sellcmdincorrectprice_message( Banker*, Player* );
+static int send_sellcmdincorrectamount_message( Banker*, Player* );
+static int send_turn_command_message( Banker*, Player* );
 
-static int help_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int market_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int player_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int list_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int prod_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int build_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int buy_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int sell_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int turn_command_handler(Banker*, Player*, CommandHandlerParams*);
-static int quit_command_handler(Banker*, Player*, CommandHandlerParams*);
+static int help_function( Banker* b, Player* p, int j, int tokens_amount );
+static int market_function( Banker* b, Player* p, int j, int tokens_amount );
+static int player_function( Banker* b, Player* p, int j, int tokens_amount );
+static int list_function( Banker* b, Player* p, int j, int tokens_amount );
+static int produce_function( Banker* b, Player* p, int j, int tokens_amount );
+static int build_function( Banker* b, Player* p, int j, int tokens_amount );
+static int buy_function( Banker* b, Player* p, int j, int tokens_amount );
+static int sell_function( Banker* b, Player* p, int j, int tokens_amount );
+static int turn_function( Banker* b, Player* p, int j, int tokens_amount );
+static int quit_function( Banker* b, Player* p, int j, int tokens_amount );
+
+static int help_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int market_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int player_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int list_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int prod_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int build_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int buy_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int sell_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int turn_command_handler( Banker*, Player*, CommandHandlerParams* );
+static int quit_command_handler( Banker*, Player*, CommandHandlerParams* );
 
 
 /* Список действительных игровых команд */
-const char* valid_commands[] = {
+static const char* valid_commands[] = {
 				"help",
 				"market",
 				"player",
@@ -75,7 +81,7 @@ const char* valid_commands[] = {
 };
 
 /* Список функций-обработчиков валидных команд(порядок должен совпадать с порядком следования элементов в valid_commands) */
-int (*commands_handlers[])(Banker*, Player*, CommandHandlerParams* ) =
+static int (*commands_handlers[])(Banker*, Player*, CommandHandlerParams* ) =
 {
 					help_command_handler,
 					market_command_handler,
@@ -101,8 +107,23 @@ char* command_tokens[3] = {
 int cmd_tokens_amount = 0;
 
 // Параметры конкретной игровой команды
-CommandHandlerParams cmd_hdl_params = { NULL, NULL };
+static CommandHandlerParams cmd_hdl_params = { NULL, NULL };
 
+// Доступные игровые фукнции
+static int (*exec_game_function[])(Banker*, Player*, int, int) =
+{
+				help_function,
+				market_function,
+				player_function,
+				list_function,
+				produce_function,
+				build_function,
+				buy_function,
+				sell_function,
+				turn_function,
+				quit_function,
+				NULL
+};
 
 
 int process_command(Banker* b, Player* p, const char** command_tokens, int tokens_amount)
@@ -114,8 +135,7 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 					( *command_tokens == NULL )			||
 					( tokens_amount < 1 )
 		)
-		return ERROR_COMMAND_NUM;
-
+		return INTERNAL_COMMAND_ERROR;
 
 
 	char command_str[100];
@@ -123,186 +143,21 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 	cut_str(command_str, 100, '\n');
 
 
-	CommandHandlerParams cmd_hdl_params;
-	cmd_hdl_params.param1 = NULL;
-	cmd_hdl_params.param2 = NULL;
-
-
-	int j;
-	for ( j = 0; valid_commands[j] != NULL; j++ )
-	{
+	for ( int j = 0; valid_commands[j] != NULL; j++ )
 		if ( strcmp(command_str, valid_commands[j]) == 0 )
-		{
-			if ( j == PLAYER_COMMAND_NUM )
-			{
-				if ( tokens_amount < 2 )
-				{
-					send_cmdincorrectargsnum_message(p->fd, p->ip);
-				}
-				else
-				{
-					char param1_str[100];
-					strcpy(param1_str, command_tokens[1]);
-					cut_str(param1_str, 100, '\n');
+			return exec_game_function[j](b, p, j, tokens_amount);
 
-					int player_number = atoi(param1_str);
-					cmd_hdl_params.param1 = (void*) &player_number;
-
-
-					commands_handlers[j](b, p, &cmd_hdl_params);
-				}
-
-				return PLAYER_COMMAND_NUM;
-			}
-
-			if ( j == BUY_COMMAND_NUM )
-			{
-				if ( !(p->is_turn) )
-				{
-					if ( tokens_amount < 3 )
-					{
-						send_cmdincorrectargsnum_message(p->fd, p->ip);
-					}
-					else
-					{
-						char param1_str[100];
-						strcpy(param1_str, command_tokens[1]);
-						cut_str(param1_str, 100, '\n');
-
-						int sources_amount = atoi(param1_str);
-						cmd_hdl_params.param1 = (void*) &sources_amount;
-
-
-						char param2_str[100];
-						strcpy(param2_str, command_tokens[2]);
-						cut_str(param2_str, 100, '\n');
-
-						int sources_price = atoi(param2_str);
-						cmd_hdl_params.param2 = (void*) &sources_price;
-
-
-						commands_handlers[j](b, p, &cmd_hdl_params);
-					}
-				}
-				else
-				{
-					send_wfnt_message(b, p);
-				}
-
-				return BUY_COMMAND_NUM;
-			}
-
-			if ( j == SELL_COMMAND_NUM )
-			{
-				if ( !(p->is_turn) )
-				{
-					if ( tokens_amount < 3 )
-					{
-						send_cmdincorrectargsnum_message(p->fd, p->ip);
-					}
-					else
-					{
-						char param1_str[100];
-						strcpy(param1_str, command_tokens[1]);
-						cut_str(param1_str, 100, '\n');
-
-						int products_amount = atoi(param1_str);
-						cmd_hdl_params.param1 = (void*) &products_amount;
-
-
-						char param2_str[100];
-						strcpy(param2_str, command_tokens[2]);
-						cut_str(param2_str, 100, '\n');
-
-						int products_price = atoi(param2_str);
-						cmd_hdl_params.param2 = (void*) &products_price;
-
-
-						commands_handlers[j](b, p, &cmd_hdl_params);
-					}
-				}
-				else
-				{
-					send_wfnt_message(b, p);
-				}
-
-				return SELL_COMMAND_NUM;
-			}
-
-			if ( j == PROD_COMMAND_NUM )
-			{
-				if ( !(p->is_turn) )
-				{
-					commands_handlers[j](b, p, &cmd_hdl_params);
-				}
-				else
-				{
-					send_wfnt_message(b, p);
-				}
-
-				return PROD_COMMAND_NUM;
-			}
-
-			if ( j == BUILD_COMMAND_NUM )
-			{
-				if ( !(p->is_turn) )
-				{
-					if ( tokens_amount >= 2 )
-					{
-						char param1_str[100];
-						strcpy(param1_str, command_tokens[1]);
-						cut_str(param1_str, 100, '\n');
-
-						char* list_subcommand = param1_str;
-						cmd_hdl_params.param1 = (void*) list_subcommand;
-					}
-					commands_handlers[j](b, p, &cmd_hdl_params);
-				}
-				else
-				{
-					send_wfnt_message(b, p);
-				}
-
-				return BUILD_COMMAND_NUM;
-			}
-
-			if ( j == TURN_COMMAND_NUM )
-			{
-				if ( !(p->is_turn) )
-				{
-					commands_handlers[j](b, p, &cmd_hdl_params);
-				}
-				else
-				{
-					send_wfnt_message(b, p);
-				}
-
-				return TURN_COMMAND_NUM;
-			}
-
-			if ( j == QUIT_COMMAND_NUM )
-			{
-				if ( commands_handlers[j](b, p, &cmd_hdl_params) )
-					return QUIT_COMMAND_NUM;
-
-				return ERROR_COMMAND_NUM;
-			}
-		}
-	}
-
-	send_unknowncmd_message(p->fd, p->ip);
-
-	return UNKNOWN_COMMAND_NUM;
+	return UNKNOWN_COMMAND_ERROR;
 }
 
 int make_cmd_tokens(char* read_buf, char** command_tokens, int* cmd_tokens_amount, int max_cmd_tokens_amount)
 {
 	if (
-			( read_buf == NULL )				||
-			( *read_buf == '\0' )				||
-			( *read_buf == '\n' )				||
-			( command_tokens == NULL )			||
-			( max_cmd_tokens_amount < 1 )
+					( read_buf == NULL )				||
+					( *read_buf == '\0' )				||
+					( *read_buf == '\n' )				||
+					( command_tokens == NULL )			||
+					( max_cmd_tokens_amount < 1 )
 		)
 		return 0;
 
@@ -320,6 +175,163 @@ int make_cmd_tokens(char* read_buf, char** command_tokens, int* cmd_tokens_amoun
 	return 1;
 }
 
+
+static int help_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	commands_handlers[j](b, p, &cmd_hdl_params);
+
+	return HELP_COMMAND_NUM;
+}
+
+static int market_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	commands_handlers[j](b, p, &cmd_hdl_params);
+
+	return MARKET_COMMAND_NUM;
+}
+
+static int player_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( tokens_amount < 2 )
+	{
+		return INCORRECT_ARGS_COMMAND_ERROR;
+	}
+
+	char param1_str[100];
+	strcpy(param1_str, command_tokens[1]);
+	cut_str(param1_str, 100, '\n');
+
+	int player_number = atoi(param1_str);
+	cmd_hdl_params.param1 = (void*) &player_number;
+
+	commands_handlers[j](b, p, &cmd_hdl_params);
+
+	return PLAYER_COMMAND_NUM;
+}
+
+static int list_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	commands_handlers[j](b, p, &cmd_hdl_params);
+
+	return LIST_COMMAND_NUM;
+}
+
+static int produce_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( !(p->is_turn) )
+	{
+		commands_handlers[j](b, p, &cmd_hdl_params);
+
+		return PROD_COMMAND_NUM;
+	}
+
+	return WFNT_COMMAND_ERROR;
+}
+
+static int build_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( !(p->is_turn) )
+	{
+		if ( tokens_amount >= 2 )
+		{
+			char param1_str[100];
+			strcpy(param1_str, command_tokens[1]);
+			cut_str(param1_str, 100, '\n');
+
+			char* list_subcommand = param1_str;
+			cmd_hdl_params.param1 = (void*) list_subcommand;
+		}
+
+		commands_handlers[j](b, p, &cmd_hdl_params);
+
+		return BUILD_COMMAND_NUM;
+	}
+
+	return WFNT_COMMAND_ERROR;
+}
+
+static int buy_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( !(p->is_turn) )
+	{
+		if ( tokens_amount < 3 )
+		{
+			return INCORRECT_ARGS_COMMAND_ERROR;
+		}
+
+		char param1_str[100];
+		strcpy(param1_str, command_tokens[1]);
+		cut_str(param1_str, 100, '\n');
+
+		int sources_amount = atoi(param1_str);
+		cmd_hdl_params.param1 = (void*) &sources_amount;
+
+
+		char param2_str[100];
+		strcpy(param2_str, command_tokens[2]);
+		cut_str(param2_str, 100, '\n');
+
+		int sources_price = atoi(param2_str);
+		cmd_hdl_params.param2 = (void*) &sources_price;
+
+		commands_handlers[j](b, p, &cmd_hdl_params);
+
+		return BUY_COMMAND_NUM;
+	}
+
+	return WFNT_COMMAND_ERROR;
+}
+
+static int sell_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( !(p->is_turn) )
+	{
+		if ( tokens_amount < 3 )
+		{
+			return INCORRECT_ARGS_COMMAND_ERROR;
+		}
+
+		char param1_str[100];
+		strcpy(param1_str, command_tokens[1]);
+		cut_str(param1_str, 100, '\n');
+
+		int products_amount = atoi(param1_str);
+		cmd_hdl_params.param1 = (void*) &products_amount;
+
+
+		char param2_str[100];
+		strcpy(param2_str, command_tokens[2]);
+		cut_str(param2_str, 100, '\n');
+
+		int products_price = atoi(param2_str);
+		cmd_hdl_params.param2 = (void*) &products_price;
+
+		commands_handlers[j](b, p, &cmd_hdl_params);
+
+		return SELL_COMMAND_NUM;
+	}
+
+	return WFNT_COMMAND_ERROR;
+}
+
+static int turn_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	if ( !(p->is_turn) )
+	{
+		commands_handlers[j](b, p, &cmd_hdl_params);
+
+		return TURN_COMMAND_NUM;
+	}
+
+	return WFNT_COMMAND_ERROR;
+}
+
+static int quit_function(Banker* b, Player* p, int j, int tokens_amount)
+{
+	commands_handlers[j](b, p, &cmd_hdl_params);
+
+	return QUIT_COMMAND_NUM;
+}
 
 
 static int send_helpcmd_message(Banker* b, Player* p)
@@ -552,6 +564,24 @@ static int send_prodcmdnosource_message(Banker* b, Player* p)
 					NULL
 	};
 	send_message(p->fd, sources_message, 1, p->ip);
+
+	return 1;
+}
+
+static int send_buildcmdincorrectarg_message(Banker* b, Player* p)
+{
+	if (
+			( b == NULL )			||
+			( p == NULL )
+		)
+		return 0;
+
+	const char* incorrect_arg_value[] =
+	{
+					info_game_messages[BUILD_COMMAND_INCORRECT_ARG],
+					NULL
+	};
+	send_message(p->fd, incorrect_arg_value, 1, p->ip);
 
 	return 1;
 }
@@ -1016,7 +1046,7 @@ static int build_command_handler(Banker* b, Player* p, CommandHandlerParams* chp
 
 		if ( strcmp( arg, "list") != 0 )
 		{
-			send_cmdincorrectargsnum_message(p->fd, p->ip);
+			send_buildcmdincorrectarg_message(b, p);
 		}
 		else
 		{
@@ -1027,17 +1057,12 @@ static int build_command_handler(Banker* b, Player* p, CommandHandlerParams* chp
 	{
 		if ( p->money >= NEW_FACTORY_UNIT_COST/2 )
 		{
-			if ( bl_insert(&p->build_list) )
-			{
-				p->money -= NEW_FACTORY_UNIT_COST/2;
-				p->build_factories += 1;
+			bl_insert(&p->build_list);
 
-				send_buildcmdsuccess_message(b, p);
-			}
-			else
-			{
-				send_cmdinternalerror_message(p->fd, p->ip);
-			}
+			p->money -= NEW_FACTORY_UNIT_COST/2;
+			p->build_factories += 1;
+
+			send_buildcmdsuccess_message(b, p);
 		}
 		else
 		{
@@ -1051,8 +1076,8 @@ static int build_command_handler(Banker* b, Player* p, CommandHandlerParams* chp
 static int buy_command_handler(Banker* b, Player* p, CommandHandlerParams* chp)
 {
 	if (
-			( b == NULL )									||
-			( p == NULL )									||
+			( b == NULL )					||
+			( p == NULL )					||
 			( chp == NULL )
 		)
 	{

@@ -19,11 +19,9 @@ extern int printf(const char*, ...);
 
 // Описана в модуле serverCore
 extern int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
+extern int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip);
 
 
-int send_wfnt_message(Banker*, Player*);
-int send_victory_message(Banker* b, Player* p);
-int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar);
 static int send_successchargespay_message(int total_charges, Banker* b, Player* p);
 static int send_playerbankrot_message(int total_charges, Banker* b, Player* p);
 static int send_payfactorysuccess_message(Banker* b, Player* p);
@@ -38,7 +36,8 @@ int send_gamenotstarted_message(Banker* b, Player* p);
 int send_lostlobbyplayer_message(Banker* b, Player* p);
 int send_lostaliveplayer_message(int left_pl_num, Banker* b, Player* p);
 int send_newturn_message(Banker* b, Player* p);
-
+int send_victory_message(Banker* b, Player* p);
+int send_auctionreport_message(Banker* b, Player* p, AuctionReport* ar);
 
 
 
@@ -75,30 +74,6 @@ const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER] = {
 MarketState cur_ms;
 
 
-int send_wfnt_message(Banker* b, Player* p)
-{
-	if (
-				( b == NULL )				||
-				( p == NULL )
-		)
-		return 0;
-
-	char w_y_p_a[10];
-	int wait_yet_players_amount = b->alive_players - b->ready_players;
-	itoa(wait_yet_players_amount, w_y_p_a, 9);
-
-	int tokns_amnt = 2;
-	char* mes_tokens[] =
-	{
-			(char*)info_game_messages[WAIT_FOR_NEXT_TURN],
-			w_y_p_a,
-			NULL
-	};
-
-	send_message(p->fd, (const char**)mes_tokens, tokns_amnt, p->ip);
-
-	return 1;
-}
 
 int send_victory_message(Banker* b, Player* p)
 {

@@ -178,6 +178,10 @@ int check_server_response(char* buffer)
 		{
 			printf("%s", "\n[!] You don't have enough sources to produce a product!\n\n");
 		}
+		else if ( strcmp(tokens[1], "BUILD_COMMAND_INCORRECT_ARG") == 0 )
+		{
+			printf("%s", "[!] Argument must be only \"list\" value!\n\n");
+		}
 		else if ( strcmp(tokens[1], "BUILD_COMMAND_SUCCESS") == 0 )
 		{
 			printf("%s", "\nYou have successfully started to build a new factory.\n\n");

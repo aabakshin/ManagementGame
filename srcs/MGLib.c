@@ -51,6 +51,7 @@ const char* info_game_messages[] =
 				"*INFO_MESSAGE|PROD_COMMAND_NO_SOURCE",
 				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST",
 				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST_EMPTY",
+				"*INFO_MESSAGE|BUILD_COMMAND_INCORRECT_ARG",
 				"*INFO_MESSAGE|BUILD_COMMAND_SUCCESS",
 				"*INFO_MESSAGE|BUILD_COMMAND_NO_MONEY",
 				"*INFO_MESSAGE|BUY_COMMAND_ALREADY_SENT",
@@ -83,10 +84,6 @@ static void reverse(char* s);
 
 // Вспомогательная функция для itoa. Подсчитывает кол-во цифр в числе
 static int num_digit_cnt(int number);
-
-// Низкоуровневая функция отправки данных в виде строки на клиентский сокет
-static int send_data(int fd, const char* send_buf, int mes_len, const char* ip);
-
 
 
 
@@ -348,56 +345,6 @@ int readline(int fd, char* buf, int bufsize)
 	strncpy(buf, buffer, total_read);
 
 	return total_read;
-}
-
-static int send_data(int fd, const char* send_buf, int mes_len, const char* ip)
-{
-	//log_info_count++;
-	//printf("\n==================== (%d) ====================\n", log_info_count);
-	printf("send_buf = %s\n", send_buf);
-
-	int wc = write(fd, send_buf, mes_len);
-
-	printf("Sent to [%s] %d\\%d bytes\n", ip, wc, mes_len);
-	//printf("==================== (%d) ====================\n\n", log_info_count);
-
-	if ( wc < 0 )
-		return 0;
-
-	return 1;
-}
-
-int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip)
-{
-	if (
-			( fd < 0 )						||
-			( message_tokens == NULL )		||
-			( *message_tokens == NULL )		||
-			( tokens_amount < 1 )			||
-			( ip == NULL )
-		)
-		return 0;
-
-
-	char buffer[BUFSIZE] = { 0 };
-
-	int i = 0;
-	for ( int j = 0; j < tokens_amount; j++ )
-	{
-		for ( int k = 0; message_tokens[j][k]; k++, i++ )
-			buffer[i] = message_tokens[j][k];
-		buffer[i] = '|';
-		i++;
-	}
-
-	buffer[i-1] = '\n';
-	buffer[i] = '\0';
-	int mes_len = i;
-
-	if ( !send_data(fd, buffer, mes_len, ip) )
-		return 0;
-
-	return 1;
 }
 
 #endif
