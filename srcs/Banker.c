@@ -561,6 +561,7 @@ int banker_init(Banker* b)
 	if ( b == NULL )
 		return 0;
 
+	b->players_prepared = 0;
 	b->lobby_players = 0;
 	b->alive_players = 0;
 	b->ready_players = 0;
@@ -594,6 +595,35 @@ int get_player_idx_by_num(Banker* b, int player_number)
 	}
 
 	return -1;
+}
+
+int check_producing_on_turn(Banker* b)
+{
+	if ( b == NULL )
+		return 0;
+
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		Player* p = b->pl_array[i];
+		if ( p != NULL )
+		{
+			if ( !p->is_prod )
+			{
+				while ( p->work_factories > 0 )
+				{
+					p->produced_on_turn++;
+					p->products++;
+					p->work_factories--;
+					p->wait_factories++;
+				}
+
+				if ( p->produced_on_turn > 0 )
+					send_produced_message(b, p);
+			}
+		}
+	}
+
+	return 1;
 }
 
 int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr)

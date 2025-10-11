@@ -67,6 +67,7 @@ typedef struct MarketState MarketState;
 /* Содержит основную информацию об игровом состоянии */
 struct Banker
 {
+	int players_prepared;
 	int turn_number;
 	int game_started;
 	int alive_players;
@@ -82,27 +83,30 @@ typedef struct Banker Banker;
 
 
 
-int banker_init(Banker* b);
+int banker_init( Banker* );
 
-int get_player_idx_by_num(Banker* b, int player_number);
+int get_player_idx_by_num( Banker*, int player_number );
+
+// проверка производства продукции игроками в начале нового месяца
+int check_producing_on_turn( Banker* );
 
 // расчёт и оплата игровых издержек каждым игроком
-int pay_charges(Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr);
+int pay_charges( Banker* banker, fd_set* readfds, AuctionReport* ar, MarketRequest** new_source_request_ptr, MarketRequest** new_prod_request_ptr );
 
 // формирование отчёта о прошедших событиях на текущем ходе
-int report_on_turn(Banker* banker, AuctionReport* ar, MarketRequest* new_source_request, MarketRequest* new_prod_request);
+int report_on_turn( Banker* banker, AuctionReport* ar, MarketRequest* new_source_request, MarketRequest* new_prod_request );
 
 // вычисление нового значения состояния рынка
-int change_market_state(Banker* banker);
+int change_market_state( Banker* banker );
 
 // запуск аукционов, auction_type принимает два значения: 0(аукцион сырья), 1(аукцион продукции)
-MarketRequest* start_auction(Banker* banker, AuctionReport* ar, int auction_type);
+MarketRequest* start_auction( Banker* banker, AuctionReport* ar, int auction_type );
 
 // проверка строящихся заводов у игроков
-int check_building_factories(Banker* banker, fd_set* readfds);
+int check_building_factories( Banker* banker, fd_set* readfds );
 
 // очистка сведений о покинувшем игру игроке
-int clean_player_record(Banker* banker, Player* p);
+int clean_player_record( Banker* banker, Player* p );
 
 
 #endif

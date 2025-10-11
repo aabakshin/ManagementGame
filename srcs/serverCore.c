@@ -50,6 +50,8 @@ static int send_gamealreadystarted_message( int cs, const char* address_buffer )
 static int send_serverfull_message( int cs, const char* address_buffer );
 static int concat_addr_port(char* address_buffer, const char* service_buffer);
 static int show_sending_message(const char* send_buf, int mes_len, const char* ip, int wc);
+static int server_fill_readfds(Banker* b, int ls);
+
 
 
 int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
@@ -75,14 +77,19 @@ static int exit_flag = 0;
 /* Номер полученного сигнала */
 static int sig_number = 0;
 
-/* Флаг о готовности всех игроков к игре */
-static int players_prepared = 0;
-
 /* Флаг установки таймера */
 static int timer_set = 0;
 
 /* Счётчик отправленных сообщений сервером */
 static int log_info_count = 0;
+
+/* мн-во сокетов, с которых можно считывать данные */
+static fd_set readfds;
+
+/* Используется в select как макс. номер прослушиваемых сокетов */
+static int max_fd = 0;
+
+
 
 /* Ф-я-обработчик сигнала SIGALRM */
 void alrm_handler(int sig_no)
@@ -472,6 +479,34 @@ int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p)
 	return 1;
 }
 
+static int server_fill_readfds(Banker* b, int ls)
+{
+	if (
+					( b == NULL )		||
+					( ls < 0 )
+		)
+		return 0;
+
+	FD_ZERO(&readfds);
+
+	FD_SET(ls, &readfds);
+
+	max_fd = ls;
+
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		Player* p = b->pl_array[i];
+		if ( p != NULL )
+		{
+			FD_SET( p->fd, &readfds );
+			if ( p->fd > max_fd )
+				max_fd = p->fd;
+		}
+	}
+
+	return 1;
+}
+
 /* запуск главного игрового цикла */
 int server_run(Banker* banker, int ls)
 {
@@ -483,47 +518,11 @@ int server_run(Banker* banker, int ls)
 
 	while ( 1 )
 	{
-		fd_set readfds;
-
 		if ( exit_flag )
 			server_stop(banker, &readfds, 1);
 
-		FD_ZERO(&readfds);
-		FD_SET(ls, &readfds);
-		int max_fd = ls;
+		server_fill_readfds(banker, ls);
 
-		int i;
-		for ( i = 0; i < MAX_PLAYERS; i++ )
-		{
-			Player* p = banker->pl_array[i];
-			if ( p != NULL )
-			{
-				if ( banker->game_started && (!p->is_prod) )
-				{
-					int amount_products_prev = p->products;
-					int w_f = p->work_factories;
-
-					while ( p->work_factories > 0 )
-					{
-						p->work_factories--;
-						p->products++;
-						p->wait_factories++;
-					}
-
-					if ( w_f > 0 )
-					{
-						p->produced_on_turn = p->products - amount_products_prev;
-						send_produced_message(banker, p);
-					}
-				}
-
-				int fd = p->fd;
-				FD_SET( fd, &readfds );
-				if ( fd > max_fd )
-					max_fd = fd;
-			}
-		}
-		/* end for */
 
 		if ( !banker->game_started )
 		{
@@ -532,7 +531,7 @@ int server_run(Banker* banker, int ls)
 				alarm(TIME_TO_START);
 				timer_set = 1;
 
-				for ( i = 0; i < MAX_PLAYERS; i++ )
+				for ( int i = 0; i < MAX_PLAYERS; i++ )
 				{
 					Player* p = banker->pl_array[i];
 					if ( p != NULL )
@@ -561,9 +560,9 @@ int server_run(Banker* banker, int ls)
 		}
 		else
 		{
-			if ( !players_prepared )
+			if ( !banker->players_prepared )
 			{
-				players_prepared = 1;
+				banker->players_prepared = 1;
 
 				banker->alive_players = banker->lobby_players;
 				banker->lobby_players = 0;
@@ -592,8 +591,10 @@ int server_run(Banker* banker, int ls)
 						send_startgameinfo_message(banker, p);
 					}
 				}
-			} /* end if (!players_prepared) */
-		} /* end server_banker.game_started */
+			}
+
+			check_producing_on_turn(banker);
+		}
 
 
 		int res = select(max_fd+1, &readfds, NULL, NULL, NULL);
@@ -746,7 +747,7 @@ int server_run(Banker* banker, int ls)
 
 
 		char read_buf[BUFSIZE];
-		for ( i = 0; i < MAX_PLAYERS; i++ )
+		for ( int i = 0; i < MAX_PLAYERS; i++ )
 		{
 			Player* p = banker->pl_array[i];
 			if ( p != NULL )
@@ -815,6 +816,8 @@ int server_run(Banker* banker, int ls)
 			} /* end server_banker.pl_array[i] != NULL */
 		} /* end for */
 
+
+		// Действия, происходящие в конце игрового месяца
 		if ( banker->game_started )
 		{
 			if ( banker->ready_players == banker->alive_players )
