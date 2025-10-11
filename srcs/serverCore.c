@@ -49,6 +49,7 @@ static void server_stop(Banker* banker, fd_set* readfds, int forcely);
 static int send_gamealreadystarted_message( int cs, const char* address_buffer );
 static int send_serverfull_message( int cs, const char* address_buffer );
 static int concat_addr_port(char* address_buffer, const char* service_buffer);
+static int show_sending_message(const char* send_buf, int mes_len, const char* ip, int wc);
 
 
 int server_quit_player(Banker* b, int i, fd_set* readfds, Player* p);
@@ -80,7 +81,7 @@ static int players_prepared = 0;
 /* Флаг установки таймера */
 static int timer_set = 0;
 
-/* Счётчик событий в логе сервера */
+/* Счётчик отправленных сообщений сервером */
 static int log_info_count = 0;
 
 /* Ф-я-обработчик сигнала SIGALRM */
@@ -108,13 +109,47 @@ void exit_handler(int sig_no)
 	errno = save_errno;
 }
 
+static int show_sending_message(const char* send_buf, int mes_len, const char* ip, int wc)
+{
+	if (
+						( send_buf == NULL )			||
+						( *send_buf == '\n' )			||
+						( *send_buf == '\0' )			||
+						( mes_len < 0 )					||
+						( ip == NULL )					||
+						( *ip == '\0' )					||
+						( *ip == '\n' )					||
+						( wc < 0 )
+		)
+		return 0;
+
+	++log_info_count;
+
+	printf("\n==================== (%d) ====================\n", log_info_count);
+
+	for ( int i = 0; i < mes_len + 10; ++i )
+	{
+		printf("%3d ", send_buf[i]);
+		if ( ((i+1) % 10) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf(
+					"\nsend_buf = %s\n"
+					"Sent to [%s] %d\\%d bytes\n"
+					"==================== (%d) ====================\n\n", send_buf, ip, wc, mes_len, log_info_count);
+
+	return 1;
+}
+
 int send_message(int fd, const char** message_tokens, int tokens_amount, const char* ip)
 {
 	if (
-					( fd < 0 )						||
-					( message_tokens == NULL )		||
-					( *message_tokens == NULL )		||
-					( tokens_amount < 1 )			||
+					( fd < 0 )							||
+					( message_tokens == NULL )			||
+					( *message_tokens == NULL )			||
+					( tokens_amount < 1 )				||
 					( ip == NULL )
 		)
 		return 0;
@@ -139,25 +174,7 @@ int send_message(int fd, const char** message_tokens, int tokens_amount, const c
 	if ( wc < 0 )
 		return 0;
 
-	++log_info_count;
-
-
-
-	printf("\n==================== (%d) ====================\n", log_info_count);
-
-	for ( int i = 0; i < mes_len+10; ++i )
-	{
-		printf("%3d ", send_buf[i]);
-		if ( ((i+1) % 10) == 0 )
-			putchar('\n');
-	}
-	putchar('\n');
-
-	printf(
-			//"\n==================== (%d) ====================\n"
-					"\nsend_buf = %s\n"
-					"Sent to [%s] %d\\%d bytes\n"
-					"==================== (%d) ====================\n\n", /*log_info_count,*/ send_buf, ip, wc, mes_len, log_info_count);
+	show_sending_message(send_buf, mes_len, ip, wc);
 
 	return 1;
 }
