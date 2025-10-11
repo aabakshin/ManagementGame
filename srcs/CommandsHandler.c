@@ -140,7 +140,6 @@ int process_command(Banker* b, Player* p, const char** command_tokens, int token
 
 	char command_str[100];
 	strcpy(command_str, command_tokens[0]);
-	cut_str(command_str, 100, '\n');
 
 
 	for ( int j = 0; valid_commands[j] != NULL; j++ )

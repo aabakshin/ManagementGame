@@ -145,7 +145,7 @@ int send_message(int fd, const char** message_tokens, int tokens_amount, const c
 
 	printf("\n==================== (%d) ====================\n", log_info_count);
 
-	for ( int i = 0; i < 50; ++i )
+	for ( int i = 0; i < mes_len+10; ++i )
 	{
 		printf("%3d ", send_buf[i]);
 		if ( ((i+1) % 10) == 0 )
@@ -155,7 +155,7 @@ int send_message(int fd, const char** message_tokens, int tokens_amount, const c
 
 	printf(
 			//"\n==================== (%d) ====================\n"
-					"send_buf = %s\n"
+					"\nsend_buf = %s\n"
 					"Sent to [%s] %d\\%d bytes\n"
 					"==================== (%d) ====================\n\n", /*log_info_count,*/ send_buf, ip, wc, mes_len, log_info_count);
 

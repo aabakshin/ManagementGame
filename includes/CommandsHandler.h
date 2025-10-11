@@ -13,10 +13,10 @@ typedef struct CommandHandlerParams CommandHandlerParams;
 /* Константы для нумерации индексов валидных команд(порядок должен совпадать с порядком следования элементов в valid_commands) */
 enum
 {
-	INTERNAL_COMMAND_ERROR,
-	INCORRECT_ARGS_COMMAND_ERROR,
-	WFNT_COMMAND_ERROR,
-	UNKNOWN_COMMAND_ERROR
+	INTERNAL_COMMAND_ERROR					=				-4,
+	INCORRECT_ARGS_COMMAND_ERROR			=				-3,
+	WFNT_COMMAND_ERROR						=				-2,
+	UNKNOWN_COMMAND_ERROR					=				-1
 };
 
 enum

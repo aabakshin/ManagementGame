@@ -69,8 +69,8 @@ const char* info_game_messages[] =
 
 const char* error_game_messages[] =
 {
-				"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM\n",
-				"*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR\n",
+				"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM",
+				"*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR",
 				NULL
 };
 
