@@ -3,16 +3,11 @@
 #ifndef MGLIB_C
 #define MGLIB_C
 
-#include "../includes/MGLib.h"
+#include "MGLib.h"
 #include <stdlib.h>
-
-
-extern ssize_t read(int fd, void* buf, size_t count);
-extern ssize_t write(int fd, const void* buf, size_t count);
-extern size_t strlen(const char* s);
-extern char* strncpy(char* dest, const char* src, size_t n);
-extern void* memset(void* s, int c, size_t n);
-extern int printf(const char*, ...);
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 
 enum { BUFSIZE = 1024 };
