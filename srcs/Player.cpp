@@ -239,9 +239,9 @@ void Player::AuctionReport::SetBoughtPrice( int price_value )
 
 Player::Player( int p_fd, const char* p_addr, int p_uid )
 {
-	SetFd(p_fd);
-	SetAddr(p_addr);
-	SetUID(p_uid);
+	SetFd( p_fd );
+	SetAddr( p_addr );
+	SetUID( p_uid );
 
 	SetMoney(0);
 	SetOldMoney(0);
@@ -252,11 +252,12 @@ Player::Player( int p_fd, const char* p_addr, int p_uid )
 	SetWorkFactories(0);
 	SetBuiltFactories(0);
 	SetProduced(0);
+	SetFree();
 
 	UnsetBot();
 	UnsetIdentMsgRecv();
 	UnsetTurn();
-	UnsetProd();
+	//UnsetProd();
 	UnsetBankrot();
 	UnsetSentSourceRequest();
 	UnsetSentProductsRequest();
@@ -280,13 +281,21 @@ void Player::SetAddr( const char* p_addr )
 
 void Player::SetUID( int p_uid )
 {
-	if ( p_uid < 1 )
+	if ( p_uid < 0 )
 	{
 		return;
 		// throw InvalidUIDException();
 	}
 
 	uid = p_uid;
+}
+
+void Player::SetMessageBuffer( const char* msg, int msg_len )
+{
+	int i;
+	for ( i = 0; ( i < BUFSIZE-1 ) && ( i < msg_len ); ++i )
+		message[i] = msg[i];
+	message[i] = '\0';
 }
 
 void Player::SetMoney( int money_value )

@@ -1,11 +1,11 @@
-/* Файл реализации модуля serverCore */
-
 #ifndef SERVER_CORE_CPP
 #define SERVER_CORE_CPP
 
 
 #include "Server.hpp"
 #include "Banker.hpp"
+#include "BrokerMessages.hpp"
+#include "CommandExecutor.hpp"
 #include "MGLib.h"
 #include <signal.h>
 #include <errno.h>
@@ -20,7 +20,7 @@
 
 enum
 {
-	LISTEN_QUEUE_LEN			=						  5
+					LISTEN_QUEUE_LEN			=						  5
 };
 
 
@@ -33,33 +33,8 @@ extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 extern const char* info_game_messages[];
 extern const char* error_game_messages[];
 
-
-static int show_sending_message( const char* send_buf, int mes_len, const char* address, int wc );
-static int send_lostlobbyplayer_message( int lobby_players, int cs, const char* address );
-static int send_lostaliveplayer_message( int alive_players, int player_number, int cs, const char* address );
-static int send_victory_message( int cs, const char* address );
-static int send_startinseconds_message( int cs, const char* address );
-static int send_gamestarted_message( int cs, const char* address );
-static int send_gamealreadystarted_message( int cs, const char* address );
-static int send_startgameinfo_message( int alive_players, int turn_number, const Player*, const MarketState& );
-static int send_startcancelled_message( int cs, const char* address );
-static int send_newplayerconnect_message( int lobby_players, int cs, const char* address );
-static int send_gamenotstarted_message( int cs, const char* address );
-static int send_auctionreport_message( int ready_players, int turn_number, const Player* const* pl_array, int cs, const char* address );
-static int send_newturn_message( int turn_number, bool is_bot, const MarketState&, int cs, const char* address );
-static int send_serverfull_message( int cs, const char* address );
-static int send_cmdinternalerror_message( int cs, const char* address );
-static int send_cmdincorrectargsnum_message( int cs, const char* address );
-static int send_unknowncmd_message( int cs, const char* address );
-static int send_wfnt_message( int wait_yet_players_amount, int cs, const char* address );
-
-static bool is_correct_identity_msg( const char* identity_msg );
-static int concat_addr_port( char* address_buffer, const char* service_buffer );
-int send_message( const int fd, const char** message_tokens, const int tokens_amount, const char* address );
-
-
 /* Список сообщений для идентификации бот-клиента */
-static const char* bot_identity_messages[] = {
+static const char* const bot_identity_messages[] = {
 				"./bot_mg_debug4",
 				"./bot_mg_debug4\n",
 				"./bot_mg_release4",
@@ -92,6 +67,316 @@ void exit_handler( int sig_no )
 	errno = save_errno;
 }
 
+
+void Server::MessageTokens::NullifyMessageTokens()
+{
+	for ( int i = 0; i < max_msg_tokens_count; ++i )
+	{
+		if ( message_tokens[i] != nullptr )
+		{
+			delete[] message_tokens[i];
+			message_tokens[i] = nullptr;
+		}
+	}
+}
+
+void Server::MessageTokens::MakeMessageTokens( int tokens_count )
+{
+	message_tokens = new const char*[tokens_count];
+
+	max_msg_tokens_count = tokens_count;
+	msg_tokens_count = tokens_count;
+
+	for ( int i = 0; i < max_msg_tokens_count; ++i )
+	{
+		message_tokens[i] = new char[MESSAGE_TOKEN_SIZE];
+		memset(const_cast<char*>(message_tokens[i]), 0, MESSAGE_TOKEN_SIZE);
+	}
+}
+
+const char*& Server::MessageTokens::operator[]( int idx )
+{
+	if ( ( idx < 0 ) || ( idx > max_msg_tokens_count-1 ) )
+	{
+		return message_tokens[0];
+		//throw IncorrectMsgTokensIdxException();
+	}
+
+	return message_tokens[idx];
+}
+
+void Server::MessageTokens::SetMsgTokensCount( int tokens_value )
+{
+	if ( ( tokens_value < 1 ) || ( tokens_value > max_msg_tokens_count ) )
+	{
+		return;
+		// throw IncorrectMsgTokensValueException();
+	}
+
+	msg_tokens_count = tokens_value;
+}
+
+Server::MessageTokens::~MessageTokens()
+{
+	NullifyMessageTokens();
+
+	delete[] message_tokens;
+}
+
+
+void Server::Sender::ShowSendingMessage() const
+{
+	Server::SetSentMsgsCount( Server::GetSentMsgsCount() + 1 );
+	printf("\n==================== (%d) ====================\n", Server::GetSentMsgsCount());
+
+	for ( int i = 0; ( i < BUFSIZE ) && ( i < message_length ); ++i )
+	{
+		printf("%3d ", message[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Sent to [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", message, target_address, sent_bytes, message_length, Server::GetSentMsgsCount());
+}
+
+void Server::Sender::SendMessage( const char* const* message_tokens, int tokens_count, int cs, const char* address )
+{
+	bool overflow = false;
+
+	ResetCurPos();
+
+	for ( int j = 0; j < tokens_count; ++j )
+	{
+		for ( int k = 0; ( cur_pos < BUFSIZE-2 ) && message_tokens[j][k]; ++k, ++cur_pos )
+			message[cur_pos] = message_tokens[j][k];
+
+		if ( cur_pos >= BUFSIZE-2 )
+		{
+			message[BUFSIZE-2] = '\n';
+			message[BUFSIZE-1] = '\0';
+			message_length = BUFSIZE;
+			overflow = true;
+			break;
+		}
+
+		message[cur_pos] = '|';
+		++cur_pos;
+	}
+
+	if ( !overflow )
+	{
+		message[cur_pos] = '\n';
+		message[cur_pos+1] = '\0';
+		message_length = cur_pos + 2;
+	}
+
+	target_socket = cs;
+
+	strncpy(target_address, address, ADDRESS_SIZE-1);
+
+	sent_bytes = send( target_socket, message, message_length, 0 );
+
+	if ( sent_bytes < 0 )
+	{
+		return;
+		// throw UnableSendDataException();
+	}
+
+	ShowSendingMessage();
+
+	Reset();
+}
+
+void Server::Sender::SendMessage( const char* msg, int cs, const char* address )
+{
+	Reset();
+
+	for ( ; ( cur_pos < BUFSIZE-2 ) && msg[cur_pos]; ++cur_pos )
+		message[cur_pos] = msg[cur_pos];
+
+	message[cur_pos] = '\n';
+	message[cur_pos+1] = '\0';
+	message_length = cur_pos + 2;
+
+	target_socket = cs;
+
+	strncpy(target_address, address, ADDRESS_SIZE-1);
+
+	sent_bytes = send( target_socket, message, message_length, 0 );
+
+	if ( !IsSentMessage() )
+	{
+		return;
+		// throw UnableSendDataException();
+	}
+
+	ShowSendingMessage();
+}
+
+bool Server::Sender::IsSentMessage() const
+{
+	if ( ( sent_bytes >= 0 ) && ( sent_bytes <= BUFSIZE-1 ) )
+		return true;
+
+	return false;
+}
+
+void Server::Sender::Reset()
+{
+	ResetMessage();
+	ResetMessageLength();
+	ResetCurPos();
+	ResetTargetSocket();
+	ResetTargetAddress();
+	ResetSentBytes();
+}
+
+void Server::Sender::ResetMessage()
+{
+	memset(message, 0x00, BUFSIZE);
+}
+
+void Server::Sender::ResetMessageLength()
+{
+	message_length = 0;
+}
+
+void Server::Sender::ResetCurPos()
+{
+	cur_pos = 0;
+}
+
+void Server::Sender::ResetTargetSocket()
+{
+	target_socket = -1;
+}
+
+void Server::Sender::ResetTargetAddress()
+{
+	memset(target_address, 0x00, ADDRESS_SIZE);
+}
+
+void Server::Sender::ResetSentBytes()
+{
+	sent_bytes = 0;
+}
+
+
+void Server::Receiver::RecvMessage( int cs, const char* address )
+{
+	Reset();
+
+	target_socket = cs;
+
+	strncpy(target_address, address, ADDRESS_SIZE );
+
+	recv_bytes = readline( target_socket, message, BUFSIZE-1 );
+
+	if ( !IsRecvMessage() )
+	{
+		return;
+		// throw UnableRecvDataException();
+	}
+
+	message[recv_bytes] = '\0';
+	cut_str(message, recv_bytes, '\n');
+
+	int message_size = strlen(message) + 1;
+	delete_spaces(message, &message_size);
+
+	message_length = message_size - 1;
+
+	ShowReceivedMessage();
+}
+
+bool Server::Receiver::IsRecvMessage() const
+{
+	if ( ( recv_bytes >= 0 ) && ( recv_bytes <= BUFSIZE-1 ) )
+		return true;
+
+	return false;
+}
+
+void Server::Receiver::Reset()
+{
+	ResetMessage();
+	ResetMessageLength();
+	ResetCurPos();
+	ResetTargetSocket();
+	ResetTargetAddress();
+	ResetSentBytes();
+}
+
+void Server::Receiver::ResetMessage()
+{
+	memset(message, 0x00, BUFSIZE);
+}
+
+void Server::Receiver::ResetMessageLength()
+{
+	message_length = 0;
+}
+
+void Server::Receiver::ResetCurPos()
+{
+	cur_pos = 0;
+}
+
+void Server::Receiver::ResetTargetSocket()
+{
+	target_socket = -1;
+}
+
+void Server::Receiver::ResetTargetAddress()
+{
+	memset(target_address, 0x00, ADDRESS_SIZE);
+}
+
+void Server::Receiver::ResetSentBytes()
+{
+	recv_bytes = 0;
+}
+
+void Server::Receiver::ShowReceivedMessage() const
+{
+	Server::SetRecvMsgsCount( Server::GetRecvMsgsCount() + 1 );
+	printf("\n==================== (%d) ====================\n", Server::GetRecvMsgsCount());
+
+	for ( int i = 0; ( i < BUFSIZE ) && ( i < message_length ); ++i )
+	{
+		printf("%3d ", message[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Received from [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", message, target_address, recv_bytes, message_length, Server::GetRecvMsgsCount());
+}
+
+template <class T>
+void Server::EncapsulatedBrokerMessages<T>::MakeBroker( const Banker& game_session )
+{
+	brokerPTR = new T( game_session );
+}
+
+template <class T>
+const T& Server::EncapsulatedBrokerMessages<T>::GetBroker() const
+{
+	return const_cast<const T&>(*brokerPTR);
+}
+
+template <class T>
+Server::EncapsulatedBrokerMessages<T>::~EncapsulatedBrokerMessages()
+{
+	delete brokerPTR;
+}
+
+
 void Server::SetSignalNum( int value )
 {
 	if ( value < 0 )
@@ -114,6 +399,17 @@ void Server::SetSentMsgsCount( int msgs_value )
 	sent_msgs_count = msgs_value;
 }
 
+void Server::SetRecvMsgsCount( int msgs_value )
+{
+	if ( msgs_value < 0 )
+	{
+		return;
+		// throw InvalidValueException();
+	}
+
+	recv_msgs_count = msgs_value;
+}
+
 void Server::SetListenSocket( int socket_value )
 {
 	if ( socket_value < -1 )
@@ -127,18 +423,8 @@ void Server::SetListenSocket( int socket_value )
 
 void Server::SetAddrBuffer( const char* addr, const char* port )
 {
-	if (
-				( strlen(addr) >= ADDRESS_BUFFER )		||
-				( strlen(addr) < 1 )						||
-				( port == nullptr )
-		)
-	{
-		memset( address_buffer, 0, ADDRESS_BUFFER );
-		return;
-		// throw InvalidArgsValuesException();
-	}
-
 	printf("%s\n", "Configuring local address...");
+
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -152,19 +438,16 @@ void Server::SetAddrBuffer( const char* addr, const char* port )
 		// throw InvalidGetAddrInfoException();
 	}
 
-	char addr_buffer[100];
-	char serv_buffer[100];
 	getnameinfo(
 			GetBindAddress()->ai_addr,
 			GetBindAddress()->ai_addrlen,
-			addr_buffer,
-			sizeof(addr_buffer),
-			serv_buffer,
-			sizeof(serv_buffer),
-			NI_NUMERICHOST | NI_NUMERICSERV);
-	concat_addr_port(addr_buffer, serv_buffer);
+			address_buffer,
+			sizeof(address_buffer),
+			service_buffer,
+			sizeof(service_buffer),
+			NI_NUMERICHOST | NI_NUMERICSERV );
 
-	strcpy(address_buffer, addr_buffer );
+	ConcatAddrPort();
 }
 
 void Server::SetMaxFd( int max_value )
@@ -212,6 +495,9 @@ void Server::ListenSocketInit()
 
 Server::Server( const char* addr, const char* port )
 {
+	EBCbroker.MakeBroker( GetBanker() );
+	msg_tokens.MakeMessageTokens( MESSAGE_TOKENS_COUNT );
+
 	UnsetAlrmFlag();
 	UnsetExitFlag();
 	UnsetTimerFlag();
@@ -229,376 +515,8 @@ Server::~Server()
 	freeaddrinfo(GetBindAddress());
 }
 
-static int show_sending_message( const char* send_buf, int mes_len, const char* address, int wc )
-{
-	if (
-						( send_buf == nullptr )					||
-						( *send_buf == '\n' )					||
-						( *send_buf == '\0' )					||
-						( mes_len < 0 )							||
-						( address == nullptr )					||
-						( *address == '\0' )					||
-						( *address == '\n' )					||
-						( wc < 0 )
-		)
-		return 0;
 
-
-	Server::SetSentMsgsCount( Server::GetSentMsgsCount() + 1 );
-	printf("\n==================== (%d) ====================\n", Server::GetSentMsgsCount());
-
-	for ( int i = 0; i < mes_len + 10; ++i )
-	{
-		printf("%3d ", send_buf[i]);
-		if ( ((i+1) % 10) == 0 )
-			putchar('\n');
-	}
-	putchar('\n');
-
-	printf(
-					"\nsend_buf = %s\n"
-					"Sent to [%s] %d\\%d bytes\n"
-					"==================== (%d) ====================\n\n", send_buf, address, wc, mes_len, Server::GetSentMsgsCount());
-
-	return 1;
-}
-
-static int send_lostlobbyplayer_message( int lobby_players, int cs, const char* address )
-{
-	char lp_buf[10];
-	itoa(lobby_players, lp_buf, 9);
-
-	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
-
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[LOST_LOBBY_PLAYER]),
-				lp_buf,
-				max_pl_buf,
-				nullptr
-	};
-	send_message(cs, mes_tokens, 3, address);
-
-	return 1;
-}
-
-static int send_lostaliveplayer_message( int alive_players, int player_number, int cs, const char* address )
-{
-	char ap_buf[10];
-	itoa(alive_players, ap_buf, 9);
-
-	char left_p_num_buf[10];
-	itoa(player_number, left_p_num_buf, 9);
-
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[LOST_ALIVE_PLAYER]),
-				ap_buf,
-				left_p_num_buf,
-				nullptr
-	};
-	send_message(cs, mes_tokens, 3, address);
-
-	return 1;
-}
-
-static int send_victory_message( int cs, const char* address )
-{
-	const char* victory_message[] =
-	{
-				info_game_messages[VICTORY_MESSAGE],
-				nullptr
-	};
-	send_message(cs, victory_message, 1, address );
-
-	return 1;
-}
-
-static int send_startinseconds_message( int cs, const char* address )
-{
-	char tts[10];
-	itoa(TIME_TO_START, tts, 9);
-
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[STARTINSECONDS]),
-				tts,
-				nullptr
-	};
-	send_message(cs, mes_tokens, 2, address);
-
-	return 1;
-}
-
-static int send_gamestarted_message( int cs, const char* address )
-{
-	const char* message[] =
-	{
-				info_game_messages[GAME_STARTED],
-				nullptr
-	};
-	send_message(cs, message, 1, address);
-
-	return 1;
-}
-
-static int send_startgameinfo_message( int alive_players, int turn_number, const Player* p, const MarketState& market )
-{
-	char p_num[10];
-	itoa(p->GetUID(), p_num, 9);
-
-	char ap[10];
-	itoa(alive_players, ap, 9);
-
-	char tn[10];
-	itoa(turn_number, tn, 9);
-
-	char p_money[20];
-	itoa(p->GetMoney(), p_money, 19);
-
-	char p_sources[10];
-	itoa(p->GetSources(), p_sources, 9);
-
-	char p_products[10];
-	itoa(p->GetProducts(), p_products, 9);
-
-	char p_wf[10];
-	itoa(p->GetWaitFactories(), p_wf, 9);
-
-	char p_wrkf[10];
-	itoa(p->GetWorkFactories(), p_wrkf, 9);
-
-	char p_bf[10];
-	itoa(p->GetBuiltFactories(), p_bf, 9);
-
-	char sa[10];
-	char msp[10];
-	char pa[10];
-	char mpp[10];
-
-	int tokns_amnt = 10;
-	if ( p->IsBot() )
-	{
-		itoa(market.GetSourcesAmount(), sa, 9);
-		itoa(market.GetSourceMinPrice(), msp, 9);
-		itoa(market.GetProductsAmount(), pa, 9);
-		itoa(market.GetProductMaxPrice(), mpp, 9);
-		tokns_amnt = 14;
-	}
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[STARTING_GAME_INFORMATION]),
-				p_num,
-				ap,
-				tn,
-				p_money,
-				p_sources,
-				p_products,
-				p_wf,
-				p_wrkf,
-				p_bf,
-				sa,
-				msp,
-				pa,
-				mpp,
-				nullptr
-	};
-	send_message(p->GetFd(), mes_tokens, tokns_amnt, p->GetAddr());
-
-	return 1;
-}
-
-static int send_startcancelled_message( int cs, const char* address )
-{
-	const char* mes_tokens[] =
-	{
-				info_game_messages[STARTCANCELLED],
-				nullptr
-	};
-	send_message(cs, mes_tokens, 1, address);
-
-	return 1;
-}
-
-static int send_newplayerconnect_message( int lobby_players, int cs, const char* address )
-{
-	char lp_buf[10];
-	itoa(lobby_players, lp_buf, 9);
-
-	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
-
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[NEW_PLAYER_CONNECT]),
-				lp_buf,
-				max_pl_buf,
-				nullptr
-	};
-	send_message(cs, mes_tokens, 3, address);
-
-	return 1;
-}
-
-static int send_gamenotstarted_message( int cs, const char* address )
-{
-	const char* message[] =
-	{
-				info_game_messages[GAME_NOT_STARTED],
-				nullptr
-	};
-	send_message(cs, message, 1, address);
-
-	return 1;
-}
-
-static int send_auctionreport_message( int ready_players, int turn_number, const Player* const* pl_array, int cs, const char* address )
-{
-	enum
-	{
-			PL_REP_FIELDS_NUM		=		6,
-			TURN_SIZE				=		16,
-			PLAYER_NUM_SIZE			=		16,
-			SOLD_SOURCES_SIZE		=		16,
-			SOLD_PRICE_SIZE			=		24,
-			BOUGHT_PRODS_SIZE		=		16,
-			BOUGHT_PRICE_SIZE		=		24
-
-	};
-	struct player_report
-	{
-		char tn[TURN_SIZE];
-		char pnum[PLAYER_NUM_SIZE];
-		char ssnum[SOLD_SOURCES_SIZE];
-		char spnum[SOLD_PRICE_SIZE];
-		char bpnum[BOUGHT_PRODS_SIZE];
-		char bprnum[BOUGHT_PRICE_SIZE];
-	};
-
-	player_report pr[MAX_PLAYERS];
-	memset(pr, 0, sizeof(player_report) * MAX_PLAYERS);
-
-
-	int tokns_amnt = PL_REP_FIELDS_NUM * MAX_PLAYERS + 1;
-	char* mes_tokens[tokns_amnt];
-
-	for ( int i = 0; i < tokns_amnt; ++i )
-		mes_tokens[i] = nullptr;
-
-	mes_tokens[0] = const_cast<char*>(info_game_messages[AUCTION_RESULTS]);
-
-	int k = 1;
-	for ( int i = 0; i < ready_players; ++i )
-	{
-		itoa(turn_number, pr[i].tn, TURN_SIZE);
-		mes_tokens[k] = pr[i].tn;
-		k++;
-
-		itoa(pl_array[i]->GetUID(), pr[i].pnum, PLAYER_NUM_SIZE);
-		mes_tokens[k] = pr[i].pnum;
-		k++;
-
-		itoa(const_cast<Player*>(pl_array[i])->GetAuctionReport().GetSoldSources(), pr[i].ssnum, SOLD_SOURCES_SIZE);
-		mes_tokens[k] = pr[i].ssnum;
-		k++;
-
-		itoa(const_cast<Player*>(pl_array[i])->GetAuctionReport().GetSoldPrice(), pr[i].spnum, SOLD_PRICE_SIZE);
-		mes_tokens[k] = pr[i].spnum;
-		k++;
-
-		itoa(const_cast<Player*>(pl_array[i])->GetAuctionReport().GetBoughtProducts(), pr[i].bpnum, BOUGHT_PRODS_SIZE);
-		mes_tokens[k] = pr[i].bpnum;
-		k++;
-
-		itoa(const_cast<Player*>(pl_array[i])->GetAuctionReport().GetBoughtPrice(), pr[i].bprnum, BOUGHT_PRICE_SIZE);
-		mes_tokens[k] = pr[i].bprnum;
-		k++;
-	}
-	tokns_amnt = k;
-
-	send_message(cs, const_cast<const char**>(mes_tokens), tokns_amnt, address);
-
-	return 1;
-}
-
-static int send_newturn_message( int turn_number, bool is_bot, const MarketState& market, int cs, const char* address )
-{
-	char tn[10];
-	itoa(turn_number, tn, 9);
-
-	char sa[10];
-	char msp[10];
-	char pa[10];
-	char mpp[10];
-
-	int tokns_amnt = 2;
-	if ( is_bot )
-	{
-		itoa(market.GetSourcesAmount(), sa, 9);
-		itoa(market.GetSourceMinPrice(), msp, 9);
-		itoa(market.GetProductsAmount(), pa, 9);
-		itoa(market.GetProductMaxPrice(), mpp, 9);
-		tokns_amnt = 6;
-	}
-
-	const char* mes_tokens[] =
-	{
-				const_cast<char*>(info_game_messages[NEW_TURN]),
-				tn,
-				sa,
-				msp,
-				pa,
-				mpp,
-				nullptr
-	};
-	send_message(cs, mes_tokens, tokns_amnt, address);
-
-	return 1;
-}
-
-int send_message( int fd, const char** message_tokens, int tokens_amount, const char* ip )
-{
-	if (
-					( fd < 0 )								||
-					( message_tokens == nullptr )			||
-					( *message_tokens == nullptr )			||
-					( tokens_amount < 1 )					||
-					( ip == nullptr )
-		)
-		return 0;
-
-
-	char send_buf[BUFSIZE] = { 0 };
-
-	int i = 0;
-	for ( int j = 0; j < tokens_amount; j++ )
-	{
-		for ( int k = 0; message_tokens[j][k]; k++, i++ )
-			send_buf[i] = message_tokens[j][k];
-		send_buf[i] = '|';
-		i++;
-	}
-
-	send_buf[i-1] = '\n';
-	send_buf[i] = '\0';
-	int mes_len = i;
-
-	int wc = write(fd, send_buf, mes_len);
-	if ( wc < 0 )
-		return 0;
-
-	show_sending_message(send_buf, mes_len, ip, wc);
-
-	return 1;
-}
-
-static bool is_correct_identity_msg( const char* identity_msg )
+bool Server::IsCorrectIdentityMsg( const char* identity_msg )
 {
 	for ( int i = 0; bot_identity_messages[i] != nullptr; ++i )
 		if ( strcmp(identity_msg, bot_identity_messages[i]) == 0 )
@@ -607,14 +525,26 @@ static bool is_correct_identity_msg( const char* identity_msg )
 	return false;
 }
 
+void Server::ConcatAddrPort()
+{
+	int addr_len = strlen(address_buffer);
+	address_buffer[addr_len] = ':';
+
+	int i = addr_len + 1;
+	for ( int j = 0; ( j < SERVICE_SIZE-1 ) && service_buffer[j]; ++j, ++i )
+		address_buffer[i] = service_buffer[j];
+	address_buffer[i] = '\0';
+}
+
+
 int Server::CloseConnection( int player_number )
 {
-	int p_fd = GetBanker().GetPlayerByNum(player_number)->GetFd();
+	int p_fd = GetBanker().GetPlayers().GetPlayerByNum(player_number)->GetFd();
 	char ip[100] = { 0 };
-	strcpy(ip, GetBanker().GetPlayerByNum(player_number)->GetAddr());
+	strcpy(ip, GetBanker().GetPlayers().GetPlayerByNum(player_number)->GetAddr());
 
 
-	GetBanker().CleanPlayer(player_number);
+	const_cast<Banker&>(GetBanker()).CleanPlayer(player_number);
 	close(p_fd);
 	FD_CLR(p_fd, &readfds);
 	printf("[+] Lost connection from [%s]\n", ip);
@@ -630,7 +560,7 @@ void Server::Stop( int forcely )
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		CloseConnection( i+1 );
-		GetBanker().SetPlayer(i, nullptr);
+		//GetBanker().SetPlayer(i, nullptr);
 	}
 
 	if ( forcely )
@@ -639,128 +569,326 @@ void Server::Stop( int forcely )
 	exit(0);
 }
 
-static int send_gamealreadystarted_message( int cs, const char* address )
+int Server::PayCharges()
 {
-	const char* message[] =
+	int total_charges = 0;
+
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
-				info_game_messages[GAME_ALREADY_STARTED],
-				nullptr
-	};
-	send_message(cs, message, 1, address );
+		const Player* p = banker.GetPlayers()[i];
+		if ( p == nullptr )
+			return 0;
+
+		total_charges = p->GetSources() * SOURCE_UNIT_CHARGE;
+		total_charges += p->GetProducts() * PRODUCT_UNIT_CHARGE;
+		total_charges += p->GetWaitFactories() * FACTORY_UNIT_CHARGE;
+		total_charges += p->GetWorkFactories() * FACTORY_UNIT_CHARGE;
+
+		itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+		const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
+
+		int remains = p->GetMoney() - total_charges;
+		if ( remains > 0 )
+		{
+			const_cast<Player*>(p)->SetMoney( remains );
+			sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SUCCESS_CHARGES_PAY_TOKEN ), p->GetFd(), p->GetAddr() );
+		}
+		else
+		{
+			sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PLAYER_BANKROT_TOKEN ), p->GetFd(), p->GetAddr() );
+			const_cast<Player*>(p)->SetBankrot();
+		}
+	}
 
 	return 1;
 }
 
-static int send_serverfull_message( int cs, const char* address )
+int Server::ShowAuctionInfo( const char* auction_type_msg, const MarketRequestList::MarketRequest* node )
 {
-	const char* message[] =
+	printf("\n%s\n", auction_type_msg);
+
+	for ( ; node != nullptr; node = node->GetNext() )
 	{
-				info_game_messages[SERVER_FULL],
-				nullptr
-	};
-	send_message(cs, message, 1, address);
+		const Player* p = banker.GetPlayers().GetPlayerByNum(node->GetData().GetPlayerNum());
+		printf("Request of Player #%d:\n", p->GetUID());
+		printf("\tPrice: %d\n\tAmount: %d\n\tIs proceed: %s\n\n",
+				node->GetData().GetPrice(),
+				(node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount(),
+				node->GetData().IsSuccess() ? "yes" : "no");
+	}
 
 	return 1;
 }
 
-static int send_cmdinternalerror_message( int cs, const char* address )
+int Server::ReportOnTurn()
 {
-	const char* message[] =
+	printf("\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
+	printf("\n%s\n", "Players statistics:");
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
-				error_game_messages[COMMAND_INTERNAL_ERROR],
-				nullptr
-	};
-	send_message(cs, message, 1, address);
+		const Player* p = banker.GetPlayers()[i];
+		if ( p != nullptr )
+			printf("\tPlayer #%d:   money: %dР   produced products: %d\n", p->GetUID(), p->GetMoney(), p->GetProduced());
+	}
+
+	ShowAuctionInfo("Sources auction", banker.GetSourcesRequests().GetFirst());
+	ShowAuctionInfo("Products auction", banker.GetProductsRequests().GetFirst());
+
+	printf("\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
+	return 1;
+}
+
+int Server::ChangeMarketState()
+{
+	int r = 1 + (int)( 12.0 * rand() / (RAND_MAX + 1.0) );
+
+	int sum = 0;
+	int i;
+	for ( i = 0; i < MARKET_LEVEL_NUMBER; i++ )
+	{
+		sum += states_market_chance[banker.GetCurrentMarketLvl()-1][i];
+		if ( sum >= r )
+			break;
+	}
+
+	if ( i < MARKET_LEVEL_NUMBER )
+		banker.SetCurrentMarketLvl( i+1 );
+
+	banker.GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
+	banker.GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
+	banker.GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
+	banker.GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
 
 	return 1;
 }
 
-static int send_cmdincorrectargsnum_message( int cs, const char* address )
+int Server::CheckPlayersReports( MarketRequestList& requests )
 {
-	const char* error_message[] =
+	// Если игрок не заявился на аукцион, добавить его пустую заявку
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
-				error_game_messages[COMMAND_INCORRECT_ARGUMENTS_NUM],
-				nullptr
-	};
+		const Player* p = banker.GetPlayers()[i];
+		if ( p != nullptr )
+		{
+			// если список заявок на аукцион пуст, то не нужно его проводить
+			MarketRequestList::MarketRequest* node = requests.GetFirst();
+			if ( node == nullptr )
+				return 0;
 
-	send_message(cs, error_message, 1, address);
+			for ( ; node != nullptr; node = node->GetNext() )
+				if ( node->GetData().GetPlayerNum() == p->GetUID() )
+					break;
+
+			if ( node == nullptr )
+				requests.Insert( p->GetUID(), 0, 0 );
+		}
+	}
 
 	return 1;
 }
 
-static int send_unknowncmd_message( int cs, const char* address )
+int Server::SortRequestsByPrice( const MarketRequestList& requests, MarketRequestList& sorted_requests, int auction_type )
 {
-	const char* unknown_cmd_message[] =
+	int ready_players = banker.GetReadyPlayers();
+	MarketRequestList::MarketRequest* arr_reqs[ready_players];
+	int prices[ready_players];
+	bool reqs_checked[ready_players];
+
+
+	MarketRequestList::MarketRequest* request = requests.GetFirst();
+	for ( int i = 0; request != nullptr; request = request->GetNext(), ++i )
 	{
-				info_game_messages[UNKNOWN_COMMAND],
-				nullptr
-	};
-	send_message(cs, unknown_cmd_message, 1, address);
+		arr_reqs[i] = request;
+		prices[i] = arr_reqs[i]->GetData().GetPrice();
+		reqs_checked[i] = false;
+	}
+
+	heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
+
+	int j = 0;
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
+		{
+			sorted_requests.Insert( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
+			reqs_checked[i] = true;
+			i = 0;
+			++j;
+			if ( j == ready_players )
+				break;
+
+			continue;
+		}
+	}
 
 	return 1;
 }
 
-static int send_wfnt_message( int wait_yet_players_amount, int cs, const char* address )
+int Server::StartAuction( const MarketRequestList& requests, int auction_type )
 {
-	char w_y_p_a[10];
-	itoa(wait_yet_players_amount, w_y_p_a, 9);
-
-	int tokns_amnt = 2;
-	const char* mes_tokens[] =
-	{
-			const_cast<char*>(info_game_messages[WAIT_FOR_NEXT_TURN]),
-			w_y_p_a,
-			nullptr
-	};
-	send_message(cs, mes_tokens, tokns_amnt, address);
-
-	return 1;
-}
-
-static int concat_addr_port( char* address_buffer, const char* service_buffer )
-{
-	if (
-				( address_buffer == nullptr )			||
-				( service_buffer == nullptr )
-		)
+	if ( !CheckPlayersReports( const_cast<MarketRequestList&>(requests) ) )
 		return 0;
 
-	int addr_len = strlen(address_buffer);
-	address_buffer[addr_len] = ':';
+	MarketRequestList sorted_requests;
+	SortRequestsByPrice( requests, sorted_requests, auction_type );
 
-	int i = addr_len + 1;
-	for ( int j = 0; service_buffer[j]; j++, i++ )
-		address_buffer[i] = service_buffer[j];
-	address_buffer[i] = '\0';
+	int max_sources = banker.GetCurrentMarketState().GetSourcesAmount();
+	int max_products = banker.GetCurrentMarketState().GetProductsAmount();
+
+	for ( MarketRequestList::MarketRequest* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
+	{
+		if ( node->GetData().GetPrice() < 1 )
+			continue;
+
+		const Player* cur_p = banker.GetPlayers().GetPlayerByNum( node->GetData().GetPlayerNum() );
+
+		if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
+		{
+			if ( node->GetData().GetAmount() > 0 )
+			{
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - node->GetData().GetAmount() * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + node->GetData().GetAmount() );
+					max_sources -= node->GetData().GetAmount();
+				}
+				else
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + node->GetData().GetAmount() * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - node->GetData().GetAmount() );
+					max_products -= node->GetData().GetAmount();
+				}
+
+				const_cast<MarketRequestList::MarketRequest::MarketData&>(node->GetData()).SetSuccess();
+
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(node->GetData().GetAmount());
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+				}
+				else
+				{
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(node->GetData().GetAmount());
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+				}
+			}
+		}
+		else
+		{
+			int saved_max_sources = 0;
+			int saved_max_products = 0;
+
+			if ( ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products) > 0 )
+			{
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - max_sources * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + max_sources );
+				}
+				else
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + max_products * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
+				}
+
+				const_cast<MarketRequestList::MarketRequest::MarketData&>(node->GetData()).SetSuccess();
+
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					saved_max_sources = max_sources;
+					max_sources = 0;
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(saved_max_sources);
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+				}
+				else
+				{
+					saved_max_products = max_products;
+					max_products = 0;
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(saved_max_products);
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
+int Server::CheckBuildingFactories()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = banker.GetPlayers()[i];
+		if ( p != nullptr )
+		{
+			for ( Player::BuildsList::BuildsItem* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
+			{
+				if ( node->GetData().GetTurnsLeft() == 1 )
+				{
+					int total_charges = NEW_FACTORY_UNIT_COST / 2;
+					const_cast<Player*>(p)->SetMoney( p->GetMoney() - total_charges );
+					if ( p->GetMoney() > 0 )
+					{
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PAY_FACTORY_SUCCESS_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
+					else
+					{
+						itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
+
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PLAYER_BANKROT_TOKEN ), p->GetFd(), p->GetAddr() );
+						const_cast<Player*>(p)->SetBankrot();
+						break;
+					}
+				}
+				else if ( node->GetData().GetTurnsLeft() == 0 )
+				{
+					const_cast<Player::BuildsList&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
+					const_cast<Player*>(p)->SetBuiltFactories( p->GetBuiltFactories() - 1 );
+					const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+
+					sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::FACTORY_BUILT_TOKEN ), p->GetFd(), p->GetAddr() );
+					node = p->GetBuildsFactories().GetFirst();
+					continue;
+				}
+
+				const_cast<Player::BuildsList::BuildsItem::BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
+				node = node->GetNext();
+			}
+		}
+	}
 
 	return 1;
 }
 
 int Server::QuitPlayer( int player_number )
 {
-	CloseConnection(player_number);
-	GetBanker().SetPlayer(GetBanker().GetIdxByNum(player_number), nullptr);
+	CloseConnection( player_number );
+	//GetBanker().SetPlayer(GetBanker().GetIdxByNum(player_number), nullptr);
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
-		Player* p = GetBanker().GetPlayer(i);
+		const Player* p = GetBanker().GetPlayers()[i];
 		if ( p != nullptr )
 		{
 			if ( !GetBanker().IsGameStarted() )
 			{
-				send_lostlobbyplayer_message(GetBanker().GetLobbyPlayers(), p->GetFd(), p->GetAddr());
+				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_LOBBY_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
 			}
 			else
 			{
-				if ( GetBanker().GetAlivePlayers() == 1 )
+				if ( GetBanker().GetAlivePlayers() <= 1 )
 				{
-					send_victory_message(p->GetFd(), p->GetAddr());
+					sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
 					printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
 					Server::Stop( 0 );
 				}
 				else
 				{
-					send_lostaliveplayer_message(GetBanker().GetAlivePlayers(), player_number, p->GetFd(), p->GetAddr());
+					itoa( player_number, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+
+					sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
 				}
 			}
 		}
@@ -779,7 +907,7 @@ int Server::FillReadfds()
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
-		Player* p = GetBanker().GetPlayer(i);
+		const Player* p = GetBanker().GetPlayers()[i];
 		if ( p != nullptr )
 		{
 			int p_fd = p->GetFd();
@@ -818,9 +946,14 @@ int Server::Run()
 
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
-					Player* p = GetBanker().GetPlayer(i);
+					const Player* p = GetBanker().GetPlayers()[i];
 					if ( p != nullptr )
-						send_startinseconds_message(p->GetFd(), p->GetAddr());
+					{
+						itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
+
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
 				}
 			}
 			else if ( GetBanker().GetLobbyPlayers() == MAX_PLAYERS )
@@ -830,16 +963,17 @@ int Server::Run()
 				UnsetTimerFlag();
 
 				/*FORCE START THE GAME*/
-				GetBanker().SetGameStarted();
+				const_cast<Banker&>(GetBanker()).SetGameStarted();
 				/*FORCE START THE GAME*/
 
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
-					Player* p = GetBanker().GetPlayer(i);
+					const Player* p = GetBanker().GetPlayers()[i];
 					if ( p != nullptr )
-						send_gamestarted_message(p->GetFd(), p->GetAddr());
+					{
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
 				}
-
 				continue;
 			}
 		}
@@ -847,33 +981,35 @@ int Server::Run()
 		{
 			if ( !GetBanker().IsPlayersPrepared() )
 			{
-				GetBanker().SetPlayersPrepared();
-				GetBanker().SetAlivePlayers(GetBanker().GetLobbyPlayers());
-				GetBanker().SetLobbyPlayers( 0 );
-				GetBanker().SetTurnNumber( 1 );
-				GetBanker().SetCurrentMarketLvl( START_MARKET_LEVEL );
-				GetBanker().GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * GetBanker().GetAlivePlayers() );
-				GetBanker().GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
-				GetBanker().GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * GetBanker().GetAlivePlayers() );
-				GetBanker().GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+				const_cast<Banker&>(GetBanker()).SetAlivePlayers(GetBanker().GetLobbyPlayers());
+				const_cast<Banker&>(GetBanker()).SetLobbyPlayers( 0 );
+				const_cast<Banker&>(GetBanker()).SetTurnNumber( 1 );
+				const_cast<Banker&>(GetBanker()).SetCurrentMarketLvl( START_MARKET_LEVEL );
+				const_cast<Banker&>(GetBanker()).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * GetBanker().GetAlivePlayers() );
+				const_cast<Banker&>(GetBanker()).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
+				const_cast<Banker&>(GetBanker()).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * GetBanker().GetAlivePlayers() );
+				const_cast<Banker&>(GetBanker()).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
 
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
-					Player* p = GetBanker().GetPlayer(i);
+					const Player* p = GetBanker().GetPlayers()[i];
 					if ( p != nullptr )
 					{
-						p->SetMoney( START_MONEY );
-						p->SetOldMoney( p->GetMoney() );
-						p->SetSources( START_SOURCES );
-						p->SetProducts( START_PRODUCTS );
-						p->SetWaitFactories( START_FACTORIES );
+						const_cast<Player*>(p)->SetMoney( START_MONEY );
+						const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
+						const_cast<Player*>(p)->SetSources( START_SOURCES );
+						const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
+						const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
 
-						send_startgameinfo_message(GetBanker().GetAlivePlayers(), GetBanker().GetTurnNumber(), p, GetBanker().GetCurrentMarketState());
+						itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
+
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTING_GAME_INFORMATION_TOKEN ), p->GetFd(), p->GetAddr() );
 					}
 				}
-			}
 
-			GetBanker().check_producing_on_turn();
+				const_cast<Banker&>(GetBanker()).SetPlayersPrepared();
+			}
 		}
 
 
@@ -891,9 +1027,11 @@ int Server::Run()
 					{
 						for ( int i = 0; i < MAX_PLAYERS; ++i )
 						{
-							Player* p = GetBanker().GetPlayer(i);
+							const Player* p = GetBanker().GetPlayers()[i];
 							if ( p != nullptr )
-								send_startcancelled_message(p->GetFd(), p->GetAddr());
+							{
+								sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTCANCELLED_TOKEN ), p->GetFd(), p->GetAddr() );
+							}
 						}
 					}
 					else
@@ -901,14 +1039,16 @@ int Server::Run()
 						if ( GetBanker().GetLobbyPlayers() < MAX_PLAYERS )
 						{
 							/* START THE GAME */
-							GetBanker().SetGameStarted();
+							const_cast<Banker&>(GetBanker()).SetGameStarted();
 							/* START THE GAME */
 
 							for ( int i = 0; i < MAX_PLAYERS; ++i )
 							{
-								Player* p = GetBanker().GetPlayer(i);
+								const Player* p = GetBanker().GetPlayers()[i];
 								if ( p != nullptr )
-									send_gamestarted_message(p->GetFd(), p->GetAddr());
+								{
+									sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
+								}
 							}
 						}
 						continue;
@@ -926,8 +1066,8 @@ int Server::Run()
 
 		if ( FD_ISSET(ls, &readfds) )
 		{
-			char address_buffer[ADDRESS_BUFFER];
-			char service_buffer[ADDRESS_BUFFER];
+			char new_client_addr[Server::ADDRESS_SIZE];
+			char new_client_serv[Server::SERVICE_SIZE];
 			struct sockaddr_storage client_address;
 			socklen_t client_address_len = sizeof(client_address);
 
@@ -941,123 +1081,112 @@ int Server::Run()
 			getnameinfo(
 					(struct sockaddr*) &client_address,
 					client_address_len,
-					address_buffer,
-					sizeof(address_buffer),
-					service_buffer,
-					sizeof(service_buffer),
+					new_client_addr,
+					sizeof(new_client_addr),
+					new_client_serv,
+					sizeof(new_client_serv),
 					NI_NUMERICHOST | NI_NUMERICSERV);
 
-			concat_addr_port(address_buffer, service_buffer);
-			printf("New client (%s) has connected.\n", address_buffer);
+			ConcatAddrPort();
+
+			printf("New connection from (%s)\n", new_client_addr);
 
 			if ( GetBanker().IsGameStarted() )
 			{
-				send_gamealreadystarted_message(cs, address_buffer);
+				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_ALREADY_STARTED_TOKEN ), cs, new_client_addr );
 				close(cs);
-				printf("Lost connection from (%s)\n", address_buffer);
+				printf("Lost connection from (%s)\n", new_client_addr);
 			}
 			else
 			{
 				int i;
 				for ( i = 0; i < MAX_PLAYERS; ++i )
-					if ( GetBanker().GetPlayer(i) == nullptr )
+					if ( GetBanker().GetPlayers()[i] == nullptr )
 						break;
 
 				if ( i >= MAX_PLAYERS )
 				{
-					send_serverfull_message(cs, address_buffer);
+					sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
 					close(cs);
-					printf("Lost connection from (%s)\n", address_buffer);
+					printf("Lost connection from (%s)\n", new_client_addr);
 				}
 				else
 				{
 					try
 					{
-						GetBanker().SetPlayer(i, new Player(cs, address_buffer, i+1));
+						//GetBanker().SetPlayer(i, new Player(cs, address_buffer, i+1));
 					}
 					catch ( ... )
 					{
-						send_cmdinternalerror_message(cs, address_buffer);
+						sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
 						close(cs);
-						printf("Lost connection from [%s]\n", address_buffer);
+						printf("Lost connection from [%s]\n", new_client_addr);
 					}
 
-					GetBanker().SetLobbyPlayers( GetBanker().GetLobbyPlayers() + 1 );
+					const_cast<Banker&>(GetBanker()).SetLobbyPlayers( GetBanker().GetLobbyPlayers() + 1 );
 
 					for ( i = 0; i < MAX_PLAYERS; ++i )
 					{
-						Player* p = GetBanker().GetPlayer(i);
+						const Player* p = GetBanker().GetPlayers()[i];
 						if ( p != nullptr )
-							send_newplayerconnect_message(GetBanker().GetLobbyPlayers(), p->GetFd(), p->GetAddr());
+						{
+							sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_PLAYER_CONNECT_TOKEN ), cs, new_client_addr );
+						}
 					}
 				}
 			}
 		}
 
-		char read_buf[BUFSIZE];
 		for ( int i = 0; i < MAX_PLAYERS; ++i )
 		{
-			Player* p = GetBanker().GetPlayer(i);
-			if ( p != nullptr )
+			const Player* sender_p = GetBanker().GetPlayers()[i];
+			if ( sender_p != nullptr )
 			{
-				int p_fd = p->GetFd();
-				const char* p_addr = p->GetAddr();
+				int sender_p_fd = sender_p->GetFd();
+				const char* sender_p_addr = sender_p->GetAddr();
 
-				if ( FD_ISSET(p_fd, &readfds) )
+				if ( FD_ISSET(sender_p_fd, &readfds) )
 				{
-					int rc = readline(p_fd, read_buf, BUFSIZE-1);
-					if ( rc > 0 )
+					receiver.RecvMessage( sender_p_fd, sender_p_addr );
+					if ( receiver.GetRecvBytes() > 0 )
 					{
-						printf("Received %d bytes from [%s]\n", rc, p_addr);
-
-						read_buf[rc] = '\0';
-						cut_str(read_buf, rc, '\n');
-
-						int size = strlen(read_buf)+1;
-						delete_spaces(read_buf, &size);
-
-						if ( !GetBanker().IsGameStarted() )
+						const_cast<Player*>(sender_p)->SetMessageBuffer( receiver.GetMessage(), receiver.GetMessageLength() );
+						if ( !banker.IsGameStarted() )
 						{
-							if ( !p->IsIdentMsgRecv() )
+							if ( !sender_p->IsIdentMsgRecv() )
 							{
-								if ( is_correct_identity_msg(read_buf) )
-									p->SetBot();
+								if ( IsCorrectIdentityMsg( sender_p->GetMessageBuffer() ) )
+									const_cast<Player*>(sender_p)->SetBot();
 								else
-									p->UnsetBot();
+									const_cast<Player*>(sender_p)->UnsetBot();
 
-								p->SetIdentMsgRecv();
+								const_cast<Player*>(sender_p)->SetIdentMsgRecv();
 							}
 							else
 							{
-								send_gamenotstarted_message(p_fd, p_addr);
+								sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), sender_p_fd, sender_p_addr );
 							}
 							continue;
 						}
 
 						// Обработка данных от игрока, когда игра началась
-						GetCmdsHndl().make_cmd_tokens( read_buf );
-						switch ( GetCmdsHndl().process_command(&GetBanker(), GetBanker().GetNumByIdx(i)) )
+						const_cast<CommandExecutor&>(GetCmdsHndl()).MakeCmdTokens( sender_p->GetMessageBuffer() );
+						const_cast<CommandExecutor&>(GetCmdsHndl()).ProcessCommand( sender_p->GetUID(), EBCbroker.GetBroker());
+						sender.SendMessage( GetCmdsHndl().GetCmdResultTokens(), GetCmdsHndl().GetCmdResultTokensAmount(), sender_p_fd, sender_p_addr );
+
+						const char* info_token = GetCmdsHndl().GetCmdToken( 0 );
+						if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )
 						{
-							case QUIT_COMMAND_NUM:
-								Server::QuitPlayer(GetBanker().GetNumByIdx(i));
-								break;
-							case INTERNAL_COMMAND_ERROR:
-								send_cmdinternalerror_message(p_fd, p_addr);
-								break;
-							case INCORRECT_ARGS_COMMAND_ERROR:
-								send_cmdincorrectargsnum_message(p_fd, p_addr);
-								break;
-							case UNKNOWN_COMMAND_ERROR:
-								send_unknowncmd_message(p_fd, p_addr);
-								break;
-							case WFNT_COMMAND_ERROR:
-								int wfnt = GetBanker().GetAlivePlayers() - GetBanker().GetReadyPlayers();
-								send_wfnt_message(wfnt, p_fd, p_addr);
+							QuitPlayer( sender_p->GetUID() );
+						}
+						else if ( strcmp(info_token, error_game_messages[INTERNAL_SERVER_ERROR]) == 0 )
+						{
+							QuitPlayer( sender_p->GetUID() );
 						}
 					}
 					else
 					{
-						Server::QuitPlayer(GetBanker().GetNumByIdx(i));
+						QuitPlayer( sender_p->GetUID() );
 					}
 				}
 			}
@@ -1068,37 +1197,58 @@ int Server::Run()
 		{
 			if ( GetBanker().GetReadyPlayers() == GetBanker().GetAlivePlayers() )
 			{
-				GetBanker().check_building_factories();
-				GetBanker().start_auction( GetBanker().GetSourcesRequests(), SOURCE_AUCTION );
-				GetBanker().start_auction( GetBanker().GetProductsRequests(), PRODUCTION_AUCTION );
+				StartAuction( const_cast<Banker&>(GetBanker()).GetSourcesRequests(), SOURCE_AUCTION );
+				StartAuction( const_cast<Banker&>(GetBanker()).GetProductsRequests(), PRODUCTION_AUCTION );
 
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
-					Player* p = GetBanker().GetPlayer(i);
-					if ( p != nullptr )
-						send_auctionreport_message(GetBanker().GetReadyPlayers(), GetBanker().GetTurnNumber(), GetBanker().GetPlayers(), p->GetFd(), p->GetAddr());
-				}
-
-				GetBanker().pay_charges();
-				GetBanker().report_on_turn();
-				GetBanker().change_market_state();
-				GetBanker().SetTurnNumber( GetBanker().GetTurnNumber() + 1 );
-				GetBanker().SetReadyPlayers( 0 );
-
-				for ( int i = 0; i < MAX_PLAYERS; ++i )
-				{
-					Player* p = GetBanker().GetPlayer( i );
+					const Player* p = GetBanker().GetPlayers()[i];
 					if ( p != nullptr )
 					{
-						p->UnsetSentSourceRequest();
-						p->UnsetSentProductsRequest();
-						p->SetProduced( 0 );
-						p->UnsetTurn();
-						p->UnsetProd();
-						p->SetIncome( p->GetMoney() - p->GetOldMoney() );
-						p->SetOldMoney( p->GetMoney() );
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::AUCTION_RESULTS_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
+				}
 
-						send_newturn_message(GetBanker().GetTurnNumber(), p->IsBot(), GetBanker().GetCurrentMarketState(), p->GetFd(), p->GetAddr());
+				CheckBuildingFactories();
+				PayCharges();
+				//ReportOnTurn();
+
+				ChangeMarketState();
+				const_cast<Banker&>(GetBanker()).SetTurnNumber( GetBanker().GetTurnNumber() + 1 );
+				const_cast<Banker&>(GetBanker()).SetReadyPlayers( 0 );
+
+				for ( int i = 0; i < MAX_PLAYERS; ++i )
+				{
+					const Player* p = GetBanker().GetPlayers()[i];
+					if ( p != nullptr )
+					{
+						const_cast<Player*>(p)->UnsetSentSourceRequest();
+						const_cast<Player*>(p)->UnsetSentProductsRequest();
+						const_cast<Player*>(p)->SetProduced( 0 );
+						const_cast<Player*>(p)->UnsetTurn();
+						const_cast<Player*>(p)->SetIncome( p->GetMoney() - p->GetOldMoney() );
+						const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
+
+						itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
+
+						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_TURN_TOKEN ), p->GetFd(), p->GetAddr() );
+
+						while ( p->GetWorkFactories() > 0 )
+						{
+							const_cast<Player*>(p)->SetProduced( p->GetProduced() + 1 );
+							const_cast<Player*>(p)->SetProducts( p->GetProducts() + 1 );
+							const_cast<Player*>(p)->SetWorkFactories( p->GetWorkFactories() - 1 );
+							const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+						}
+
+						if ( p->GetProduced() > 0 )
+						{
+							itoa( p->GetProduced(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+							const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN+1 );
+
+							sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PRODUCED_TOKEN ), p->GetFd(), p->GetAddr() );
+						}
 					}
 				}
 			}

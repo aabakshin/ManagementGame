@@ -2,14 +2,8 @@
 #define BANKER_HPP
 
 
-#include "Player.hpp"
+#include "RegisteredPlayers.hpp"
 
-
-enum
-{
-	BUFSIZE							=							1024,
-	ADDRESS_BUFFER					=							 100
-};
 
 enum
 {
@@ -136,7 +130,7 @@ private:
 	int ready_players;
 	int lobby_players;
 	int cur_market_lvl;
-	Player* pl_array[MAX_PLAYERS];
+	RegisteredPlayers registered_players;
 	MarketState cur_market_state;
 	MarketRequestList sources_requests;
 	MarketRequestList products_requests;
@@ -154,12 +148,7 @@ public:
 	int GetReadyPlayers() const { return ready_players; }
 	int GetLobbyPlayers() const { return lobby_players; }
 	int GetCurrentMarketLvl() const { return cur_market_lvl; }
-	Player* const* GetPlayers() const { return pl_array; }
-	Player* GetPlayer( int idx ) const { return ((idx < 0) || (idx >= MAX_PLAYERS)) ? nullptr : pl_array[idx]; }
-	Player* GetPlayerByFd( int fd ) const;
-	Player* GetPlayerByNum( int player_number ) const;
-	int GetIdxByNum( int player_number ) const;
-	int GetNumByIdx( int idx ) const;
+	const RegisteredPlayers& GetPlayers() const { return registered_players; }
 	MarketState& GetCurrentMarketState() { return cur_market_state; }
 	MarketRequestList& GetSourcesRequests() { return sources_requests; }
 	MarketRequestList& GetProductsRequests() { return products_requests; }
@@ -169,21 +158,12 @@ public:
 	void SetReadyPlayers( int players_value );
 	void SetLobbyPlayers( int players_value );
 	void SetCurrentMarketLvl( int lvl_value );
-	void SetPlayer( int idx, Player* p );
-	int CleanPlayer( int player_number );
 
-	int check_producing_on_turn();
-	int pay_charges();
-	int report_on_turn();
-	int change_market_state();
-	int check_players_reports( MarketRequestList& );
-	int sort_requests_by_price( const MarketRequestList&, MarketRequestList& , int auction_type);
-	int start_auction( const MarketRequestList&, int auction_type );
-	int check_building_factories();
+	void CleanPlayer( int player_id );
 private:
+	Banker( const Banker& ) = delete;
+	Banker( Banker&& ) = delete;
 	void operator=( const Banker& ) {}
-	Banker( const Banker& ) {}
-	int show_auction_info( const char* auction_type_msg, const MarketRequestList::MarketRequest* );
 };
 
 #endif

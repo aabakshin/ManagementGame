@@ -1,5 +1,3 @@
-/* Файл реализации модуля MGLib */
-
 #ifndef MGLIB_C
 #define MGLIB_C
 
@@ -10,16 +8,12 @@
 #include <unistd.h>
 
 
-enum { BUFSIZE = 1024 };
-
-
 const char* info_game_messages[] =
 {
 				"*INFO_MESSAGE|AUCTION_RESULTS",
 				"*INFO_MESSAGE|SUCCESS_CHARGES_PAY",
 				"*INFO_MESSAGE|PLAYER_BANKROT",
 				"*INFO_MESSAGE|LOST_ALIVE_PLAYER",
-				"*INFO_MESSAGE|WAIT_FOR_NEXT_TURN",
 				"*INFO_MESSAGE|PRODUCED",
 				"*INFO_MESSAGE|STARTINSECONDS",
 				"*INFO_MESSAGE|GAME_STARTED",
@@ -27,7 +21,6 @@ const char* info_game_messages[] =
 				"*INFO_MESSAGE|STARTCANCELLED",
 				"*INFO_MESSAGE|PAY_FACTORY_SUCCESS",
 				"*INFO_MESSAGE|FACTORY_BUILT",
-				"*INFO_MESSAGE|UNKNOWN_COMMAND",
 				"*INFO_MESSAGE|VICTORY_MESSAGE",
 				"*INFO_MESSAGE|GAME_ALREADY_STARTED",
 				"*INFO_MESSAGE|SERVER_FULL",
@@ -35,11 +28,14 @@ const char* info_game_messages[] =
 				"*INFO_MESSAGE|GAME_NOT_STARTED",
 				"*INFO_MESSAGE|LOST_LOBBY_PLAYER",
 				"*INFO_MESSAGE|NEW_TURN",
-				"*INFO_MESSAGE|HELP_COMMAND",
-				"*INFO_MESSAGE|MARKET_COMMAND",
+				"*INFO_MESSAGE|WAIT_FOR_NEXT_TURN",
+				"*INFO_MESSAGE|UNKNOWN_COMMAND",
+				"*INFO_MESSAGE|HELP_COMMAND_SUCCESS",
+				"*INFO_MESSAGE|MARKET_COMMAND_SUCCESS",
 				"*INFO_MESSAGE|PLAYER_COMMAND_NOT_FOUND",
-				"*INFO_MESSAGE|PLAYER_COMMAND",
-				"*INFO_MESSAGE|LIST_COMMAND",
+				"*INFO_MESSAGE|PLAYER_COMMAND_SUCCESS",
+				"*INFO_MESSAGE|PLAYER_COMMAND_INCORRECT_ID",
+				"*INFO_MESSAGE|LIST_COMMAND_SUCCESS",
 				"*INFO_MESSAGE|PROD_COMMAND_SUCCESS",
 				"*INFO_MESSAGE|PROD_COMMAND_NO_FACTORIES",
 				"*INFO_MESSAGE|PROD_COMMAND_NO_MONEY",
@@ -59,13 +55,13 @@ const char* info_game_messages[] =
 				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_PRICE",
 				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_AMOUNT",
 				"*INFO_MESSAGE|TURN_COMMAND_SUCCESS",
+				"*INFO_MESSAGE|QUIT_COMMAND_SUCCESS",
 				NULL
 };
 
 const char* error_game_messages[] =
 {
-				"*ERROR_MESSAGE|COMMAND_INCORRECT_ARGUMENTS_NUM",
-				"*ERROR_MESSAGE|COMMAND_INTERNAL_ERROR",
+				"*ERROR_MESSAGE|INTERNAL_SERVER_ERROR",
 				NULL
 };
 
@@ -164,7 +160,7 @@ void delete_spaces(char* buffer, int* bufsize)
 	if ( buffer == NULL )
 		return;
 
-	if ( (*bufsize < 2) || (*bufsize > BUFSIZE) )
+	if ( *bufsize < 2 )
 		return;
 
 	/* ---------------------------Удаление слева--------------------------- */
@@ -340,6 +336,36 @@ int readline(int fd, char* buf, int bufsize)
 	strncpy(buf, buffer, total_read);
 
 	return total_read;
+}
+
+void concat_to_str(int number, char* number_buf, int number_len, char* str, int* str_offset)
+{
+	itoa( number, number_buf, number_len );
+	strcpy(str + *str_offset, number_buf);
+	*str_offset += strlen(number_buf);
+	str[*str_offset] = '|';
+	++(*str_offset);
+}
+
+int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count )
+{
+	int i, j = 0;
+	for ( i = 0; i < tokens_count; ++i )
+	{
+		for (; ( j < buffer_size-1 ) && tokens[i][j]; ++j )
+			buffer[j] = tokens[i][j];
+		buffer[j] = '|';
+		++j;
+
+		if ( j >= buffer_size-1 )
+		{
+			buffer[buffer_size-1] = '\0';
+			return buffer_size-1;
+		}
+	}
+	buffer[j-1] = '\0';
+
+	return j-1;
 }
 
 #endif

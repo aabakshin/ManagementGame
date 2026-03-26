@@ -1,8 +1,3 @@
-/*
- *	Модуль MGLib содержит вспомогательные функции общего назначения для реализации различных частей программы
- *	Этот модуль вызывается в след. модулях: botCore, clientCore, CommandsHandler, serverCore, PolizElem
- */
-
 #ifndef MGLIB_H
 #define MGLIB_H
 
@@ -13,7 +8,6 @@ enum
 					SUCCESS_CHARGES_PAY,
 					PLAYER_BANKROT,
 					LOST_ALIVE_PLAYER,
-					WAIT_FOR_NEXT_TURN,
 					PRODUCED,
 					STARTINSECONDS,
 					GAME_STARTED,
@@ -21,7 +15,6 @@ enum
 					STARTCANCELLED,
 					PAY_FACTORY_SUCCESS,
 					FACTORY_BUILT,
-					UNKNOWN_COMMAND,
 					VICTORY_MESSAGE,
 					GAME_ALREADY_STARTED,
 					SERVER_FULL,
@@ -29,11 +22,14 @@ enum
 					GAME_NOT_STARTED,
 					LOST_LOBBY_PLAYER,
 					NEW_TURN,
-					HELP_COMMAND,
-					MARKET_COMMAND,
+					WAIT_FOR_NEXT_TURN,
+					UNKNOWN_COMMAND,
+					HELP_COMMAND_SUCCESS,
+					MARKET_COMMAND_SUCCESS,
 					PLAYER_COMMAND_NOT_FOUND,
-					PLAYER_COMMAND,
-					LIST_COMMAND,
+					PLAYER_COMMAND_SUCCESS,
+					PLAYER_COMMAND_INCORRECT_ID,
+					LIST_COMMAND_SUCCESS,
 					PROD_COMMAND_SUCCESS,
 					PROD_COMMAND_NO_FACTORIES,
 					PROD_COMMAND_NO_MONEY,
@@ -52,13 +48,13 @@ enum
 					SELL_COMMAND_SUCCESS,
 					SELL_COMMAND_INCORRECT_PRICE,
 					SELL_COMMAND_INCORRECT_AMOUNT,
-					TURN_COMMAND_SUCCESS
+					TURN_COMMAND_SUCCESS,
+					QUIT_COMMAND_SUCCESS
 };
 
 enum
 {
-					COMMAND_INCORRECT_ARGUMENTS_NUM,
-					COMMAND_INTERNAL_ERROR
+					INTERNAL_SERVER_ERROR
 };
 
 
@@ -75,6 +71,10 @@ void itoa(int number, char* num_buf, int max_buf_len);
 int readline(int fd, char* buf, int bufsize);
 
 /* Обрезать строку по символу ch, затирая его. Область памяти s должна быть изменяемая! */
-int cut_str(char* s, int s_size, int ch);
+int cut_str( char* s, int s_size, int ch );
+
+void concat_to_str( int number, char* number_buf, int number_len, char* str, int* str_offset );
+
+int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count );
 
 #endif
