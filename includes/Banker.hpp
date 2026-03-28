@@ -3,6 +3,7 @@
 
 
 #include "RegisteredPlayers.hpp"
+#include "List.hpp"
 
 
 enum
@@ -32,6 +33,7 @@ enum
 	PRODUCTION_AUCTION				=							   1
 };
 
+
 class MarketState
 {
 private:
@@ -45,80 +47,63 @@ public:
 	int GetSourceMinPrice() const { return source_min_price; }
 	int GetProductsAmount() const { return products_amount; }
 	int GetProductMaxPrice() const { return product_max_price; }
-	void SetSourcesAmount( int amount );
-	void SetSourceMinPrice( int min_price );
-	void SetProductsAmount( int amount );
-	void SetProductMaxPrice( int max_price );
+	void SetSourcesAmount( int );
+	void SetSourceMinPrice( int );
+	void SetProductsAmount( int );
+	void SetProductMaxPrice( int );
 private:
-	MarketState( const MarketState& ) {}
-	void operator=( const MarketState& ) {}
+	MarketState( const MarketState& ) = delete;
+	MarketState( MarketState&& ) = delete;
+	void operator=( const MarketState& ) = delete;
 };
 
-
-class MarketRequestList
+class MarketData
 {
+	int player_id;
+	int amount;
+	int price;
+	bool success;
 public:
-	class MarketRequest
-	{
-	public:
-		class MarketData
-		{
-			int player_num;
-			int amount;
-			int price;
-			bool success;
-		public:
-			MarketData( int p_num = 0, int amnt = 0, int price_value = 0 );
-			int GetPlayerNum() const { return player_num; }
-			int GetAmount() const { return amount; }
-			int GetPrice() const { return price; }
-			void SetPlayerNum( int num_value );
-			void SetAmount( int amount_value );
-			void SetPrice( int price_value );
-			bool IsSuccess() const { return success; }
-			void SetSuccess() { success = true; }
-			void UnsetSuccess() { success = false; }
-		private:
-			MarketData( const MarketData& ) {}
-			void operator=( const MarketData& ) {}
-		};
-	private:
-		MarketData data;
-		MarketRequest* next;
-		MarketRequest* prev;
-	public:
-		MarketRequest( int num_value, int amount_value, int price_value );
-		void SetData( int num_value, int amount_value, int price_value );
-		const MarketData& GetData() const { return data; }
-		MarketRequest* GetNext() const { return next; }
-		MarketRequest* GetPrev() const { return prev; }
-		void SetNext( MarketRequest* next_value ) { next = next_value; }
-		void SetPrev( MarketRequest* prev_value ) { prev = prev_value; }
-	private:
-		MarketRequest( const MarketRequest& ) {}
-		void operator=( const MarketRequest& ) {}
-	};
+	MarketData( int p_num = 0, int amnt = 0, int pr = 0 );
+	MarketData( const MarketData& );
+	MarketData( MarketData&& );
+	void operator=( const MarketData& );
+	void MakeData( int p_num, int amnt, int pr );
+	int GetPlayerNum() const { return player_id; }
+	int GetAmount() const { return amount; }
+	int GetPrice() const { return price; }
+	void SetPlayerNum( int value );
+	void SetAmount( int value );
+	void SetPrice( int value );
+	bool IsSuccess() const { return success; }
+	void SetSuccess() { success = true; }
+	void UnsetSuccess() { success = false; }
+};
+
+template<>
+class List<Item<MarketData>>
+{
 private:
-	MarketRequest* first;
-	MarketRequest* last;
+	Item<MarketData>* first;
+	Item<MarketData>* last;
 public:
-	MarketRequestList() { first = nullptr; last = nullptr; }
-	~MarketRequestList() { Clear(); }
-	MarketRequest* GetFirst() const { return first; }
-	MarketRequest* GetLast() const { return last; }
+	List<Item<MarketData>>() { first = nullptr; last = nullptr; }
+	~List<Item<MarketData>>() { Clear(); }
+	Item<MarketData>* GetFirst() const { return first; }
+	Item<MarketData>* GetLast() const { return last; }
 	bool IsEmpty() const { if ( !first && !last ) return true; return false; }
-	int Insert( int num_value, int amount_value, int price_value );
-	int Delete( int num_value );
-	int Clear();
+	void Insert( MarketData data );
+	void Delete( int num_value );
+	void Clear();
 	int GetSize() const;
 	void Print() const;
 private:
-	MarketRequestList( const MarketRequestList& ) {}
-	void operator=( const MarketRequestList& ) {}
-	void SetFirst( MarketRequest* first_value ) { first = first_value; }
-	void SetLast( MarketRequest* last_value ) { last = last_value; }
+	List<Item<MarketData>>( const List<Item<MarketData>>& ) = delete;
+	List<Item<MarketData>>( List<Item<MarketData>>&& ) = delete;
+	void operator=( const List<Item<MarketData>>& ) = delete;
+	void SetFirst( Item<MarketData>* first_value ) { first = first_value; }
+	void SetLast( Item<MarketData>* last_value ) { last = last_value; }
 };
-
 
 class Banker
 {
@@ -132,8 +117,8 @@ private:
 	int cur_market_lvl;
 	RegisteredPlayers registered_players;
 	MarketState cur_market_state;
-	MarketRequestList sources_requests;
-	MarketRequestList products_requests;
+	List<Item<MarketData>> sources_requests;
+	List<Item<MarketData>> products_requests;
 public:
 	Banker();
 	bool IsPlayersPrepared() const { return players_prepared; }
@@ -150,20 +135,20 @@ public:
 	int GetCurrentMarketLvl() const { return cur_market_lvl; }
 	const RegisteredPlayers& GetPlayers() const { return registered_players; }
 	MarketState& GetCurrentMarketState() { return cur_market_state; }
-	MarketRequestList& GetSourcesRequests() { return sources_requests; }
-	MarketRequestList& GetProductsRequests() { return products_requests; }
+	List<Item<MarketData>>& GetSourcesRequests() { return sources_requests; }
+	List<Item<MarketData>>& GetProductsRequests() { return products_requests; }
 
-	void SetTurnNumber( int number );
-	void SetAlivePlayers( int players_value );
-	void SetReadyPlayers( int players_value );
-	void SetLobbyPlayers( int players_value );
-	void SetCurrentMarketLvl( int lvl_value );
+	void SetTurnNumber( int );
+	void SetAlivePlayers( int );
+	void SetReadyPlayers( int );
+	void SetLobbyPlayers( int );
+	void SetCurrentMarketLvl( int );
 
-	void CleanPlayer( int player_id );
+	void CleanPlayer( int );
 private:
 	Banker( const Banker& ) = delete;
 	Banker( Banker&& ) = delete;
-	void operator=( const Banker& ) {}
+	void operator=( const Banker& ) = delete;
 };
 
 #endif

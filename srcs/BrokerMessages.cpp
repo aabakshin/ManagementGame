@@ -3,7 +3,9 @@
 
 
 #include "BrokerMessages.hpp"
+#include "Banker.hpp"
 #include "MGLib.h"
+#include "Player.hpp"
 #include <cstring>
 
 
@@ -208,7 +210,20 @@ void GameMessages::GameAlreadyStartedMessage()
 
 void GameMessages::StartGameInfoMessage()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_id );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			//throw PlayerRecordIsFreeException();
+		}
+	}
+	else
+	{
+		return;
+		//throw NullPointerException();
+	}
 
 	char p_num[10];
 	itoa(sender_p->GetUID(), p_num, 9);
@@ -379,6 +394,21 @@ void GameMessages::AuctionResultsMessage()
 
 void GameMessages::NewTurnMessage()
 {
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_id );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			//throw PlayerRecordIsFreeException();
+		}
+	}
+	else
+	{
+		return;
+		//throw NullPointerException();
+	}
+
 	char tn[10];
 	itoa(GetGameSession().GetTurnNumber(), tn, 9);
 
@@ -405,8 +435,6 @@ void GameMessages::NewTurnMessage()
 				pmp,
 				nullptr
 	};
-
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_id );
 
 	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, sender_p->IsBot() ? 6 : 2 );
 }
@@ -617,91 +645,216 @@ void BCBrokerMessages::MarketCmdProductMaxPrice()
 
 void BCBrokerMessages::PlayerCmdIsTargetNotFound()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	if ( target_p->IsFree() )
+	if ( target_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( target_p->IsFree() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
-
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetUID()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetUID(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetUID(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetMoney()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetMoney(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetMoney(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetIncome()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetIncome(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetIncome(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetSources()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetSources(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetSources(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetProducts()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetProducts(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetProducts(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetWaitFactories(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetWaitFactories(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetWorkFactories(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetWorkFactories(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetBuiltFactories(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetBuiltFactories(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerSenderIsBot()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->IsBot() )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->IsBot() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message,  false_str);
 		return;
 	}
 
-	strcpy(result_message,  false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetProduced()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByNum( target_player_id );
+	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
 
-	itoa(target_p->GetProduced(), result_message, MESSAGE_SIZE-1);
+	if ( target_p != nullptr )
+	{
+		if ( target_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		itoa(target_p->GetProduced(), result_message, MESSAGE_SIZE-1);
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::ListCmdGetAlivePlayers()
@@ -711,137 +864,276 @@ void BCBrokerMessages::ListCmdGetAlivePlayers()
 
 void BCBrokerMessages::PlayerSenderIsTurn()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->IsTurn() )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->IsTurn() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::ProdCmdSourcesCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->GetSources() >= 1 )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->GetSources() >= 1 )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::ProdCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->GetMoney() >= PRODUCTION_PRODUCT_COST )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->GetMoney() >= PRODUCTION_PRODUCT_COST )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->GetWaitFactories() > 0 )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->GetWaitFactories() > 0 )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::ProdCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	const_cast<Player*>(sender_p)->SetWaitFactories( sender_p->GetWaitFactories() - 1 );
-	const_cast<Player*>(sender_p)->SetWorkFactories( sender_p->GetWorkFactories() + 1 );
-	const_cast<Player*>(sender_p)->SetSources( sender_p->GetSources() - 1 );
-	const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - PRODUCTION_PRODUCT_COST );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		const_cast<Player*>(sender_p)->SetWaitFactories( sender_p->GetWaitFactories() - 1 );
+		const_cast<Player*>(sender_p)->SetWorkFactories( sender_p->GetWorkFactories() + 1 );
+		const_cast<Player*>(sender_p)->SetSources( sender_p->GetSources() - 1 );
+		const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - PRODUCTION_PRODUCT_COST );
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
 {
-	const Player::BuildsList& player_builds = GetGameSession().GetPlayers().GetPlayerByNum(sender_player_id)->GetBuildsFactories();
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
 
-	if ( player_builds.IsEmpty() )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
+
+		if ( player_builds.IsEmpty() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
 {
-	const Player::BuildsList& player_builds = GetGameSession().GetPlayers().GetPlayerByNum(sender_player_id)->GetBuildsFactories();
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
 
-	itoa( player_builds.GetSize(), result_message, MESSAGE_SIZE-1 );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
+		itoa( player_builds.GetSize(), result_message, MESSAGE_SIZE-1 );
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 {
-	const Player::BuildsList& player_builds = GetGameSession().GetPlayers().GetPlayerByNum(sender_player_id)->GetBuildsFactories();
-	char build_number[10]	{	0x00	};
-	char turns_left[10]		{	0x00	};
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
 
-
-	int offset = 0;
-
-	for ( Player::BuildsList::BuildsItem* node = player_builds.GetFirst(); node != nullptr; node = node->GetNext() )
+	if ( sender_p != nullptr )
 	{
-		concat_to_str(node->GetData().GetBuildNumber(), build_number, 9, result_message, &offset);
-		concat_to_str(node->GetData().GetTurnsLeft(), turns_left, 9, result_message, &offset);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
+
+		char build_number[10]	{	0x00	};
+		char turns_left[10]		{	0x00	};
+
+		int offset = 0;
+
+		for ( Item<BuildsData>* node = player_builds.GetFirst(); node != nullptr; node = node->GetNext() )
+		{
+			concat_to_str(node->GetData().GetBuildNumber(), build_number, 9, result_message, &offset);
+			concat_to_str(node->GetData().GetTurnsLeft(), turns_left, 9, result_message, &offset);
+		}
+
+		result_message[offset-1] = '\0';
+		return;
 	}
 
-	result_message[offset-1] = '\0';
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuildCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->GetMoney() >= NEW_FACTORY_UNIT_COST/2 )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->GetMoney() >= NEW_FACTORY_UNIT_COST/2 )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuildCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	const_cast<Player::BuildsList&>(sender_p->GetBuildsFactories()).Insert( sender_p->GetBuildsFactories().GetValidNum(), TURNS_TO_BUILD );
-	const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - NEW_FACTORY_UNIT_COST/2 );
-	const_cast<Player*>(sender_p)->SetBuiltFactories( sender_p->GetBuiltFactories() + 1 );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		BuildsData data;
+		data.MakeData( sender_p->GetBuildsFactories().GetValidNum(), TURNS_TO_BUILD );
+
+		const_cast<List<Item<BuildsData>>&>(sender_p->GetBuildsFactories()).Insert( data );
+		const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - NEW_FACTORY_UNIT_COST/2 );
+		const_cast<Player*>(sender_p)->SetBuiltFactories( sender_p->GetBuiltFactories() + 1 );
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuyCmdIsSentSourceRequest()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->IsSentSourceRequest() )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->IsSentSourceRequest() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuyCmdSourcesCondition()
@@ -868,76 +1160,168 @@ void BCBrokerMessages::BuyCmdPriceCondition()
 
 void BCBrokerMessages::BuyCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->GetMoney() < source_price * sources_amount )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->GetMoney() < source_price * sources_amount )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::BuyCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	const_cast<Banker&>(GetGameSession()).GetSourcesRequests().Insert( sender_player_id, sources_amount, source_price );
-	const_cast<Player*>(sender_p)->SetSentSourceRequest();
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		MarketData data;
+		data.MakeData( sender_player_id, sources_amount, source_price );
+
+		const_cast<Banker&>(GetGameSession()).GetSourcesRequests().Insert( data );
+		const_cast<Player*>(sender_p)->SetSentSourceRequest();
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::SellCmdIsSentProductRequest()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( sender_p->IsSentProductsRequest() )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( sender_p->IsSentProductsRequest() )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::SellCmdAmountCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	if ( ( products_amount > 0 ) && ( products_amount <= sender_p->GetProducts() ) )
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( ( products_amount > 0 ) && ( products_amount <= sender_p->GetProducts() ) )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::SellCmdPriceCondition()
 {
-	if ( ( product_price > 0 ) && ( product_price <= const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice() ) )
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+
+	if ( sender_p != nullptr )
 	{
-		strcpy(result_message, true_str);
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		if ( ( product_price > 0 ) && ( product_price <= const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice() ) )
+		{
+			strcpy(result_message, true_str);
+			return;
+		}
+
+		strcpy(result_message, false_str);
 		return;
 	}
 
-	strcpy(result_message, false_str);
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::SellCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	const_cast<Banker&>(GetGameSession()).GetProductsRequests().Insert( sender_player_id, products_amount, product_price );
-	const_cast<Player*>(sender_p)->SetSentProductsRequest();
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		MarketData data;
+		data.MakeData( sender_player_id, products_amount, product_price );
+
+		const_cast<Banker&>(GetGameSession()).GetProductsRequests().Insert( data );
+		const_cast<Player*>(sender_p)->SetSentProductsRequest();
+		return;
+	}
+
+	//throw NullPointerException();
 }
 
 void BCBrokerMessages::TurnCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByNum( sender_player_id );
+	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
 
-	const_cast<Player*>(sender_p)->SetTurn();
-	const_cast<Banker&>(GetGameSession()).SetReadyPlayers( GetGameSession().GetReadyPlayers() + 1 );
+	if ( sender_p != nullptr )
+	{
+		if ( sender_p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
+
+		const_cast<Player*>(sender_p)->SetTurn();
+		const_cast<Banker&>(GetGameSession()).SetReadyPlayers( GetGameSession().GetReadyPlayers() + 1 );
+		return;
+	}
+
+	//throw NullPointerException();
 }
 void BCBrokerMessages::TurnCmdGetWypaToken()
 {

@@ -1,6 +1,7 @@
 #ifndef BANKER_CPP
 #define BANKER_CPP
 
+
 #include "Banker.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -43,52 +44,51 @@ MarketState::MarketState()
 	SetProductMaxPrice(0);
 }
 
-void MarketState::SetSourcesAmount( int amount )
+void MarketState::SetSourcesAmount( int value )
 {
-	if ( amount < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidAmountException();
 	}
 
-	sources_amount = amount;
+	sources_amount = value;
 }
 
-void MarketState::SetSourceMinPrice( int min_price )
+void MarketState::SetSourceMinPrice( int value )
 {
-	if ( min_price < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidPriceException();
 	}
 
-	source_min_price = min_price;
+	source_min_price = value;
 }
 
-void MarketState::SetProductsAmount( int amount )
+void MarketState::SetProductsAmount( int value )
 {
-	if ( amount < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidAmountException();
 	}
 
-	products_amount = amount;
+	products_amount = value;
 }
 
-void MarketState::SetProductMaxPrice( int max_price )
+void MarketState::SetProductMaxPrice( int value )
 {
-	if ( max_price < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidPriceException();
 	}
 
-	product_max_price = max_price;
+	product_max_price = value;
 }
 
-
-MarketRequestList::MarketRequest::MarketData::MarketData( int p_num, int amnt, int price_value )
+void MarketData::MakeData( int p_num, int amnt, int price_value )
 {
 	SetPlayerNum( p_num );
 	SetAmount( amnt );
@@ -96,73 +96,95 @@ MarketRequestList::MarketRequest::MarketData::MarketData( int p_num, int amnt, i
 	UnsetSuccess();
 }
 
-void MarketRequestList::MarketRequest::MarketData::SetPlayerNum( int num_value )
+MarketData::MarketData( int p_num, int amnt, int price_value )
 {
-	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) )
+	SetPlayerNum( p_num );
+	SetAmount( amnt );
+	SetPrice( price_value );
+	UnsetSuccess();
+}
+
+MarketData::MarketData( const MarketData& data )
+{
+	SetPlayerNum( data.GetPlayerNum() );
+	SetAmount( data.GetAmount() );
+	SetPrice( data.GetPrice() );
+
+	success = data.success;
+}
+
+MarketData::MarketData( MarketData&& data )
+{
+	SetPlayerNum( data.GetPlayerNum() );
+	SetAmount( data.GetAmount() );
+	SetPrice( data.GetPrice() );
+
+	success = data.success;
+
+	data.SetPlayerNum( 0 );
+	data.SetAmount( 0 );
+	data.SetPrice( 0 );
+	data.UnsetSuccess();
+}
+
+void MarketData::operator=( const MarketData& data )
+{
+	SetPlayerNum( data.GetPlayerNum() );
+	SetAmount( data.GetAmount() );
+	SetPrice( data.GetPrice() );
+
+	success = data.success;
+}
+
+void MarketData::SetPlayerNum( int value )
+{
+	if ( ( value < 1 ) || ( value > MAX_PLAYERS ) )
 	{
 		return;
 		// throw InvalidValueException();
 	}
 
-	player_num = num_value;
+	player_id = value;
 }
 
-void MarketRequestList::MarketRequest::MarketData::SetAmount( int amount_value )
+void MarketData::SetAmount( int value )
 {
-	if ( amount_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidValueException();
 	}
 
-	amount = amount_value;
+	amount = value;
 }
 
-void MarketRequestList::MarketRequest::MarketData::SetPrice( int price_value )
+void MarketData::SetPrice( int value )
 {
-	if ( price_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidValueException();
 	}
 
-	price = price_value;
+	price = value;
 }
 
 
-MarketRequestList::MarketRequest::MarketRequest( int num_value, int amount_value, int price_value )
+void List<Item<MarketData>>::Insert( MarketData data )
 {
-	SetData( num_value, amount_value, price_value );
-	SetNext( nullptr );
-	SetPrev( nullptr );
-}
-
-void MarketRequestList::MarketRequest::SetData( int num_value, int amount_value, int price_value )
-{
-	const_cast<MarketData&>(GetData()).SetPlayerNum(num_value);
-	const_cast<MarketData&>(GetData()).SetAmount(amount_value);
-	const_cast<MarketData&>(GetData()).SetPrice(price_value);
-}
-
-
-int MarketRequestList::Insert( int num_value, int amount_value, int price_value )
-{
-	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) || ( amount_value < 0 ) || ( price_value < 0 ) )
-		return 0;
-
-	MarketRequest* prev_node = nullptr;
-	MarketRequest* cur_node = GetFirst();
+	Item<MarketData>* prev_node = nullptr;
+	Item<MarketData>* cur_node = GetFirst();
 
 	while ( cur_node != nullptr )
 	{
-		if ( cur_node->GetData().GetPlayerNum() == num_value )
-			return 0;
+		if ( cur_node->GetData().GetPlayerNum() == data.GetPlayerNum() )
+			return;
 
 		prev_node = cur_node;
 		cur_node = cur_node->GetNext();
 	}
 
-	MarketRequest* new_node = new MarketRequest( num_value, amount_value, price_value );
+	Item<MarketData>* new_node = new Item<MarketData>( data );
 	new_node->SetNext( nullptr );
 
 	new_node->SetPrev( prev_node );
@@ -172,23 +194,21 @@ int MarketRequestList::Insert( int num_value, int amount_value, int price_value 
 		SetFirst( new_node );
 
 	SetLast( new_node );
-
-	return 1;
 }
 
-int MarketRequestList::Delete( int player_num )
+void List<Item<MarketData>>::Delete( int player_id )
 {
 	if ( IsEmpty() )
-		return 0;
+		return;
 
-	MarketRequest* cur_node = GetFirst();
-	while ( ( cur_node != nullptr ) && ( cur_node->GetData().GetPlayerNum() != player_num ) )
+	Item<MarketData>* cur_node = GetFirst();
+	while ( ( cur_node != nullptr ) && ( cur_node->GetData().GetPlayerNum() != player_id ) )
 	{
 		cur_node = cur_node->GetNext();
 	}
 
 	if ( cur_node == nullptr )
-		return 0;
+		return;
 
 	if ( cur_node->GetPrev() == nullptr )
 	{
@@ -197,16 +217,14 @@ int MarketRequestList::Delete( int player_num )
 			delete cur_node;
 			SetFirst( nullptr );
 			SetLast( nullptr );
-
-			return 1;
+			return;
 		}
 
 		cur_node->GetNext()->SetPrev( nullptr );
 		SetFirst( cur_node->GetNext() );
 		cur_node->SetNext( nullptr );
 		delete cur_node;
-
-		return 1;
+		return;
 	}
 
 	if ( cur_node->GetNext() == nullptr )
@@ -215,8 +233,7 @@ int MarketRequestList::Delete( int player_num )
 		SetLast( cur_node->GetPrev() );
 		cur_node->SetPrev( nullptr );
 		delete cur_node;
-
-		return 1;
+		return;
 	}
 
 	cur_node->GetNext()->SetPrev( cur_node->GetPrev() );
@@ -224,35 +241,31 @@ int MarketRequestList::Delete( int player_num )
 	cur_node->SetNext( nullptr );
 	cur_node->SetPrev( nullptr );
 	delete cur_node;
-
-	return 1;
 }
 
-int MarketRequestList::Clear()
+void List<Item<MarketData>>::Clear()
 {
 	if ( IsEmpty() )
-		return 0;
+		return;
 
 	int list_size = GetSize();
 	for ( int i = 1; i <= list_size; ++i )
 		Delete(GetFirst()->GetData().GetPlayerNum());
-
-	return 1;
 }
 
-int MarketRequestList::GetSize() const
+int List<Item<MarketData>>::GetSize() const
 {
 	if ( IsEmpty() )
 		return 0;
 
 	int size = 0;
-	for ( MarketRequest* node = GetFirst(); node != nullptr; ++size, node = node->GetNext() )
+	for ( Item<MarketData>* node = GetFirst(); node != nullptr; ++size, node = node->GetNext() )
 		{}
 
 	return size;
 }
 
-void MarketRequestList::Print() const
+void List<Item<MarketData>>::Print() const
 {
 	if ( IsEmpty() )
 	{
@@ -260,7 +273,7 @@ void MarketRequestList::Print() const
 		return;
 	}
 
-	for ( MarketRequest* node = GetFirst(); node != nullptr; node = node->GetNext() )
+	for ( Item<MarketData>* node = GetFirst(); node != nullptr; node = node->GetNext() )
 	{
 		printf("( %d, %d, %d ),\n", node->GetData().GetPlayerNum(), node->GetData().GetAmount(), node->GetData().GetPrice());
 	}
@@ -278,59 +291,59 @@ Banker::Banker()
 	SetCurrentMarketLvl(0);
 }
 
-void Banker::SetTurnNumber( int number )
+void Banker::SetTurnNumber( int value )
 {
-	if ( number < 0 )
+	if ( value < 0 )
 	{
 		return;
 		//throw InvalidTurnValueException();
 	}
 
-	turn_number = number;
+	turn_number = value;
 }
 
-void Banker::SetAlivePlayers( int players_value )
+void Banker::SetAlivePlayers( int value )
 {
-	if ( ( players_value < 0 ) || ( players_value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
 	{
 		return;
 		// throw InvalidPlayersValueException();
 	}
 
-	alive_players = players_value;
+	alive_players = value;
 }
 
-void Banker::SetReadyPlayers( int players_value )
+void Banker::SetReadyPlayers( int value )
 {
-	if ( ( players_value < 0 ) || ( players_value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
 	{
 		return;
 		// throw InvalidPlayersValueException();
 	}
 
-	ready_players = players_value;
+	ready_players = value;
 }
 
-void Banker::SetLobbyPlayers( int players_value )
+void Banker::SetLobbyPlayers( int value )
 {
-	if ( ( players_value < 0 ) || ( players_value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
 	{
 		return;
 		// throw InvalidPlayersValueException();
 	}
 
-	lobby_players = players_value;
+	lobby_players = value;
 }
 
-void Banker::SetCurrentMarketLvl( int lvl_value )
+void Banker::SetCurrentMarketLvl( int value )
 {
-	if ( lvl_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidMarketLvlException();
 	}
 
-	cur_market_lvl = lvl_value;
+	cur_market_lvl = value;
 }
 
 void Banker::CleanPlayer( int player_id )
@@ -342,14 +355,14 @@ void Banker::CleanPlayer( int player_id )
 	else
 	{
 		--alive_players;
-		if ( GetPlayers().GetPlayerByNum( player_id )->IsTurn() )
+		if ( GetPlayers().GetPlayerByUID( player_id )->IsTurn() )
 			--ready_players;
 
 		GetSourcesRequests().Delete( player_id );
 		GetProductsRequests().Delete( player_id );
 	}
 
-	const_cast<Player*>(GetPlayers().GetPlayerByNum(player_id))->SetFree();
+	const_cast<Player*>(GetPlayers().GetPlayerByUID(player_id))->SetFree();
 	printf( "[+] Player's #%d record now is free\n", player_id );
 }
 

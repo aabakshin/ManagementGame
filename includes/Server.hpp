@@ -163,27 +163,27 @@ public:
 	const Banker& GetBanker() const { return banker; }
 	int Run();
 
-	int PayCharges();
-	int ReportOnTurn();
-	int ChangeMarketState();
-	int StartAuction( const MarketRequestList&, int auction_type );
-	int CheckBuildingFactories();
+	void PayCharges();
+	void ReportOnTurn();
+	void ChangeMarketState();
+	void StartAuction( const List<Item<MarketData>>&, int auction_type );
+	void CheckBuildingFactories();
 private:
 	Server() = delete;
 	Server( const Server& ) = delete;
 	Server( Server&& ) = delete;
 	void operator=( const Server& ) {}
 	void ListenSocketInit();
-	int CloseConnection( int player_number );
+	void CloseConnection( int player_number );
 	void Stop( int forcely );
-	int QuitPlayer( int player_number );
-	int FillReadfds();
+	void QuitPlayer( int player_number );
+	void FillReadfds();
 	bool IsCorrectIdentityMsg( const char* );
 	void ConcatAddrPort();
 
-	int ShowAuctionInfo( const char* auction_type_msg, const MarketRequestList::MarketRequest* );
-	int SortRequestsByPrice( const MarketRequestList&, MarketRequestList&, int auction_type );
-	int CheckPlayersReports( MarketRequestList& );
+	void ShowAuctionInfo( const char* auction_type_msg, const Item<MarketData>* );
+	void SortRequestsByPrice( const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
+	bool CheckPlayersReports( List<Item<MarketData>>& );
 };
 
 #endif

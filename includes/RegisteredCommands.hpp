@@ -1,7 +1,9 @@
 #ifndef REGISTERED_COMMANDS_HPP_SENTINEL
 #define REGISTERED_COMMANDS_HPP_SENTINEL
 
+
 #include "Command.hpp"
+
 
 enum
 {

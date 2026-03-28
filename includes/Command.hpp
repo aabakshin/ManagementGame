@@ -42,6 +42,7 @@ class BCBrokerMessages;
 class Command
 {
 public:
+
 	class CommandParams
 	{
 	private:
@@ -54,10 +55,11 @@ public:
 		void SetParam1( const void* value ) { param1 = const_cast<void*>(value); }
 		void SetParam2( const void* value ) { param2 = const_cast<void*>(value); }
 	private:
-		CommandParams( const CommandParams& ) {}
-		CommandParams( CommandParams&& ) {}
-		void operator=( const CommandParams& ) {}
+		CommandParams( const CommandParams& ) = delete;
+		CommandParams( CommandParams&& ) = delete;
+		void operator=( const CommandParams& ) = delete;
 	};
+
 	class MessageTokens
 	{
 	private:
@@ -73,11 +75,12 @@ public:
 		void SetMsgTokensCount( int );
 		~MessageTokens();
 	private:
-		MessageTokens( const MessageTokens& ) {}
-		MessageTokens( MessageTokens&& ) {}
-		void operator=( const MessageTokens& ) {}
+		MessageTokens( const MessageTokens& ) = delete;
+		MessageTokens( MessageTokens&& ) = delete;
+		void operator=( const MessageTokens& ) = delete;
 		void NullifyMessageTokens();
 	};
+
 private:
 	char name[COMMAND_NAME_SIZE];
 	CommandParams cmd_params;
@@ -93,9 +96,9 @@ public:
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) = 0;
 	virtual ~Command() {}
 private:
-	Command(const Command& obj) {}
-	Command(Command&& obj) {}
-	void operator=( const Command& obj ) {}
+	Command( const Command& ) = delete;
+	Command( Command&& ) = delete;
+	void operator=( const Command& ) = delete;
 };
 
 class HelpCommand : public Command
@@ -105,7 +108,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~HelpCommand() {}
 private:
-	void operator=( const HelpCommand& obj ) {}
+	HelpCommand( const HelpCommand& ) = delete;
+	HelpCommand( HelpCommand&& ) = delete;
+	void operator=( const HelpCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -116,7 +121,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~MarketCommand() {}
 private:
-	void operator=( const MarketCommand& obj ) {}
+	MarketCommand( const MarketCommand& ) = delete;
+	MarketCommand( MarketCommand&& ) = delete;
+	void operator=( const MarketCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -127,7 +134,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~PlayerCommand() {}
 private:
-	void operator=( const PlayerCommand& obj ) {}
+	PlayerCommand( const PlayerCommand& ) = delete;
+	PlayerCommand( PlayerCommand&& ) = delete;
+	void operator=( const PlayerCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -138,7 +147,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~ListCommand() {}
 private:
-	void operator=( const ListCommand& obj ) {}
+	ListCommand( const ListCommand& ) = delete;
+	ListCommand( ListCommand&& ) = delete;
+	void operator=( const ListCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -149,7 +160,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~ProdCommand() {}
 private:
-	void operator=( const ProdCommand& obj ) {}
+	ProdCommand( const ProdCommand& ) = delete;
+	ProdCommand( ProdCommand&& ) = delete;
+	void operator=( const ProdCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -160,7 +173,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~BuildCommand() {}
 private:
-	void operator=( const PlayerCommand& obj ) {}
+	BuildCommand( const BuildCommand& ) = delete;
+	BuildCommand( BuildCommand&& ) = delete;
+	void operator=( const BuildCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -171,7 +186,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~BuyCommand() {}
 private:
-	void operator=( const BuyCommand& obj ) {}
+	BuyCommand( const BuyCommand& ) = delete;
+	BuyCommand( BuyCommand&& ) = delete;
+	void operator=( const BuyCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -182,7 +199,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~SellCommand() {}
 private:
-	void operator=( const SellCommand& obj ) {}
+	SellCommand( const SellCommand& ) = delete;
+	SellCommand( SellCommand&& ) = delete;
+	void operator=( const SellCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -193,7 +212,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~TurnCommand() {}
 private:
-	void operator=( const TurnCommand& obj ) {}
+	TurnCommand( const TurnCommand& ) = delete;
+	TurnCommand( TurnCommand&& ) = delete;
+	void operator=( const TurnCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 
@@ -204,7 +225,9 @@ public:
 	virtual void PrepareAndProc( int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~QuitCommand() {}
 private:
-	void operator=( const QuitCommand& obj ) {}
+	QuitCommand( const QuitCommand& ) = delete;
+	QuitCommand( QuitCommand&& ) = delete;
+	void operator=( const QuitCommand& ) = delete;
 	virtual void Process( int, const Command::CommandParams&, const BCBrokerMessages& ) override;
 };
 

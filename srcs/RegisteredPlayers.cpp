@@ -1,6 +1,7 @@
 #ifndef REGISTERED_PLAYERS_CPP_SENTINEL
 #define REGISTERED_PLAYERS_CPP_SENTINEL
 
+
 #include "RegisteredPlayers.hpp"
 
 
@@ -9,10 +10,8 @@ RegisteredPlayers::RegisteredPlayers()
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = (*this)[i];
-		p = new Player( 0, "", 0 );
+		p = new Player( -1, "", GetUIDByIdx(i) );
 	}
-
-	players_count = MAX_PLAYERS;
 }
 
 RegisteredPlayers::~RegisteredPlayers()
@@ -26,13 +25,11 @@ RegisteredPlayers::~RegisteredPlayers()
 			p = nullptr;
 		}
 	}
-
-	players_count = 0;
 }
 
 const Player* RegisteredPlayers::operator[]( unsigned int idx ) const
 {
-	if ( ( idx < 0 ) || ( idx > (MAX_PLAYERS-1) ) )
+	if ( ( idx < 0 ) || ( idx > ( MAX_PLAYERS-1 ) ) )
 	{
 		return nullptr;
 		// throw IndexOutOfRangeException();
@@ -53,7 +50,7 @@ const Player* RegisteredPlayers::GetPlayerByFd( int fd ) const
 	return nullptr;
 }
 
-const Player* RegisteredPlayers::GetPlayerByNum( int player_id ) const
+const Player* RegisteredPlayers::GetPlayerByUID( int player_id ) const
 {
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
@@ -65,7 +62,7 @@ const Player* RegisteredPlayers::GetPlayerByNum( int player_id ) const
 	return nullptr;
 }
 
-int RegisteredPlayers::GetIdxByNum( int player_id ) const
+int RegisteredPlayers::GetIdxByUID( int player_id ) const
 {
 	if ( ( player_id < 1 ) || ( player_id > MAX_PLAYERS ) )
 		return -1;
@@ -73,7 +70,7 @@ int RegisteredPlayers::GetIdxByNum( int player_id ) const
 	return player_id - 1;
 }
 
-int RegisteredPlayers::GetNumByIdx( int idx ) const
+const int RegisteredPlayers::GetUIDByIdx( int idx ) const
 {
 	if ( ( idx < 0 ) || ( idx >= MAX_PLAYERS ) )
 		return -1;

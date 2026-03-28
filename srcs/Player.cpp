@@ -1,18 +1,46 @@
 #ifndef PLAYER_CPP
 #define PLAYER_CPP
 
+
 #include "Player.hpp"
 #include <cstdio>
 #include <cstring>
 
 
-Player::BuildsList::BuildsItem::BuildsData::BuildsData( int num_value, int turns_left_value )
+BuildsData::BuildsData( int num_value, int turns_left_value )
 {
 	SetBuildNumber( num_value );
 	SetTurnsLeft( turns_left_value );
 }
 
-void Player::BuildsList::BuildsItem::BuildsData::SetBuildNumber( int num_value )
+BuildsData::BuildsData( const BuildsData& data )
+{
+	SetBuildNumber( data.GetBuildNumber() );
+	SetTurnsLeft( data.GetTurnsLeft() );
+}
+
+BuildsData::BuildsData( BuildsData&& data )
+{
+	SetBuildNumber( data.GetBuildNumber() );
+	SetTurnsLeft( data.GetTurnsLeft() );
+
+	data.SetBuildNumber( 0 );
+	data.SetTurnsLeft( 0 );
+}
+
+void BuildsData::operator=( const BuildsData& data )
+{
+	SetBuildNumber( data.GetBuildNumber() );
+	SetTurnsLeft( data.GetTurnsLeft() );
+}
+
+void BuildsData::MakeData( int num_value, int turns_left_value )
+{
+	SetBuildNumber( num_value );
+	SetTurnsLeft( turns_left_value );
+}
+
+void BuildsData::SetBuildNumber( int num_value )
 {
 	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) )
 	{
@@ -23,7 +51,7 @@ void Player::BuildsList::BuildsItem::BuildsData::SetBuildNumber( int num_value )
 	build_number = num_value;
 }
 
-void Player::BuildsList::BuildsItem::BuildsData::SetTurnsLeft( int turns_left_value )
+void BuildsData::SetTurnsLeft( int turns_left_value )
 {
 	if ( turns_left_value < 0 )
 	{
@@ -35,38 +63,21 @@ void Player::BuildsList::BuildsItem::BuildsData::SetTurnsLeft( int turns_left_va
 }
 
 
-Player::BuildsList::BuildsItem::BuildsItem( int num_value, int turns_left_value )
+void List<Item<BuildsData>>::Insert( BuildsData data )
 {
-	SetData( num_value, turns_left_value );
-	SetNext( nullptr );
-	SetPrev( nullptr );
-}
-
-void Player::BuildsList::BuildsItem::SetData( int num_value, int turns_left_value )
-{
-	const_cast<Player::BuildsList::BuildsItem::BuildsData&>(GetData()).SetBuildNumber( num_value );
-	const_cast<Player::BuildsList::BuildsItem::BuildsData&>(GetData()).SetTurnsLeft( turns_left_value );
-}
-
-
-int Player::BuildsList::Insert( int num_value, int turns_left_value )
-{
-	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) || ( turns_left_value < 0 ) )
-		return 0;
-
-	BuildsItem* prev_node = nullptr;
-	BuildsItem* cur_node = GetFirst();
+	Item<BuildsData>* prev_node = nullptr;
+	Item<BuildsData>* cur_node = GetFirst();
 
 	while ( cur_node != nullptr )
 	{
-		if ( cur_node->GetData().GetBuildNumber() == num_value )
-			return 0;
+		if ( cur_node->GetData().GetBuildNumber() == data.GetBuildNumber() )
+			return;
 
 		prev_node = cur_node;
 		cur_node = cur_node->GetNext();
 	}
 
-	BuildsItem* new_node = new BuildsItem( num_value, turns_left_value );
+	Item<BuildsData>* new_node = new Item<BuildsData>( data );
 	new_node->SetNext( nullptr );
 
 	new_node->SetPrev( prev_node );
@@ -76,23 +87,21 @@ int Player::BuildsList::Insert( int num_value, int turns_left_value )
 		SetFirst( new_node );
 
 	SetLast( new_node );
-
-	return 1;
 }
 
-int Player::BuildsList::Delete( int build_num )
+void List<Item<BuildsData>>::Delete( int build_num )
 {
 	if ( IsEmpty() )
-		return 0;
+		return;
 
-	BuildsItem* cur_node = GetFirst();
+	Item<BuildsData>* cur_node = GetFirst();
 	while ( ( cur_node != nullptr ) && ( cur_node->GetData().GetBuildNumber() != build_num ) )
 	{
 		cur_node = cur_node->GetNext();
 	}
 
 	if ( cur_node == nullptr )
-		return 0;
+		return;
 
 	if ( cur_node->GetPrev() == nullptr )
 	{
@@ -101,16 +110,14 @@ int Player::BuildsList::Delete( int build_num )
 			delete cur_node;
 			SetFirst( nullptr );
 			SetLast( nullptr );
-
-			return 1;
+			return;
 		}
 
 		cur_node->GetNext()->SetPrev( nullptr );
 		SetFirst( cur_node->GetNext() );
 		cur_node->SetNext( nullptr );
 		delete cur_node;
-
-		return 1;
+		return;
 	}
 
 	if ( cur_node->GetNext() == nullptr )
@@ -119,8 +126,7 @@ int Player::BuildsList::Delete( int build_num )
 		SetLast( cur_node->GetPrev() );
 		cur_node->SetPrev( nullptr );
 		delete cur_node;
-
-		return 1;
+		return;
 	}
 
 	cur_node->GetNext()->SetPrev( cur_node->GetPrev() );
@@ -128,35 +134,31 @@ int Player::BuildsList::Delete( int build_num )
 	cur_node->SetNext( nullptr );
 	cur_node->SetPrev( nullptr );
 	delete cur_node;
-
-	return 1;
 };
 
-int Player::BuildsList::Clear()
+void List<Item<BuildsData>>::Clear()
 {
 	if ( IsEmpty() )
-		return 0;
+		return;
 
 	int list_size = GetSize();
 	for ( int i = 1; i <= list_size; ++i )
 		Delete( GetFirst()->GetData().GetBuildNumber() );
-
-	return 1;
 }
 
-int Player::BuildsList::GetSize() const
+int List<Item<BuildsData>>::GetSize() const
 {
 	if ( IsEmpty() )
 		return 0;
 
 	int size = 0;
-	for ( BuildsItem* node = GetFirst(); node != nullptr; ++size, node = node->GetNext() )
+	for ( Item<BuildsData>* node = GetFirst(); node != nullptr; ++size, node = node->GetNext() )
 		{}
 
 	return size;
 }
 
-void Player::BuildsList::Print() const
+void List<Item<BuildsData>>::Print() const
 {
 	if ( IsEmpty() )
 	{
@@ -164,20 +166,20 @@ void Player::BuildsList::Print() const
 		return;
 	}
 
-	for ( BuildsItem* node = GetFirst(); node != nullptr; node = node->GetNext() )
+	for ( Item<BuildsData>* node = GetFirst(); node != nullptr; node = node->GetNext() )
 	{
 		printf("( %d, %d ), \n", node->GetData().GetBuildNumber(), node->GetData().GetTurnsLeft());
 	}
 }
 
-int Player::BuildsList::GetMaxNum() const
+int List<Item<BuildsData>>::GetMaxNum() const
 {
 	if ( IsEmpty() )
 		return 0;
 
 	int max_number = 0;
 
-	for ( Player::BuildsList::BuildsItem* node = GetFirst(); node != nullptr; node = node->GetNext() )
+	for ( Item<BuildsData>* node = GetFirst(); node != nullptr; node = node->GetNext() )
 		if ( node->GetData().GetBuildNumber() > max_number )
 			max_number = node->GetData().GetBuildNumber();
 
@@ -237,6 +239,7 @@ void Player::AuctionReport::SetBoughtPrice( int price_value )
 	bought_price = price_value;
 }
 
+
 Player::Player( int p_fd, const char* p_addr, int p_uid )
 {
 	SetFd( p_fd );
@@ -265,7 +268,7 @@ Player::Player( int p_fd, const char* p_addr, int p_uid )
 
 void Player::SetFd( int p_fd )
 {
-	if ( p_fd < 0 )
+	if ( p_fd < -1 )
 	{
 		return;
 		// throw InvalidSocketException();
@@ -276,7 +279,7 @@ void Player::SetFd( int p_fd )
 
 void Player::SetAddr( const char* p_addr )
 {
-	strcpy(addr, p_addr);
+	strncpy(addr, p_addr, ADDRESS_SIZE-1);
 }
 
 void Player::SetUID( int p_uid )
@@ -290,6 +293,13 @@ void Player::SetUID( int p_uid )
 	uid = p_uid;
 }
 
+void Player::SetNewPlayer( int cs, const char* address_buffer )
+{
+	SetFd( cs );
+	SetAddr( address_buffer );
+	UnsetFree();
+}
+
 void Player::SetMessageBuffer( const char* msg, int msg_len )
 {
 	int i;
@@ -298,85 +308,85 @@ void Player::SetMessageBuffer( const char* msg, int msg_len )
 	message[i] = '\0';
 }
 
-void Player::SetMoney( int money_value )
+void Player::SetMoney( int value )
 {
-	money = money_value;
+	money = value;
 }
 
-void Player::SetOldMoney( int money_value )
+void Player::SetOldMoney( int value )
 {
-	old_money = money_value;
+	old_money = value;
 }
 
-void Player::SetIncome( int income_value )
+void Player::SetIncome( int value )
 {
-	income = income_value;
+	income = value;
 }
 
-void Player::SetSources( int sources_value )
+void Player::SetSources( int value )
 {
-	if ( sources_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidSourcesException();
 	}
 
-	sources = sources_value;
+	sources = value;
 }
 
-void Player::SetProducts( int products_value )
+void Player::SetProducts( int value )
 {
-	if ( products_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidProductsException();
 	}
 
-	products = products_value;
+	products = value;
 }
 
-void Player::SetWaitFactories( int wait_factories_value )
+void Player::SetWaitFactories( int value )
 {
-	if ( wait_factories_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidFactoriesException();
 	}
 
-	wait_factories = wait_factories_value;
+	wait_factories = value;
 }
 
-void Player::SetWorkFactories( int work_factories_value )
+void Player::SetWorkFactories( int value )
 {
-	if ( work_factories_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidFactoriesException();
 	}
 
-	work_factories = work_factories_value;
+	work_factories = value;
 }
 
-void Player::SetBuiltFactories( int built_factories_value )
+void Player::SetBuiltFactories( int value )
 {
-	if ( built_factories_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidFactoriesException();
 	}
 
-	built_factories = built_factories_value;
+	built_factories = value;
 }
 
-void Player::SetProduced( int produced_value )
+void Player::SetProduced( int value )
 {
-	if ( produced_value < 0 )
+	if ( value < 0 )
 	{
 		return;
 		// throw InvalidProducedException();
 	}
 
-	produced_on_turn = produced_value;
+	produced_on_turn = value;
 }
 
 #endif

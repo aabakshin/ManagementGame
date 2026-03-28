@@ -1,26 +1,26 @@
 #ifndef REGISTERED_PLAYERS_HPP_SENTINEL
 #define REGISTERED_PLAYERS_HPP_SENTINEL
 
+
 #include "Player.hpp"
+
 
 class RegisteredPlayers
 {
 private:
 	Player* registered_players[MAX_PLAYERS];
-	int players_count;
 public:
 	RegisteredPlayers();
 	~RegisteredPlayers();
 	const Player* operator[]( unsigned int idx ) const;
-	int GetPlayersCount() const { return players_count; }
 	const Player* GetPlayerByFd( int ) const;
-	const Player* GetPlayerByNum( int ) const;
-	int GetIdxByNum( int ) const;
-	int GetNumByIdx( int ) const;
+	const Player* GetPlayerByUID( int ) const;
+	int GetIdxByUID( int ) const;
+	const int GetUIDByIdx( int ) const;
 private:
-	RegisteredPlayers( const RegisteredPlayers& ) {}
-	RegisteredPlayers( RegisteredPlayers&& ) {}
-	void operator=( const RegisteredPlayers& ) {}
+	RegisteredPlayers( const RegisteredPlayers& ) = delete;
+	RegisteredPlayers( RegisteredPlayers&& ) = delete;
+	void operator=( const RegisteredPlayers& ) = delete;
 };
 
 #endif

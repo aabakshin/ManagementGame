@@ -4,9 +4,9 @@
 
 #include "Server.hpp"
 #include "Banker.hpp"
-#include "BrokerMessages.hpp"
-#include "CommandExecutor.hpp"
+#include "List.hpp"
 #include "MGLib.h"
+#include "Player.hpp"
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
@@ -146,7 +146,7 @@ void Server::Sender::SendMessage( const char* const* message_tokens, int tokens_
 {
 	bool overflow = false;
 
-	ResetCurPos();
+	Reset();
 
 	for ( int j = 0; j < tokens_count; ++j )
 	{
@@ -186,8 +186,6 @@ void Server::Sender::SendMessage( const char* const* message_tokens, int tokens_
 	}
 
 	ShowSendingMessage();
-
-	Reset();
 }
 
 void Server::Sender::SendMessage( const char* msg, int cs, const char* address )
@@ -537,19 +535,17 @@ void Server::ConcatAddrPort()
 }
 
 
-int Server::CloseConnection( int player_number )
+void Server::CloseConnection( int player_number )
 {
-	int p_fd = GetBanker().GetPlayers().GetPlayerByNum(player_number)->GetFd();
-	char ip[100] = { 0 };
-	strcpy(ip, GetBanker().GetPlayers().GetPlayerByNum(player_number)->GetAddr());
+	int p_fd = GetBanker().GetPlayers().GetPlayerByUID(player_number)->GetFd();
 
+	char ip[100] = { 0 };
+	strcpy(ip, GetBanker().GetPlayers().GetPlayerByUID(player_number)->GetAddr());
 
 	const_cast<Banker&>(GetBanker()).CleanPlayer(player_number);
 	close(p_fd);
 	FD_CLR(p_fd, &readfds);
-	printf("[+] Lost connection from [%s]\n", ip);
-
-	return 1;
+	printf("[-] Lost connection from [%s]\n", ip);
 }
 
 void Server::Stop( int forcely )
@@ -558,10 +554,7 @@ void Server::Stop( int forcely )
 		printf("%s", "\n\n========== SERVER IS STOPPING WORK FORCELY ==========\n");
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
-	{
-		CloseConnection( i+1 );
-		//GetBanker().SetPlayer(i, nullptr);
-	}
+		CloseConnection( GetBanker().GetPlayers().GetUIDByIdx( i ) );
 
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
@@ -569,15 +562,19 @@ void Server::Stop( int forcely )
 	exit(0);
 }
 
-int Server::PayCharges()
+void Server::PayCharges()
 {
 	int total_charges = 0;
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = banker.GetPlayers()[i];
-		if ( p == nullptr )
-			return 0;
+
+		if ( p->IsFree() )
+		{
+			return;
+			// throw PlayerRecordIsFreeException();
+		}
 
 		total_charges = p->GetSources() * SOURCE_UNIT_CHARGE;
 		total_charges += p->GetProducts() * PRODUCT_UNIT_CHARGE;
@@ -599,35 +596,31 @@ int Server::PayCharges()
 			const_cast<Player*>(p)->SetBankrot();
 		}
 	}
-
-	return 1;
 }
 
-int Server::ShowAuctionInfo( const char* auction_type_msg, const MarketRequestList::MarketRequest* node )
+void Server::ShowAuctionInfo( const char* auction_type_msg, const Item<MarketData>* node )
 {
 	printf("\n%s\n", auction_type_msg);
 
 	for ( ; node != nullptr; node = node->GetNext() )
 	{
-		const Player* p = banker.GetPlayers().GetPlayerByNum(node->GetData().GetPlayerNum());
+		const Player* p = banker.GetPlayers().GetPlayerByUID(node->GetData().GetPlayerNum());
 		printf("Request of Player #%d:\n", p->GetUID());
 		printf("\tPrice: %d\n\tAmount: %d\n\tIs proceed: %s\n\n",
 				node->GetData().GetPrice(),
 				(node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount(),
 				node->GetData().IsSuccess() ? "yes" : "no");
 	}
-
-	return 1;
 }
 
-int Server::ReportOnTurn()
+void Server::ReportOnTurn()
 {
 	printf("\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
 	printf("\n%s\n", "Players statistics:");
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = banker.GetPlayers()[i];
-		if ( p != nullptr )
+		if ( !p->IsFree() )
 			printf("\tPlayer #%d:   money: %dР   produced products: %d\n", p->GetUID(), p->GetMoney(), p->GetProduced());
 	}
 
@@ -635,10 +628,9 @@ int Server::ReportOnTurn()
 	ShowAuctionInfo("Products auction", banker.GetProductsRequests().GetFirst());
 
 	printf("\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
-	return 1;
 }
 
-int Server::ChangeMarketState()
+void Server::ChangeMarketState()
 {
 	int r = 1 + (int)( 12.0 * rand() / (RAND_MAX + 1.0) );
 
@@ -658,44 +650,47 @@ int Server::ChangeMarketState()
 	banker.GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
 	banker.GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
 	banker.GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
-
-	return 1;
 }
 
-int Server::CheckPlayersReports( MarketRequestList& requests )
+bool Server::CheckPlayersReports( List<Item<MarketData>>& requests )
 {
+	// если список заявок на аукцион пуст, то не нужно его проводить
+	if ( requests.IsEmpty() )
+		return false;
+
 	// Если игрок не заявился на аукцион, добавить его пустую заявку
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = banker.GetPlayers()[i];
-		if ( p != nullptr )
+		if ( !p->IsFree() )
 		{
-			// если список заявок на аукцион пуст, то не нужно его проводить
-			MarketRequestList::MarketRequest* node = requests.GetFirst();
-			if ( node == nullptr )
-				return 0;
-
-			for ( ; node != nullptr; node = node->GetNext() )
+			Item<MarketData>* node;
+			for ( node = requests.GetFirst(); node != nullptr; node = node->GetNext() )
 				if ( node->GetData().GetPlayerNum() == p->GetUID() )
 					break;
 
 			if ( node == nullptr )
-				requests.Insert( p->GetUID(), 0, 0 );
+			{
+				MarketData data;
+				data.MakeData( p->GetUID(), 0, 0 );
+				requests.Insert( data );
+			}
 		}
 	}
 
-	return 1;
+	return true;
 }
 
-int Server::SortRequestsByPrice( const MarketRequestList& requests, MarketRequestList& sorted_requests, int auction_type )
+void Server::SortRequestsByPrice( const List<Item<MarketData>>& requests, List<Item<MarketData>>& sorted_requests, int auction_type )
 {
-	int ready_players = banker.GetReadyPlayers();
-	MarketRequestList::MarketRequest* arr_reqs[ready_players];
+	const int ready_players = banker.GetReadyPlayers();
+
+	Item<MarketData>* arr_reqs[ready_players];
 	int prices[ready_players];
 	bool reqs_checked[ready_players];
 
 
-	MarketRequestList::MarketRequest* request = requests.GetFirst();
+	Item<MarketData>* request = requests.GetFirst();
 	for ( int i = 0; request != nullptr; request = request->GetNext(), ++i )
 	{
 		arr_reqs[i] = request;
@@ -710,7 +705,10 @@ int Server::SortRequestsByPrice( const MarketRequestList& requests, MarketReques
 	{
 		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
 		{
-			sorted_requests.Insert( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
+			MarketData data;
+			data.MakeData( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
+
+			sorted_requests.Insert( data );
 			reqs_checked[i] = true;
 			i = 0;
 			++j;
@@ -720,27 +718,28 @@ int Server::SortRequestsByPrice( const MarketRequestList& requests, MarketReques
 			continue;
 		}
 	}
-
-	return 1;
 }
 
-int Server::StartAuction( const MarketRequestList& requests, int auction_type )
+void Server::StartAuction( const List<Item<MarketData>>& requests, int auction_type )
 {
-	if ( !CheckPlayersReports( const_cast<MarketRequestList&>(requests) ) )
-		return 0;
+	if ( !CheckPlayersReports( const_cast<List<Item<MarketData>>&>(requests) ) )
+		return;
 
-	MarketRequestList sorted_requests;
+	List<Item<MarketData>> sorted_requests;
 	SortRequestsByPrice( requests, sorted_requests, auction_type );
 
 	int max_sources = banker.GetCurrentMarketState().GetSourcesAmount();
 	int max_products = banker.GetCurrentMarketState().GetProductsAmount();
 
-	for ( MarketRequestList::MarketRequest* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
+	for ( Item<MarketData>* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
 	{
 		if ( node->GetData().GetPrice() < 1 )
 			continue;
 
-		const Player* cur_p = banker.GetPlayers().GetPlayerByNum( node->GetData().GetPlayerNum() );
+		const Player* cur_p = banker.GetPlayers().GetPlayerByUID( node->GetData().GetPlayerNum() );
+
+		if ( cur_p->IsFree() )
+			continue;
 
 		if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
 		{
@@ -759,7 +758,7 @@ int Server::StartAuction( const MarketRequestList& requests, int auction_type )
 					max_products -= node->GetData().GetAmount();
 				}
 
-				const_cast<MarketRequestList::MarketRequest::MarketData&>(node->GetData()).SetSuccess();
+				const_cast<MarketData&>(node->GetData()).SetSuccess();
 
 				if ( auction_type == SOURCE_AUCTION )
 				{
@@ -791,7 +790,7 @@ int Server::StartAuction( const MarketRequestList& requests, int auction_type )
 					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
 				}
 
-				const_cast<MarketRequestList::MarketRequest::MarketData&>(node->GetData()).SetSuccess();
+				const_cast<MarketData&>(node->GetData()).SetSuccess();
 
 				if ( auction_type == SOURCE_AUCTION )
 				{
@@ -810,18 +809,16 @@ int Server::StartAuction( const MarketRequestList& requests, int auction_type )
 			}
 		}
 	}
-
-	return 1;
 }
 
-int Server::CheckBuildingFactories()
+void Server::CheckBuildingFactories()
 {
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = banker.GetPlayers()[i];
-		if ( p != nullptr )
+		if ( !p->IsFree() )
 		{
-			for ( Player::BuildsList::BuildsItem* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
+			for ( Item<BuildsData>* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
 			{
 				if ( node->GetData().GetTurnsLeft() == 1 )
 				{
@@ -843,7 +840,7 @@ int Server::CheckBuildingFactories()
 				}
 				else if ( node->GetData().GetTurnsLeft() == 0 )
 				{
-					const_cast<Player::BuildsList&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
+					const_cast<List<Item<BuildsData>>&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
 					const_cast<Player*>(p)->SetBuiltFactories( p->GetBuiltFactories() - 1 );
 					const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
 
@@ -852,24 +849,21 @@ int Server::CheckBuildingFactories()
 					continue;
 				}
 
-				const_cast<Player::BuildsList::BuildsItem::BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
+				const_cast<BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
 				node = node->GetNext();
 			}
 		}
 	}
-
-	return 1;
 }
 
-int Server::QuitPlayer( int player_number )
+void Server::QuitPlayer( int player_number )
 {
 	CloseConnection( player_number );
-	//GetBanker().SetPlayer(GetBanker().GetIdxByNum(player_number), nullptr);
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = GetBanker().GetPlayers()[i];
-		if ( p != nullptr )
+		if ( !p->IsFree() )
 		{
 			if ( !GetBanker().IsGameStarted() )
 			{
@@ -893,11 +887,9 @@ int Server::QuitPlayer( int player_number )
 			}
 		}
 	}
-
-	return 1;
 }
 
-int Server::FillReadfds()
+void Server::FillReadfds()
 {
 	FD_ZERO(&readfds);
 
@@ -908,7 +900,7 @@ int Server::FillReadfds()
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = GetBanker().GetPlayers()[i];
-		if ( p != nullptr )
+		if ( !p->IsFree() )
 		{
 			int p_fd = p->GetFd();
 
@@ -917,8 +909,6 @@ int Server::FillReadfds()
 				max_fd = p_fd;
 		}
 	}
-
-	return 1;
 }
 
 int Server::Run()
@@ -938,7 +928,7 @@ int Server::Run()
 
 		if ( !GetBanker().IsGameStarted() )
 		{
-			if ( !IsTimerFlag() && (GetBanker().GetLobbyPlayers() >= MIN_PLAYERS_TO_START) && (GetBanker().GetLobbyPlayers() < MAX_PLAYERS) )
+			if ( !IsTimerFlag() && ( GetBanker().GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( GetBanker().GetLobbyPlayers() < MAX_PLAYERS ) )
 			{
 				alarm(TIME_TO_START);
 
@@ -947,7 +937,7 @@ int Server::Run()
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
 					const Player* p = GetBanker().GetPlayers()[i];
-					if ( p != nullptr )
+					if ( !p->IsFree() )
 					{
 						itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
 						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
@@ -969,7 +959,7 @@ int Server::Run()
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
 					const Player* p = GetBanker().GetPlayers()[i];
-					if ( p != nullptr )
+					if ( !p->IsFree() )
 					{
 						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
 					}
@@ -993,7 +983,7 @@ int Server::Run()
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
 					const Player* p = GetBanker().GetPlayers()[i];
-					if ( p != nullptr )
+					if ( !p->IsFree() )
 					{
 						const_cast<Player*>(p)->SetMoney( START_MONEY );
 						const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
@@ -1028,7 +1018,7 @@ int Server::Run()
 						for ( int i = 0; i < MAX_PLAYERS; ++i )
 						{
 							const Player* p = GetBanker().GetPlayers()[i];
-							if ( p != nullptr )
+							if ( !p->IsFree() )
 							{
 								sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTCANCELLED_TOKEN ), p->GetFd(), p->GetAddr() );
 							}
@@ -1045,7 +1035,7 @@ int Server::Run()
 							for ( int i = 0; i < MAX_PLAYERS; ++i )
 							{
 								const Player* p = GetBanker().GetPlayers()[i];
-								if ( p != nullptr )
+								if ( !p->IsFree() )
 								{
 									sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
 								}
@@ -1099,10 +1089,14 @@ int Server::Run()
 			}
 			else
 			{
+				const Player* new_player = nullptr;
 				int i;
 				for ( i = 0; i < MAX_PLAYERS; ++i )
-					if ( GetBanker().GetPlayers()[i] == nullptr )
+				{
+					new_player = GetBanker().GetPlayers()[i];
+					if ( new_player->IsFree() )
 						break;
+				}
 
 				if ( i >= MAX_PLAYERS )
 				{
@@ -1114,13 +1108,14 @@ int Server::Run()
 				{
 					try
 					{
-						//GetBanker().SetPlayer(i, new Player(cs, address_buffer, i+1));
+						const_cast<Player*>(new_player)->SetNewPlayer( cs, address_buffer );
 					}
 					catch ( ... )
 					{
 						sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
 						close(cs);
 						printf("Lost connection from [%s]\n", new_client_addr);
+						continue;
 					}
 
 					const_cast<Banker&>(GetBanker()).SetLobbyPlayers( GetBanker().GetLobbyPlayers() + 1 );
@@ -1128,7 +1123,7 @@ int Server::Run()
 					for ( i = 0; i < MAX_PLAYERS; ++i )
 					{
 						const Player* p = GetBanker().GetPlayers()[i];
-						if ( p != nullptr )
+						if ( !p->IsFree() )
 						{
 							sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_PLAYER_CONNECT_TOKEN ), cs, new_client_addr );
 						}
@@ -1140,7 +1135,7 @@ int Server::Run()
 		for ( int i = 0; i < MAX_PLAYERS; ++i )
 		{
 			const Player* sender_p = GetBanker().GetPlayers()[i];
-			if ( sender_p != nullptr )
+			if ( !sender_p->IsFree() )
 			{
 				int sender_p_fd = sender_p->GetFd();
 				const char* sender_p_addr = sender_p->GetAddr();
@@ -1203,7 +1198,7 @@ int Server::Run()
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
 					const Player* p = GetBanker().GetPlayers()[i];
-					if ( p != nullptr )
+					if ( !p->IsFree() )
 					{
 						sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::AUCTION_RESULTS_TOKEN ), p->GetFd(), p->GetAddr() );
 					}
@@ -1220,7 +1215,7 @@ int Server::Run()
 				for ( int i = 0; i < MAX_PLAYERS; ++i )
 				{
 					const Player* p = GetBanker().GetPlayers()[i];
-					if ( p != nullptr )
+					if ( !p->IsFree() )
 					{
 						const_cast<Player*>(p)->UnsetSentSourceRequest();
 						const_cast<Player*>(p)->UnsetSentProductsRequest();

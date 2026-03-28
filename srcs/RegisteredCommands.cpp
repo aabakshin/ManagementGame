@@ -1,6 +1,7 @@
 #ifndef REGISTERED_COMMANDS_CPP_SENTINEL
 #define REGISTERED_COMMANDS_CPP_SENTINEL
 
+
 #include "RegisteredCommands.hpp"
 
 
