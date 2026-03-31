@@ -66,68 +66,6 @@ private:
 	};
 
 public:
-	/*
-	class BuildsList
-	{
-	public:
-		class BuildsItem
-		{
-		public:
-			class BuildsData
-			{
-				int build_number;
-				int turns_left;
-			public:
-				BuildsData( int num_value = 0, int turns_left_value = 0 );
-				int GetBuildNumber() const { return build_number; }
-				int GetTurnsLeft() const { return turns_left; }
-				void SetBuildNumber( int num_value );
-				void SetTurnsLeft( int turns_left_value );
-			private:
-				BuildsData( const BuildsData& ) = delete;
-				BuildsData( BuildsData&& ) = delete;
-				void operator=( const BuildsData& ) = delete;
-			};
-		private:
-			BuildsData data;
-			BuildsItem* next;
-			BuildsItem* prev;
-		public:
-			BuildsItem( int num_value, int turns_left_value );
-			void SetData( int num_value, int turns_left_value );
-			const BuildsData& GetData() const { return data; }
-			BuildsItem* GetNext() const { return next; }
-			BuildsItem* GetPrev() const { return prev; }
-			void SetNext( BuildsItem* next_value ) { next = next_value; }
-			void SetPrev( BuildsItem* prev_value ) { prev = prev_value; }
-		private:
-			BuildsItem( const BuildsItem& ) = delete;
-			BuildsItem( BuildsItem&& ) = delete;
-			void operator=( const BuildsItem& ) = delete;
-		};
-	private:
-		BuildsItem* first;
-		BuildsItem* last;
-	public:
-		BuildsList() { first = nullptr; last = nullptr; }
-		~BuildsList() { Clear(); }
-		BuildsItem* GetFirst() const { return first; }
-		BuildsItem* GetLast() const { return last; }
-		bool IsEmpty() const { if ( !first && !last ) return true; return false; }
-		int Insert( int num_value, int turns_left_value );
-		int Delete( int num_value );
-		int Clear();
-		int GetSize() const;
-		void Print() const;
-		int GetValidNum() const { return GetMaxNum() + 1; }
-	private:
-		BuildsList( const BuildsList& ) = delete;
-		BuildsList( BuildsList&& ) = delete;
-		void operator=( const BuildsList& ) = delete;
-		void SetFirst( BuildsItem* first_value ) { first = first_value; }
-		void SetLast( BuildsItem* last_value ) { last = last_value; }
-		int GetMaxNum() const;
-	};*/
 
 	class AuctionReport
 	{
@@ -193,6 +131,8 @@ public:
 	int GetProduced() const { return produced_on_turn; }
 	const AuctionReport& GetAuctionReport() const { return ar; }
 	const List<Item<BuildsData>>& GetBuildsFactories() const { return builds_factories; }
+
+	void Reset();
 
 	void SetMessageBuffer( const char*, int );
 	void SetMoney( int );

@@ -362,7 +362,8 @@ void Banker::CleanPlayer( int player_id )
 		GetProductsRequests().Delete( player_id );
 	}
 
-	const_cast<Player*>(GetPlayers().GetPlayerByUID(player_id))->SetFree();
+	const_cast<Player*>(GetPlayers().GetPlayerByUID(player_id))->Reset();
+
 	printf( "[+] Player's #%d record now is free\n", player_id );
 }
 

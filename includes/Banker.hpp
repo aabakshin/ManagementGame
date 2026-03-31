@@ -108,7 +108,7 @@ private:
 class Banker
 {
 private:
-	bool players_prepared;
+	bool game_state_prepared;
 	bool game_started;
 	int turn_number;
 	int alive_players;
@@ -121,9 +121,9 @@ private:
 	List<Item<MarketData>> products_requests;
 public:
 	Banker();
-	bool IsPlayersPrepared() const { return players_prepared; }
-	void SetPlayersPrepared() { players_prepared = true; }
-	void UnsetPlayersPrepared() { players_prepared = false; }
+	bool IsGameStatePrepared() const { return game_state_prepared; }
+	void SetGameStatePrepared() { game_state_prepared = true; }
+	void UnsetPlayersPrepared() { game_state_prepared = false; }
 	bool IsGameStarted() const { return game_started; }
 	void SetGameStarted() { game_started = true; }
 	void UnsetGameStarted() { game_started = false; }

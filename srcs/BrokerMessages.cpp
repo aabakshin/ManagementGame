@@ -3,9 +3,7 @@
 
 
 #include "BrokerMessages.hpp"
-#include "Banker.hpp"
 #include "MGLib.h"
-#include "Player.hpp"
 #include <cstring>
 
 
@@ -14,6 +12,32 @@ static const char* const false_str = "false";
 
 extern const char* info_game_messages[];
 
+
+
+template <class T, class U>
+void EncapsulatedBrokerMessages<T,U>::MakeBroker( const U& context_object )
+{
+	brokerPTR = new T( context_object );
+}
+
+template <class T, class U>
+template <class X, class Y, class Z>
+void EncapsulatedBrokerMessages<T,U>::MakeBroker( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4 )
+{
+	brokerPTR = new T( context_object1, context_object2, context_object3, context_object4 );
+}
+
+template <class T, class U>
+const T& EncapsulatedBrokerMessages<T,U>::GetBroker() const
+{
+	return const_cast<const T&>(*brokerPTR);
+}
+
+template <class T, class U>
+EncapsulatedBrokerMessages<T,U>::~EncapsulatedBrokerMessages()
+{
+	delete brokerPTR;
+}
 
 void BrokerMessages::BrokerActions::MakeBrokerActions( int a_count )
 {
@@ -39,10 +63,362 @@ BrokerMessages::BrokerActions::~BrokerActions()
 		delete[] actions;
 }
 
-
-GameMessages::GameMessages( const Banker& banker ) : BrokerMessages( banker )
+const char* BrokerMessages::TakeMessage( int message_code )
 {
-	broker_actions.MakeBrokerActions( GameMessages::BROKER_ACTIONS_COUNT );
+	CheckMessageCode( message_code );
+
+	broker_actions[message_code]();
+
+	return result_message;
+}
+
+
+MulticastActionsExec::MulticastActionsExec( const Banker& banker, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, Banker>& egm )
+	: game_session( banker ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
+{
+	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
+	br_acts.MakeBrokerActions( MulticastActionsExec::BROKER_ACTIONS_COUNT );
+
+	auction_type			=			0;
+	left_player_id			=			0;
+
+	memset( result_message, 0, MESSAGE_SIZE );
+
+	br_acts[SEND_REPORT_ON_TURN_TOKEN]							=					[this]() {	SendReportOnTurn();			};
+	br_acts[ADD_EMPTY_AUCTION_REQUEST_TOKEN]					=					[this]() {	AddEmptyAuctionRequest();	};
+	br_acts[PAY_CHARGES_TOKEN]									=					[this]() {	PayCharges();				};
+	br_acts[CHECK_BUILDING_FACTORIES_TOKEN]						=					[this]() {	CheckBuildingFactories();	};
+	br_acts[PREPARE_NEW_TURN_TOKEN]								=					[this]() {	PrepareNewTurn();			};
+	br_acts[PREPARE_PLAYERS_STATE_TOKEN]						=					[this]() {	PreparePlayersState();		};
+	br_acts[SEND_AUCTIONS_RESULTS_TOKEN]						=					[this]() {	SendAuctionsResults();		};
+	br_acts[SEND_PLAYERS_BANKROT_TOKEN]							=					[this]() {	SendPlayersBankrot();		};
+	br_acts[SEND_NEW_PLAYER_CONNECT_TOKEN]						=					[this]() {	SendNewPlayerConnect();		};
+	br_acts[SEND_START_TIME_TOKEN]								=					[this]() {	SendStartTime();			};
+	br_acts[SEND_START_CANCELLED_TOKEN]							=					[this]() {	SendStartCancelled();		};
+	br_acts[SEND_GAME_STARTED_TOKEN]							=					[this]() {	SendGameStarted();			};
+	br_acts[QUIT_PLAYER_TOKEN]									=					[this]() {	QuitPlayer();				};
+}
+
+void MulticastActionsExec::PutMessage( const char** message_tokens, int tokens_count )
+{
+	for ( int i = AUCTION_TYPE_PARAM_TOKEN; i < tokens_count; ++i )
+	{
+		if ( ( message_tokens[i] != nullptr ) && ( strcmp(message_tokens[i], "") != 0 ) )
+		{
+			switch ( i )
+			{
+				case AUCTION_TYPE_PARAM_TOKEN:
+					auction_type = atoi(message_tokens[i]);
+					break;
+				case LEFT_PLAYER_ID_PARAM_TOKEN:
+					left_player_id = atoi(message_tokens[i]);
+					break;
+			}
+			break;
+		}
+	}
+}
+
+void MulticastActionsExec::CheckMessageCode( int message_code ) const
+{
+	for ( int i = SEND_REPORT_ON_TURN_TOKEN; i <= QUIT_PLAYER_TOKEN; ++i )
+		if ( message_code == i )
+			return;
+
+	// throw IncorrectMessageCodeExc
+}
+
+void MulticastActionsExec::SendReportOnTurn()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			printf("\tPlayer #%d:   money: %dР   produced products: %d\n", p->GetUID(), p->GetMoney(), p->GetProduced());
+		}
+	}
+}
+
+void MulticastActionsExec::AddEmptyAuctionRequest()
+{
+	List<Item<MarketData>>& requests = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(game_session).GetSourcesRequests() : const_cast<Banker&>(game_session).GetProductsRequests();
+
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			Item<MarketData>* node;
+			for ( node = requests.GetFirst(); node != nullptr; node = node->GetNext() )
+				if ( node->GetData().GetPlayerNum() == p->GetUID() )
+					break;
+
+			if ( node == nullptr )
+			{
+				MarketData data;
+				data.MakeData( p->GetUID(), 0, 0 );
+				requests.Insert( data );
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::PayCharges()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( !p->IsBankrot() )
+			{
+				int total_charges = 0;
+				total_charges = p->GetSources() * SOURCE_UNIT_CHARGE;
+				total_charges += p->GetProducts() * PRODUCT_UNIT_CHARGE;
+				total_charges += p->GetWaitFactories() * FACTORY_UNIT_CHARGE;
+				total_charges += p->GetWorkFactories() * FACTORY_UNIT_CHARGE;
+
+				itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
+
+				int remains = p->GetMoney() - total_charges;
+				if ( remains >= 0 )
+				{
+					const_cast<Player*>(p)->SetMoney( remains );
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SUCCESS_CHARGES_PAY_TOKEN ), p->GetFd(), p->GetAddr() );
+				}
+				else
+				{
+					const_cast<Player*>(p)->SetBankrot();
+				}
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::CheckBuildingFactories()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( !p->IsBankrot() )
+			{
+				for ( Item<BuildsData>* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
+				{
+					if ( node->GetData().GetTurnsLeft() == 1 )
+					{
+						int total_charges = NEW_FACTORY_UNIT_COST / 2;
+
+						itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
+
+						int remains = p->GetMoney() - total_charges;
+						if ( remains >= 0 )
+						{
+							const_cast<Player*>(p)->SetMoney( remains );
+							const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PAY_FACTORY_SUCCESS_TOKEN ), p->GetFd(), p->GetAddr() );
+						}
+						else
+						{
+							const_cast<Player*>(p)->SetBankrot();
+							break;
+						}
+					}
+					else if ( node->GetData().GetTurnsLeft() == 0 )
+					{
+						const_cast<List<Item<BuildsData>>&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
+						const_cast<Player*>(p)->SetBuiltFactories( p->GetBuiltFactories() - 1 );
+						const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::FACTORY_BUILT_TOKEN ), p->GetFd(), p->GetAddr() );
+						node = p->GetBuildsFactories().GetFirst();
+						continue;
+					}
+
+					const_cast<BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
+					node = node->GetNext();
+				}
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::PrepareNewTurn()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( !p->IsBankrot() )
+			{
+				const_cast<Player*>(p)->UnsetSentSourceRequest();
+				const_cast<Player*>(p)->UnsetSentProductsRequest();
+				const_cast<Player*>(p)->SetProduced( 0 );
+				const_cast<Player*>(p)->UnsetTurn();
+				const_cast<Player*>(p)->SetIncome( p->GetMoney() - p->GetOldMoney() );
+				const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
+
+				itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
+
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_TURN_TOKEN ), p->GetFd(), p->GetAddr() );
+
+				while ( p->GetWorkFactories() > 0 )
+				{
+					const_cast<Player*>(p)->SetProduced( p->GetProduced() + 1 );
+					const_cast<Player*>(p)->SetProducts( p->GetProducts() + 1 );
+					const_cast<Player*>(p)->SetWorkFactories( p->GetWorkFactories() - 1 );
+					const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+				}
+
+				if ( p->GetProduced() > 0 )
+				{
+					itoa( p->GetProduced(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN+1 );
+
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PRODUCED_TOKEN ), p->GetFd(), p->GetAddr() );
+				}
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::PreparePlayersState()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			const_cast<Player*>(p)->SetMoney( START_MONEY );
+			const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
+			const_cast<Player*>(p)->SetSources( START_SOURCES );
+			const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
+			const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
+
+			itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
+
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTING_GAME_INFORMATION_TOKEN ), p->GetFd(), p->GetAddr() );
+		}
+	}
+}
+
+void MulticastActionsExec::SendAuctionsResults()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::AUCTION_RESULTS_TOKEN ), p->GetFd(), p->GetAddr() );
+		}
+	}
+}
+
+void MulticastActionsExec::SendPlayersBankrot()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( p->IsBankrot() )
+			{
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PLAYER_BANKROT_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::SendNewPlayerConnect()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_PLAYER_CONNECT_TOKEN ), p->GetFd(), p->GetAddr() );
+		}
+	}
+}
+
+void MulticastActionsExec::SendStartTime()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
+		}
+	}
+}
+
+void MulticastActionsExec::SendStartCancelled()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTCANCELLED_TOKEN ), p->GetFd(), p->GetAddr() );
+	}
+}
+
+void MulticastActionsExec::SendGameStarted()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
+	}
+}
+
+void MulticastActionsExec::QuitPlayer()
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( !p->IsBankrot() )
+			{
+				if ( !game_session.IsGameStarted() )
+				{
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_LOBBY_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
+				}
+				else
+				{
+					if ( game_session.GetAlivePlayers() <= 1 )
+					{
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
+						printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
+					}
+					else
+					{
+						itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
+				}
+			}
+		}
+	}
+}
+
+
+GameMessages::GameMessages( const Banker& banker ) : game_session( banker )
+{
+	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
+	br_acts.MakeBrokerActions( GameMessages::BROKER_ACTIONS_COUNT );
 
 	left_player_id			=			0;
 	time_to_start			=			0;
@@ -52,24 +428,24 @@ GameMessages::GameMessages( const Banker& banker ) : BrokerMessages( banker )
 
 	memset(result_message, 0, MESSAGE_SIZE);
 
-	broker_actions[AUCTION_RESULTS_TOKEN]					=				[this]() {	AuctionResultsMessage();		};
-	broker_actions[SUCCESS_CHARGES_PAY_TOKEN]				=				[this]() {	SuccessChargesPayMessage();		};
-	broker_actions[PLAYER_BANKROT_TOKEN]					=				[this]() {	PlayerBankrotMessage();			};
-	broker_actions[LOST_ALIVE_PLAYER_TOKEN]					=				[this]() {	LostAlivePlayerMessage();		};
-	broker_actions[PRODUCED_TOKEN]							=				[this]() {	ProducedMessage();				};
-	broker_actions[STARTINSECONDS_TOKEN]					=				[this]() {	StartInSecondsMessage();		};
-	broker_actions[GAME_STARTED_TOKEN]						=				[this]() {	GameStartedMessage();			};
-	broker_actions[STARTING_GAME_INFORMATION_TOKEN]			=				[this]() {	StartGameInfoMessage();			};
-	broker_actions[STARTCANCELLED_TOKEN]					=				[this]() {	StartCancelledMessage();		};
-	broker_actions[PAY_FACTORY_SUCCESS_TOKEN]				=				[this]() {	PayFactorySuccessMessage();		};
-	broker_actions[FACTORY_BUILT_TOKEN]						=				[this]() {	FactoryBuiltMessage();			};
-	broker_actions[VICTORY_MESSAGE_TOKEN]					=				[this]() {	VictoryMessage();				};
-	broker_actions[GAME_ALREADY_STARTED_TOKEN]				=				[this]() {	GameAlreadyStartedMessage();	};
-	broker_actions[SERVER_FULL_TOKEN]						=				[this]() {	ServerFullMessage();			};
-	broker_actions[NEW_PLAYER_CONNECT_TOKEN]				=				[this]() {	NewPlayerConnectMessage();		};
-	broker_actions[GAME_NOT_STARTED_TOKEN]					=				[this]() {	GameNotStartedMessage();		};
-	broker_actions[LOST_LOBBY_PLAYER_TOKEN]					=				[this]() {	LostLobbyPlayerMessage();		};
-	broker_actions[NEW_TURN_TOKEN]							=				[this]() {	NewTurnMessage();				};
+	br_acts[AUCTION_RESULTS_TOKEN]							=				[this]() {	AuctionResultsMessage();		};
+	br_acts[SUCCESS_CHARGES_PAY_TOKEN]						=				[this]() {	SuccessChargesPayMessage();		};
+	br_acts[PLAYER_BANKROT_TOKEN]							=				[this]() {	PlayerBankrotMessage();			};
+	br_acts[LOST_ALIVE_PLAYER_TOKEN]						=				[this]() {	LostAlivePlayerMessage();		};
+	br_acts[PRODUCED_TOKEN]									=				[this]() {	ProducedMessage();				};
+	br_acts[STARTINSECONDS_TOKEN]							=				[this]() {	StartInSecondsMessage();		};
+	br_acts[GAME_STARTED_TOKEN]								=				[this]() {	GameStartedMessage();			};
+	br_acts[STARTING_GAME_INFORMATION_TOKEN]				=				[this]() {	StartGameInfoMessage();			};
+	br_acts[STARTCANCELLED_TOKEN]							=				[this]() {	StartCancelledMessage();		};
+	br_acts[PAY_FACTORY_SUCCESS_TOKEN]						=				[this]() {	PayFactorySuccessMessage();		};
+	br_acts[FACTORY_BUILT_TOKEN]							=				[this]() {	FactoryBuiltMessage();			};
+	br_acts[VICTORY_MESSAGE_TOKEN]							=				[this]() {	VictoryMessage();				};
+	br_acts[GAME_ALREADY_STARTED_TOKEN]						=				[this]() {	GameAlreadyStartedMessage();	};
+	br_acts[SERVER_FULL_TOKEN]								=				[this]() {	ServerFullMessage();			};
+	br_acts[NEW_PLAYER_CONNECT_TOKEN]						=				[this]() {	NewPlayerConnectMessage();		};
+	br_acts[GAME_NOT_STARTED_TOKEN]							=				[this]() {	GameNotStartedMessage();		};
+	br_acts[LOST_LOBBY_PLAYER_TOKEN]						=				[this]() {	LostLobbyPlayerMessage();		};
+	br_acts[NEW_TURN_TOKEN]									=				[this]() {	NewTurnMessage();				};
 }
 
 void GameMessages::PutMessage( const char** message_tokens, int tokens_count )
@@ -108,15 +484,6 @@ void GameMessages::CheckMessageCode( int message_code ) const
 			return;
 
 	// throw IncorrectMessageCodeException();
-}
-
-const char* GameMessages::TakeMessage( int message_code )
-{
-	CheckMessageCode( message_code );
-
-	broker_actions[message_code]();
-
-	return result_message;
 }
 
 void GameMessages::LostLobbyPlayerMessage()
@@ -521,9 +888,10 @@ void GameMessages::ServerFullMessage()
 }
 
 
-BCBrokerMessages::BCBrokerMessages( const Banker& banker ) : BrokerMessages( banker )
+BCBrokerMessages::BCBrokerMessages( const Banker& banker ) : game_session( banker )
 {
-	broker_actions.MakeBrokerActions( BCBrokerMessages::BROKER_ACTIONS_COUNT );
+	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
+	br_acts.MakeBrokerActions( BCBrokerMessages::BROKER_ACTIONS_COUNT );
 
 	sender_player_id		=			0;
 	target_player_id		=			0;
@@ -533,43 +901,43 @@ BCBrokerMessages::BCBrokerMessages( const Banker& banker ) : BrokerMessages( ban
 
 	memset(result_message, 0, MESSAGE_SIZE);
 
-	broker_actions[MARKET_SOURCES_AMOUNT_TOKEN]							=			[this]() {	MarketCmdSourcesAmount();			};
-	broker_actions[MARKET_SOURCE_MIN_PRICE_TOKEN]						=			[this]() {	MarketCmdSourceMinPrice();			};
-	broker_actions[MARKET_PRODUCTS_AMOUNT_TOKEN]						=			[this]() {	MarketCmdProductsAmount();			};
-	broker_actions[MARKET_PRODUCT_MAX_PRICE_TOKEN]						=			[this]() {	MarketCmdProductMaxPrice();			};
-	broker_actions[TARGET_PLAYER_NOT_FOUND_TOKEN]						=			[this]() { 	PlayerCmdIsTargetNotFound();		};
-	broker_actions[TARGET_PLAYER_UID_TOKEN]								=			[this]() {	PlayerCmdGetTargetUID();			};
-	broker_actions[TARGET_PLAYER_MONEY_TOKEN]							=			[this]() {	PlayerCmdGetTargetMoney();			};
-	broker_actions[TARGET_PLAYER_INCOME_TOKEN]							=			[this]() {	PlayerCmdGetTargetIncome();			};
-	broker_actions[TARGET_PLAYER_SOURCES_TOKEN]							=			[this]() {	PlayerCmdGetTargetSources();		};
-	broker_actions[TARGET_PLAYER_PRODUCTS_TOKEN]						=			[this]() {	PlayerCmdGetTargetProducts();		};
-	broker_actions[TARGET_PLAYER_WAIT_FACTORIES_TOKEN]					=			[this]() {	PlayerCmdGetTargetWaitFactories();	};
-	broker_actions[TARGET_PLAYER_WORK_FACTORIES_TOKEN]					=			[this]() {	PlayerCmdGetTargetWorkFactories();	};
-	broker_actions[TARGET_PLAYER_BUILT_FACTORIES_TOKEN]					=			[this]() {	PlayerCmdGetTargetBuiltFactories(); };
-	broker_actions[SENDER_PLAYER_IS_BOT_TOKEN]							=			[this]() {	PlayerSenderIsBot();				};
-	broker_actions[TARGET_PLAYER_PRODUCED_TOKEN]						=			[this]() {	PlayerCmdGetTargetProduced();		};
-	broker_actions[ALIVE_PLAYERS_TOKEN]									=			[this]() {	ListCmdGetAlivePlayers();			};
-	broker_actions[PLAYER_IS_TURN_TOKEN]								=			[this]() {	PlayerSenderIsTurn();				};
-	broker_actions[PROD_CMD_SOURCES_CONDITION_SUCCESS_TOKEN]			=			[this]() {	ProdCmdSourcesCondition();			};
-	broker_actions[PROD_CMD_MONEY_CONDITION_SUCCESS_TOKEN]				=			[this]() {	ProdCmdMoneyCondition();			};
-	broker_actions[PROD_CMD_WAIT_FACTORIES_CONDITION_SUCCESS_TOKEN]		=			[this]() {	ProdCmdWaitFactoriesCondition();	};
-	broker_actions[PROD_CMD_UPDATE_GAME_STATE_TOKEN]					=			[this]() {	ProdCmdUpdateGameState();			};
-	broker_actions[BUILD_CMD_PLAYER_BUILDS_LIST_IS_EMPTY_TOKEN]			=			[this]() {	BuildCmdPlayerBuildsListIsEmpty();	};
-	broker_actions[BUILD_CMD_PLAYER_GET_BUILDS_LIST_SIZE_TOKEN]			=			[this]() {	BuildCmdPlayerGetBuildsListSize();	};
-	broker_actions[BUILD_CMD_PLAYER_GET_BUILDS_LIST_TOKEN]				=			[this]() {	BuildCmdPlayerGetBuildsList();		};
-	broker_actions[BUILD_CMD_MONEY_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuildCmdMoneyCondition();			};
-	broker_actions[BUILD_CMD_UPDATE_GAME_STATE_TOKEN]					=			[this]() {	BuildCmdUpdateGameState();			};
-	broker_actions[BUY_CMD_IS_SENT_SOURCE_REQUEST]						=			[this]() { 	BuyCmdIsSentSourceRequest();		};
-	broker_actions[BUY_CMD_SOURCES_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuyCmdSourcesCondition();			};
-	broker_actions[BUY_CMD_PRICE_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuyCmdPriceCondition();				};
-	broker_actions[BUY_CMD_MONEY_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuyCmdMoneyCondition();				};
-	broker_actions[BUY_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	BuyCmdUpdateGameState();			};
-	broker_actions[SELL_CMD_IS_SENT_PRODUCT_REQUEST]					=			[this]() {	SellCmdIsSentProductRequest();		};
-	broker_actions[SELL_CMD_AMOUNT_CONDITION_SUCCESS_TOKEN]				=			[this]() {	SellCmdAmountCondition();			};
-	broker_actions[SELL_CMD_PRICE_CONDITION_SUCCESS_TOKEN]				=			[this]() {	SellCmdPriceCondition();			};
-	broker_actions[SELL_CMD_UPDATE_GAME_STATE_TOKEN]					=			[this]() {	SellCmdUpdateGameState();			};
-	broker_actions[TURN_CMD_UPDATE_GAME_STATE_TOKEN]					=			[this]() {	TurnCmdUpdateGameState();			};
-	broker_actions[TURN_CMD_GET_WYPA_TOKEN]								=			[this]() {	TurnCmdGetWypaToken();				};
+	br_acts[MARKET_SOURCES_AMOUNT_TOKEN]							=			[this]() {	MarketCmdSourcesAmount();			};
+	br_acts[MARKET_SOURCE_MIN_PRICE_TOKEN]							=			[this]() {	MarketCmdSourceMinPrice();			};
+	br_acts[MARKET_PRODUCTS_AMOUNT_TOKEN]							=			[this]() {	MarketCmdProductsAmount();			};
+	br_acts[MARKET_PRODUCT_MAX_PRICE_TOKEN]							=			[this]() {	MarketCmdProductMaxPrice();			};
+	br_acts[TARGET_PLAYER_NOT_FOUND_TOKEN]							=			[this]() { 	PlayerCmdIsTargetNotFound();		};
+	br_acts[TARGET_PLAYER_UID_TOKEN]								=			[this]() {	PlayerCmdGetTargetUID();			};
+	br_acts[TARGET_PLAYER_MONEY_TOKEN]								=			[this]() {	PlayerCmdGetTargetMoney();			};
+	br_acts[TARGET_PLAYER_INCOME_TOKEN]								=			[this]() {	PlayerCmdGetTargetIncome();			};
+	br_acts[TARGET_PLAYER_SOURCES_TOKEN]							=			[this]() {	PlayerCmdGetTargetSources();		};
+	br_acts[TARGET_PLAYER_PRODUCTS_TOKEN]							=			[this]() {	PlayerCmdGetTargetProducts();		};
+	br_acts[TARGET_PLAYER_WAIT_FACTORIES_TOKEN]						=			[this]() {	PlayerCmdGetTargetWaitFactories();	};
+	br_acts[TARGET_PLAYER_WORK_FACTORIES_TOKEN]						=			[this]() {	PlayerCmdGetTargetWorkFactories();	};
+	br_acts[TARGET_PLAYER_BUILT_FACTORIES_TOKEN]					=			[this]() {	PlayerCmdGetTargetBuiltFactories(); };
+	br_acts[SENDER_PLAYER_IS_BOT_TOKEN]								=			[this]() {	PlayerSenderIsBot();				};
+	br_acts[TARGET_PLAYER_PRODUCED_TOKEN]							=			[this]() {	PlayerCmdGetTargetProduced();		};
+	br_acts[ALIVE_PLAYERS_TOKEN]									=			[this]() {	ListCmdGetAlivePlayers();			};
+	br_acts[PLAYER_IS_TURN_TOKEN]									=			[this]() {	PlayerSenderIsTurn();				};
+	br_acts[PROD_CMD_SOURCES_CONDITION_SUCCESS_TOKEN]				=			[this]() {	ProdCmdSourcesCondition();			};
+	br_acts[PROD_CMD_MONEY_CONDITION_SUCCESS_TOKEN]					=			[this]() {	ProdCmdMoneyCondition();			};
+	br_acts[PROD_CMD_WAIT_FACTORIES_CONDITION_SUCCESS_TOKEN]		=			[this]() {	ProdCmdWaitFactoriesCondition();	};
+	br_acts[PROD_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	ProdCmdUpdateGameState();			};
+	br_acts[BUILD_CMD_PLAYER_BUILDS_LIST_IS_EMPTY_TOKEN]			=			[this]() {	BuildCmdPlayerBuildsListIsEmpty();	};
+	br_acts[BUILD_CMD_PLAYER_GET_BUILDS_LIST_SIZE_TOKEN]			=			[this]() {	BuildCmdPlayerGetBuildsListSize();	};
+	br_acts[BUILD_CMD_PLAYER_GET_BUILDS_LIST_TOKEN]					=			[this]() {	BuildCmdPlayerGetBuildsList();		};
+	br_acts[BUILD_CMD_MONEY_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuildCmdMoneyCondition();			};
+	br_acts[BUILD_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	BuildCmdUpdateGameState();			};
+	br_acts[BUY_CMD_IS_SENT_SOURCE_REQUEST]							=			[this]() { 	BuyCmdIsSentSourceRequest();		};
+	br_acts[BUY_CMD_SOURCES_CONDITION_SUCCESS_TOKEN]				=			[this]() {	BuyCmdSourcesCondition();			};
+	br_acts[BUY_CMD_PRICE_CONDITION_SUCCESS_TOKEN]					=			[this]() {	BuyCmdPriceCondition();				};
+	br_acts[BUY_CMD_MONEY_CONDITION_SUCCESS_TOKEN]					=			[this]() {	BuyCmdMoneyCondition();				};
+	br_acts[BUY_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	BuyCmdUpdateGameState();			};
+	br_acts[SELL_CMD_IS_SENT_PRODUCT_REQUEST]						=			[this]() {	SellCmdIsSentProductRequest();		};
+	br_acts[SELL_CMD_AMOUNT_CONDITION_SUCCESS_TOKEN]				=			[this]() {	SellCmdAmountCondition();			};
+	br_acts[SELL_CMD_PRICE_CONDITION_SUCCESS_TOKEN]					=			[this]() {	SellCmdPriceCondition();			};
+	br_acts[SELL_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	SellCmdUpdateGameState();			};
+	br_acts[TURN_CMD_UPDATE_GAME_STATE_TOKEN]						=			[this]() {	TurnCmdUpdateGameState();			};
+	br_acts[TURN_CMD_GET_WYPA_TOKEN]								=			[this]() {	TurnCmdGetWypaToken();				};
 }
 
 void BCBrokerMessages::PutMessage( const char** message_tokens, int tokens_count )
@@ -612,16 +980,6 @@ void BCBrokerMessages::CheckMessageCode( int message_code ) const
 
 	// throw IncorrectMessageCodeException();
 }
-
-const char* BCBrokerMessages::TakeMessage( int message_code )
-{
-	CheckMessageCode( message_code );
-
-	broker_actions[message_code]();
-
-	return result_message;
-}
-
 
 void BCBrokerMessages::MarketCmdSourcesAmount()
 {

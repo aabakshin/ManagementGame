@@ -3,8 +3,28 @@
 
 
 #include "Banker.hpp"
+#include "Sender.hpp"
+#include "MessageTokens.hpp"
 #include <functional>
 
+
+template <class T, class U>
+class EncapsulatedBrokerMessages
+{
+private:
+	T* brokerPTR { nullptr };
+public:
+	EncapsulatedBrokerMessages() {}
+	void MakeBroker( const U& );
+	template <class X, class Y, class Z>
+	void MakeBroker( const U&, const X&, const Y&, const Z& );
+	const T& GetBroker() const;
+	~EncapsulatedBrokerMessages();
+private:
+	EncapsulatedBrokerMessages( const EncapsulatedBrokerMessages& ) = delete;
+	EncapsulatedBrokerMessages( EncapsulatedBrokerMessages&& ) = delete;
+	void operator=( const EncapsulatedBrokerMessages& ) = delete;
+};
 
 class BrokerMessages
 {
@@ -27,18 +47,97 @@ public:
 	};
 
 private:
-	const Banker& game_session;
+	char result_message[0];
+	BrokerActions broker_actions;
 public:
-	BrokerMessages( const Banker& );
-	const Banker& GetGameSession() const { return game_session; }
+	BrokerMessages() {}
+	const BrokerActions& GetBrokerActions() const { return broker_actions; }
 	virtual void PutMessage( const char**, int ) = 0;
-	virtual const char* TakeMessage( int ) = 0;
+	const char* TakeMessage( int );
 	virtual void CheckMessageCode( int ) const = 0;
 	virtual ~BrokerMessages() {}
 private:
 	BrokerMessages( const BrokerMessages& ) = delete;
 	BrokerMessages( BrokerMessages&& ) = delete;
 	void operator=( const BrokerMessages& ) = delete;
+};
+
+class GameMessages;
+class MulticastActionsExec : public BrokerMessages
+{
+public:
+
+	enum
+	{
+				SEND_REPORT_ON_TURN_TOKEN,
+				ADD_EMPTY_AUCTION_REQUEST_TOKEN,
+				PAY_CHARGES_TOKEN,
+				CHECK_BUILDING_FACTORIES_TOKEN,
+				PREPARE_NEW_TURN_TOKEN,
+				PREPARE_PLAYERS_STATE_TOKEN,
+				SEND_AUCTIONS_RESULTS_TOKEN,
+				SEND_PLAYERS_BANKROT_TOKEN,
+				SEND_NEW_PLAYER_CONNECT_TOKEN,
+				SEND_START_TIME_TOKEN,
+				SEND_START_CANCELLED_TOKEN,
+				SEND_GAME_STARTED_TOKEN,
+				QUIT_PLAYER_TOKEN
+	};
+
+	enum
+	{
+				AUCTION_TYPE_PARAM_TOKEN,
+				LEFT_PLAYER_ID_PARAM_TOKEN
+	};
+
+	enum
+	{
+				BROKER_ACTIONS_COUNT	=		 13
+	};
+
+	enum
+	{
+				MESSAGE_SIZE			=		300,
+				MESSAGE_TOKEN_SIZE		=		100
+	};
+
+private:
+	int auction_type;
+	int left_player_id;
+
+	const Banker& game_session;
+	const Sender& sender;
+	const MessageTokens& msg_tokens;
+	const EncapsulatedBrokerMessages<GameMessages, Banker>& EGameMessages;
+
+	char result_message[MESSAGE_SIZE];
+public:
+	MulticastActionsExec( const Banker&, const Sender&, const MessageTokens&, const EncapsulatedBrokerMessages<GameMessages, Banker>& );
+	const Banker& GetGameSession() const { return game_session; }
+	const Sender& GetSender() const { return sender; }
+	const MessageTokens& GetMsgTokens() const { return msg_tokens; }
+	const EncapsulatedBrokerMessages<GameMessages, Banker>& GetEGameMessages() const { return EGameMessages; }
+	virtual void PutMessage( const char**, int ) override;
+	virtual ~MulticastActionsExec() {}
+private:
+	virtual void CheckMessageCode( int ) const override;
+	MulticastActionsExec( const MulticastActionsExec& ) = delete;
+	MulticastActionsExec( MulticastActionsExec&& ) = delete;
+	void operator=( const MulticastActionsExec& ) = delete;
+
+	void SendReportOnTurn();
+	void AddEmptyAuctionRequest();
+	void PayCharges();
+	void CheckBuildingFactories();
+	void PrepareNewTurn();
+	void PreparePlayersState();
+	void SendAuctionsResults();
+	void SendPlayersBankrot();
+	void SendNewPlayerConnect();
+	void SendStartTime();
+	void SendStartCancelled();
+	void SendGameStarted();
+	void QuitPlayer();
 };
 
 class BCBrokerMessages : public BrokerMessages
@@ -114,12 +213,13 @@ private:
 	int products_amount;
 	int product_price;
 
+	const Banker& game_session;
+
 	char result_message[MESSAGE_SIZE];
-	BrokerActions broker_actions;
 public:
 	BCBrokerMessages( const Banker& );
+	const Banker& GetGameSession() const { return game_session; }
 	virtual void PutMessage( const char**, int ) override;
-	virtual const char* TakeMessage( int ) override;
 	virtual ~BCBrokerMessages() {}
 private:
 	virtual void CheckMessageCode( int ) const override;
@@ -218,12 +318,13 @@ private:
 	int produced;
 	int total_charges;
 
+	const Banker& game_session;
+
 	char result_message[MESSAGE_SIZE];
-	BrokerActions broker_actions;
 public:
 	GameMessages( const Banker& );
+	const Banker& GetGameSession() const { return game_session; }
 	virtual void PutMessage( const char**, int ) override;
-	virtual const char* TakeMessage( int ) override;
 	virtual ~GameMessages() {}
 private:
 	virtual void CheckMessageCode( int ) const override;

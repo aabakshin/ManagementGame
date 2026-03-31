@@ -43,8 +43,11 @@ const Player* RegisteredPlayers::GetPlayerByFd( int fd ) const
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = (*this)[i];
-		if ( !p->IsFree() && ( p->GetFd() == fd ) )
-			return const_cast<Player*>(p);
+		if ( !p->IsFree() )
+		{
+			if ( p->GetFd() == fd )
+				return const_cast<Player*>(p);
+		}
 	}
 
 	return nullptr;
@@ -55,8 +58,11 @@ const Player* RegisteredPlayers::GetPlayerByUID( int player_id ) const
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = (*this)[i];
-		if ( !p->IsFree() && ( p->GetUID() == player_id ) )
-			return const_cast<Player*>(p);
+		if ( !p->IsFree() )
+		{
+			if ( p->GetUID() == player_id )
+				return const_cast<Player*>(p);
+		}
 	}
 
 	return nullptr;

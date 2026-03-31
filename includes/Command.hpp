@@ -1,6 +1,10 @@
 #ifndef COMMAND_HPP_SENTINEL
 #define COMMAND_HPP_SENTINEL
 
+
+#include "MessageTokens.hpp"
+
+
 enum
 {
 		HELP_COMMAND_NUM,
@@ -32,8 +36,7 @@ enum
 enum
 {
 		COMMAND_NAME_SIZE		=		10,
-		COMMANDS_COUNT			=		10,
-		MESSAGE_TOKEN_SIZE		=	   100
+		COMMANDS_COUNT			=		10
 };
 
 
@@ -58,27 +61,6 @@ public:
 		CommandParams( const CommandParams& ) = delete;
 		CommandParams( CommandParams&& ) = delete;
 		void operator=( const CommandParams& ) = delete;
-	};
-
-	class MessageTokens
-	{
-	private:
-		const char** message_tokens;
-		int max_msg_tokens_count;
-		int msg_tokens_count;
-	public:
-		MessageTokens() {}
-		void MakeMessageTokens( int );
-		const char*& operator[]( int );
-		const char** GetValue() const { return message_tokens; }
-		int GetMsgTokensCount() const { return msg_tokens_count; }
-		void SetMsgTokensCount( int );
-		~MessageTokens();
-	private:
-		MessageTokens( const MessageTokens& ) = delete;
-		MessageTokens( MessageTokens&& ) = delete;
-		void operator=( const MessageTokens& ) = delete;
-		void NullifyMessageTokens();
 	};
 
 private:

@@ -240,11 +240,10 @@ void Player::AuctionReport::SetBoughtPrice( int price_value )
 }
 
 
-Player::Player( int p_fd, const char* p_addr, int p_uid )
+void Player::Reset()
 {
-	SetFd( p_fd );
-	SetAddr( p_addr );
-	SetUID( p_uid );
+	SetFd( -1 );
+	SetAddr( "0.0.0.0" );
 
 	SetMoney(0);
 	SetOldMoney(0);
@@ -264,6 +263,15 @@ Player::Player( int p_fd, const char* p_addr, int p_uid )
 	UnsetBankrot();
 	UnsetSentSourceRequest();
 	UnsetSentProductsRequest();
+}
+
+Player::Player( int p_fd, const char* p_addr, int p_uid )
+{
+	Reset();
+
+	SetUID( p_uid );
+	SetFd( p_fd );
+	SetAddr( p_addr );
 }
 
 void Player::SetFd( int p_fd )
