@@ -229,6 +229,39 @@ void Server::ConcatAddrPort()
 	address_buffer[i] = '\0';
 }
 
+void Server::ShowSentMessage() const
+{
+	printf("\n==================== (%d) ====================\n", GetSentMsgsCount());
+
+	for ( int i = 0; ( i < BUFSIZE ) && ( i < sender.GetMessageLength() ); ++i )
+	{
+		printf("%3d ", sender.GetMessage()[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Sent to [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", sender.GetMessage(), sender.GetTargetAddress(), sender.GetSentBytes(), sender.GetMessageLength(), GetSentMsgsCount());
+}
+
+void Server::ShowReceivedMessage() const
+{
+	printf("\n==================== (%d) ====================\n", GetRecvMsgsCount());
+
+	for ( int i = 0; ( i < BUFSIZE ) && ( i < receiver.GetMessageLength() ); ++i )
+	{
+		printf("%3d ", receiver.GetMessage()[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Received from [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", receiver.GetMessage(), receiver.GetTargetAddress(), receiver.GetRecvBytes(), receiver.GetMessageLength(), GetRecvMsgsCount());
+}
 
 void Server::CloseConnection( int player_number )
 {
@@ -557,6 +590,9 @@ void Server::NewClientHandle()
 		if ( banker.IsGameStarted() )
 		{
 			sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_ALREADY_STARTED_TOKEN ), cs, new_client_addr );
+			SetSentMsgsCount( GetSentMsgsCount() + 1 );
+			ShowSentMessage();
+
 			close(cs);
 			printf("Lost connection from (%s)\n", new_client_addr);
 		}
@@ -574,6 +610,9 @@ void Server::NewClientHandle()
 			if ( i >= MAX_PLAYERS )
 			{
 				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
+				SetSentMsgsCount( GetSentMsgsCount() + 1 );
+				ShowSentMessage();
+
 				close(cs);
 				printf("Lost connection from (%s)\n", new_client_addr);
 			}
@@ -586,6 +625,9 @@ void Server::NewClientHandle()
 				catch ( ... )
 				{
 					sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
+					SetSentMsgsCount( GetSentMsgsCount() + 1 );
+					ShowSentMessage();
+
 					close(cs);
 					printf("Lost connection from [%s]\n", new_client_addr);
 					return;
@@ -611,6 +653,9 @@ void Server::ClientsInputHandle()
 			if ( FD_ISSET(sender_p_fd, &readfds) )
 			{
 				receiver.RecvMessage( sender_p_fd, sender_p_addr );
+				SetRecvMsgsCount( GetRecvMsgsCount() + 1 );
+				ShowReceivedMessage();
+
 				if ( receiver.GetRecvBytes() > 0 )
 				{
 					const_cast<Player*>(p)->SetMessageBuffer( receiver.GetMessage(), receiver.GetMessageLength() );
@@ -629,6 +674,8 @@ void Server::ClientsInputHandle()
 						else
 						{
 							sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), sender_p_fd, sender_p_addr );
+							SetSentMsgsCount( GetSentMsgsCount() + 1 );
+							ShowSentMessage();
 						}
 					}
 					else
@@ -637,6 +684,8 @@ void Server::ClientsInputHandle()
 						cmds_exec.MakeCmdTokens( p->GetMessageBuffer() );
 						cmds_exec.ProcessCommand( p->GetUID(), EBCbroker.GetBroker());
 						sender.SendMessage( cmds_exec.GetCmdResultTokens(), cmds_exec.GetCmdResultTokensAmount(), sender_p_fd, sender_p_addr );
+						SetSentMsgsCount( GetSentMsgsCount() + 1 );
+						ShowSentMessage();
 
 						const char* info_token = cmds_exec.GetCmdToken( 0 );
 						if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )

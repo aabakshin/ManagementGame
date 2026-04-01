@@ -30,8 +30,6 @@ void Receiver::RecvMessage( int cs, const char* address )
 	delete_spaces(message, &message_size);
 
 	message_length = message_size - 1;
-
-	ShowReceivedMessage();
 }
 
 bool Receiver::IsRecvMessage() const
@@ -81,23 +79,5 @@ void Receiver::ResetSentBytes()
 {
 	recv_bytes = 0;
 }
-/*
-void Receiver::ShowReceivedMessage() const
-{
-	Server::SetRecvMsgsCount( Server::GetRecvMsgsCount() + 1 );
-	printf("\n==================== (%d) ====================\n", Server::GetRecvMsgsCount());
-
-	for ( int i = 0; ( i < BUFSIZE ) && ( i < message_length ); ++i )
-	{
-		printf("%3d ", message[i]);
-		if ( ( (i+1) % 10 ) == 0 )
-			putchar('\n');
-	}
-	putchar('\n');
-
-	printf("\nmessage: <[ %s ]>\n"
-			"Received from [%s] %d\\%d bytes\n"
-			"==================== (%d) ====================\n\n", message, target_address, recv_bytes, message_length, Server::GetRecvMsgsCount());
-}*/
 
 #endif

@@ -24,8 +24,10 @@ public:
 	Receiver() {}
 	const char* GetMessage() const { return message; }
 	void RecvMessage( int, const char* );
-	int GetRecvBytes() const { return recv_bytes; }
-	int GetMessageLength() const { return message_length; }
+	const int GetRecvBytes() const { return recv_bytes; }
+	const int GetMessageLength() const { return message_length; }
+	const int GetTargetSocket() const { return target_socket; }
+	const char* GetTargetAddress() const { return target_address; }
 private:
 	Receiver( const Receiver& ) = delete;
 	Receiver( Receiver&& ) = delete;
@@ -37,7 +39,6 @@ private:
 	void ResetTargetSocket();
 	void ResetTargetAddress();
 	void ResetSentBytes();
-	void ShowReceivedMessage() const;
 	bool IsRecvMessage() const;
 };
 

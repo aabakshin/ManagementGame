@@ -23,6 +23,11 @@ public:
 	Sender() {}
 	void SendMessage( const char* const*, int, int, const char* );
 	void SendMessage( const char*, int, const char* );
+	const char* GetMessage() const { return message; }
+	const int GetMessageLength() const { return message_length; }
+	const int GetSentBytes() const { return sent_bytes; }
+	const int GetTargetSocket() const { return target_socket; }
+	const char* GetTargetAddress() const { return target_address; }
 private:
 	Sender( const Sender& ) = delete;
 	Sender( Sender&& ) = delete;
@@ -34,7 +39,6 @@ private:
 	void ResetTargetSocket();
 	void ResetTargetAddress();
 	void ResetSentBytes();
-	void ShowSendingMessage() const;
 	bool IsSentMessage() const;
 };
 

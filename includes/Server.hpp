@@ -24,9 +24,9 @@ private:
 	static bool alrm_flag;
 	static bool exit_flag;
 	static int sig_number;
-	static int sent_msgs_count;
-	static int recv_msgs_count;
-	static bool timer_flag;
+	int sent_msgs_count;
+	int recv_msgs_count;
+	bool timer_flag;
 	int ls;
 	struct addrinfo* bind_address;
 	char address_buffer[ADDRESS_SIZE];
@@ -52,13 +52,13 @@ public:
 	static bool IsExitFlag() { return exit_flag; }
 	static int GetSignalNum() { return sig_number; }
 	static void SetSignalNum( int value );
-	static int GetSentMsgsCount() { return sent_msgs_count; }
-	static void SetSentMsgsCount( int msgs_value );
-	static int GetRecvMsgsCount() { return recv_msgs_count; }
-	static void SetRecvMsgsCount( int msgs_value );
-	static void SetTimerFlag() { timer_flag = true; }
-	static void UnsetTimerFlag() { timer_flag = false; }
-	static bool IsTimerFlag() { return timer_flag; }
+	int GetSentMsgsCount() const { return sent_msgs_count; }
+	void SetSentMsgsCount( int msgs_value );
+	int GetRecvMsgsCount() const { return recv_msgs_count; }
+	void SetRecvMsgsCount( int msgs_value );
+	void SetTimerFlag() { timer_flag = true; }
+	void UnsetTimerFlag() { timer_flag = false; }
+	bool IsTimerFlag() { return timer_flag; }
 	int Run();
 private:
 	Server() = delete;
@@ -77,6 +77,8 @@ private:
 	void FillReadfds();
 	bool IsCorrectIdentityMsg( const char* );
 	void ConcatAddrPort();
+	void ShowSentMessage() const;
+	void ShowReceivedMessage() const;
 
 	void NewClientHandle();
 	void ClientsInputHandle();

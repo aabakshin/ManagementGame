@@ -8,24 +8,6 @@
 #include <sys/socket.h>
 
 
-/*void Sender::ShowSendingMessage() const
-{
-	Server::SetSentMsgsCount( Server::GetSentMsgsCount() + 1 );
-	printf("\n==================== (%d) ====================\n", Server::GetSentMsgsCount());
-
-	for ( int i = 0; ( i < BUFSIZE ) && ( i < message_length ); ++i )
-	{
-		printf("%3d ", message[i]);
-		if ( ( (i+1) % 10 ) == 0 )
-			putchar('\n');
-	}
-	putchar('\n');
-
-	printf("\nmessage: <[ %s ]>\n"
-			"Sent to [%s] %d\\%d bytes\n"
-			"==================== (%d) ====================\n\n", message, target_address, sent_bytes, message_length, Server::GetSentMsgsCount());
-}*/
-
 void Sender::SendMessage( const char* const* message_tokens, int tokens_count, int cs, const char* address )
 {
 	bool overflow = false;
@@ -68,8 +50,6 @@ void Sender::SendMessage( const char* const* message_tokens, int tokens_count, i
 		return;
 		// throw UnableSendDataException();
 	}
-
-	ShowSendingMessage();
 }
 
 void Sender::SendMessage( const char* msg, int cs, const char* address )
@@ -94,8 +74,6 @@ void Sender::SendMessage( const char* msg, int cs, const char* address )
 		return;
 		// throw UnableSendDataException();
 	}
-
-	ShowSendingMessage();
 }
 
 bool Sender::IsSentMessage() const
