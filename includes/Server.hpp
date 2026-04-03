@@ -2,7 +2,7 @@
 #define SERVER_CORE_HPP
 
 
-#include "Banker.hpp"
+#include "SessionsPlanner.hpp"
 #include "CommandExecutor.hpp"
 #include "BrokerMessages.hpp"
 #include "Sender.hpp"
@@ -18,7 +18,8 @@ private:
 	{
 				BUFSIZE							=		   1024,
 				ADDRESS_SIZE					=			 50,
-				SERVICE_SIZE					=            10
+				SERVICE_SIZE					=            10,
+				SESSIONS_COUNT					=			  4
 	};
 
 	static bool alrm_flag;
@@ -34,10 +35,10 @@ private:
 	int max_fd;
 	fd_set readfds;
 	CommandExecutor cmds_exec;
-	Banker banker;
-	EncapsulatedBrokerMessages<BCBrokerMessages,Banker> EBCbroker;
-	EncapsulatedBrokerMessages<GameMessages,Banker> EGameMessages;
-	EncapsulatedBrokerMessages<MulticastActionsExec,Banker> EMultiActionsExec;
+	SessionsPlanner session_planner;
+	EncapsulatedBrokerMessages<BCBrokerMessages,SessionsPlanner> EBCbroker;
+	EncapsulatedBrokerMessages<GameMessages,SessionsPlanner> EGameMessages;
+	EncapsulatedBrokerMessages<MulticastActionsExec,SessionsPlanner> EMultiActionsExec;
 	Sender sender;
 	Receiver receiver;
 	MessageTokens msg_tokens;
@@ -72,28 +73,28 @@ private:
 	int GetMaxFd() const { return max_fd; }
 	void SetMaxFd( int );
 	void ListenSocketInit();
-	void CloseConnection( int );
+	void CloseConnection( int, int );
 	void Stop( int forcely );
 	void FillReadfds();
 	bool IsCorrectIdentityMsg( const char* );
 	void ConcatAddrPort();
 	void ShowSentMessage() const;
 	void ShowReceivedMessage() const;
-
 	void NewClientHandle();
 	void ClientsInputHandle();
 	void GameEventsHandle();
-
-	bool QuitPlayer( int );
-	void EndGameTurn();
-	void ReportOnTurn();
-	void ChangeMarketState();
-	void StartAuction( const List<Item<MarketData>>&, int auction_type );
-	void PrepareNewTurn();
-	void PrepareGameState();
-	void ShowAuctionInfo( const char* auction_type_msg, const Item<MarketData>* );
-	void SortRequestsByPrice( const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
-	bool CheckPlayersReports( List<Item<MarketData>>&, int );
+	void ErrorEvent( int, const char*, int );
+	void AddNewClientToSession( int, const char* );
+	bool QuitPlayer( int, int );
+	void ChangeMarketState( int );
+	void PrepareNewTurn( int );
+	void ShowAuctionInfo( int, const char* auction_type_msg, const Item<MarketData>* );
+	void ReportOnTurn( int );
+	void EndGameTurn( int );
+	void SortRequestsByPrice( int session_id, const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
+	bool CheckPlayersReports( int, List<Item<MarketData>>&, int );
+	void StartAuction( int, const List<Item<MarketData>>&, int auction_type );
+	void PrepareGameState( int );
 };
 
 

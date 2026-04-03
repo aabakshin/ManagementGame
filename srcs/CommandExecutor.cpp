@@ -102,8 +102,10 @@ void CommandExecutor::MakeCmdTokens( const char* read_buf )
 	SetCmdTokensAmount( j );
 }
 
-void CommandExecutor::ProcessCommand( int sender_player_id, const BCBrokerMessages& BCbroker )
+void CommandExecutor::ProcessCommand( int session_id, const char* read_buf, int sender_player_id, const BCBrokerMessages& BCbroker )
 {
+	MakeCmdTokens( read_buf );
+
 	char command_str[100];
 	strcpy(command_str, GetCmdToken( 0 ));
 
@@ -111,7 +113,7 @@ void CommandExecutor::ProcessCommand( int sender_player_id, const BCBrokerMessag
 	{
 		if ( strcmp(command_str, reg_cmds[j]->GetName()) == 0 )
 		{
-			const_cast<Command*>(reg_cmds[j])->PrepareAndProc( sender_player_id, GetCmdTokensAmount(), GetCmdToken(1), GetCmdToken(2), BCbroker );
+			const_cast<Command*>(reg_cmds[j])->PrepareAndProc( session_id, sender_player_id, GetCmdTokensAmount(), GetCmdToken(1), GetCmdToken(2), BCbroker );
 
 			int tokens_count = reg_cmds[j]->GetMessageTokens().GetMsgTokensCount();
 

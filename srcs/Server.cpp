@@ -6,6 +6,7 @@
 #include "BrokerMessages.hpp"
 #include "MGLib.h"
 #include "MessageTokens.hpp"
+#include "SessionsPlanner.hpp"
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
@@ -40,6 +41,7 @@ static const char* const bot_identity_messages[] = {
 				"./bot_mg_release4\n",
 				nullptr
 };
+
 
 /* Ф-я-обработчик сигнала SIGALRM */
 void alrm_handler( int sig_no )
@@ -185,9 +187,11 @@ void Server::ListenSocketInit()
 
 Server::Server( const char* addr, const char* port )
 {
-	EBCbroker.MakeBroker( banker );
-	EGameMessages.MakeBroker( banker );
-	EMultiActionsExec.MakeBroker( banker, sender, msg_tokens, EGameMessages );
+	session_planner.Make( SESSIONS_COUNT );
+
+	EBCbroker.MakeBroker( session_planner );
+	EGameMessages.MakeBroker( session_planner );
+	EMultiActionsExec.MakeBroker( session_planner, sender, msg_tokens, EGameMessages );
 
 	msg_tokens.MakeMessageTokens( MessageTokens::MESSAGE_TOKENS_COUNT );
 
@@ -207,7 +211,6 @@ Server::~Server()
 {
 	freeaddrinfo(bind_address);
 }
-
 
 bool Server::IsCorrectIdentityMsg( const char* identity_msg )
 {
@@ -263,8 +266,10 @@ void Server::ShowReceivedMessage() const
 			"==================== (%d) ====================\n\n", receiver.GetMessage(), receiver.GetTargetAddress(), receiver.GetRecvBytes(), receiver.GetMessageLength(), GetRecvMsgsCount());
 }
 
-void Server::CloseConnection( int player_number )
+void Server::CloseConnection( int session_id, int player_number )
 {
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
 	const Player* p = banker.GetPlayers().GetPlayerByUID( player_number );
 	if ( p != nullptr )
 	{
@@ -273,7 +278,7 @@ void Server::CloseConnection( int player_number )
 		char ip[100] = { 0 };
 		strncpy( ip, p->GetAddr(), ADDRESS_SIZE );
 
-		banker.CleanPlayer(player_number);
+		const_cast<Banker&>(banker).CleanPlayer(player_number);
 		close(p_fd);
 		FD_CLR(p_fd, &readfds);
 		printf("[-] Lost connection from [%s]\n", ip);
@@ -288,8 +293,12 @@ void Server::Stop( int forcely )
 	if ( forcely )
 		printf("%s", "\n\n========== SERVER IS STOPPING WORK FORCELY ==========\n");
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
-		CloseConnection( banker.GetPlayers().GetUIDByIdx( i ) );
+	for ( int i = SessionsPlanner::DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
+	{
+		const Banker& banker = *session_planner.GetSessionById( i );
+		for ( int j = 0; j < MAX_PLAYERS; ++j )
+			CloseConnection( i, banker.GetPlayers().GetUIDByIdx( j ) );
+	}
 
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
@@ -297,8 +306,10 @@ void Server::Stop( int forcely )
 	exit(0);
 }
 
-void Server::ShowAuctionInfo( const char* auction_type_msg, const Item<MarketData>* node )
+void Server::ShowAuctionInfo( int session_id, const char* auction_type_msg, const Item<MarketData>* node )
 {
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
 	printf("\n%s\n", auction_type_msg);
 
 	for ( ; node != nullptr; node = node->GetNext() )
@@ -312,21 +323,28 @@ void Server::ShowAuctionInfo( const char* auction_type_msg, const Item<MarketDat
 	}
 }
 
-void Server::ReportOnTurn()
+void Server::ReportOnTurn( int session_id )
 {
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
 	printf("\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
 	printf("\n%s\n", "Players statistics:");
 
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
+
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_REPORT_ON_TURN_TOKEN );
 
-	ShowAuctionInfo("Sources auction", banker.GetSourcesRequests().GetFirst());
-	ShowAuctionInfo("Products auction", banker.GetProductsRequests().GetFirst());
+	ShowAuctionInfo( session_id, "Sources auction", const_cast<Banker&>(banker).GetSourcesRequests().GetFirst());
+	ShowAuctionInfo( session_id, "Products auction", const_cast<Banker&>(banker).GetProductsRequests().GetFirst());
 
 	printf("\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
 }
 
-void Server::ChangeMarketState()
+void Server::ChangeMarketState( int session_id )
 {
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
 	int r = 1 + (int)( 12.0 * rand() / (RAND_MAX + 1.0) );
 
 	int sum = 0;
@@ -339,32 +357,33 @@ void Server::ChangeMarketState()
 	}
 
 	if ( i < MARKET_LEVEL_NUMBER )
-		banker.SetCurrentMarketLvl( i+1 );
+		const_cast<Banker&>(banker).SetCurrentMarketLvl( i+1 );
 
-	banker.GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
-	banker.GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
-	banker.GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
-	banker.GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
 }
 
-bool Server::CheckPlayersReports( List<Item<MarketData>>& requests, int auction_type )
+bool Server::CheckPlayersReports( int session_id, List<Item<MarketData>>& requests, int auction_type )
 {
 	// если список заявок на аукцион пуст, то не нужно его проводить
 	if ( requests.IsEmpty() )
 		return false;
 
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	itoa( auction_type, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 
-	// Если игрок не заявился на аукцион, добавить его пустую заявку
+	// Если какой-либо игрок не заявился на аукцион, добавить его пустую заявку
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::ADD_EMPTY_AUCTION_REQUEST_TOKEN );
 
 	return true;
 }
 
-void Server::SortRequestsByPrice( const List<Item<MarketData>>& requests, List<Item<MarketData>>& sorted_requests, int auction_type )
+void Server::SortRequestsByPrice( int session_id, const List<Item<MarketData>>& requests, List<Item<MarketData>>& sorted_requests, int auction_type )
 {
-	const int ready_players = banker.GetReadyPlayers();
+	const int ready_players = (*session_planner.GetSessionById( session_id )).GetReadyPlayers();
 
 	Item<MarketData>* arr_reqs[ready_players];
 	int prices[ready_players];
@@ -401,16 +420,18 @@ void Server::SortRequestsByPrice( const List<Item<MarketData>>& requests, List<I
 	}
 }
 
-void Server::StartAuction( const List<Item<MarketData>>& requests, int auction_type )
+void Server::StartAuction( int session_id, const List<Item<MarketData>>& requests, int auction_type )
 {
-	if ( !CheckPlayersReports( const_cast<List<Item<MarketData>>&>(requests), auction_type ) )
+	if ( !CheckPlayersReports( session_id, const_cast<List<Item<MarketData>>&>(requests), auction_type ) )
 		return;
 
 	List<Item<MarketData>> sorted_requests;
-	SortRequestsByPrice( requests, sorted_requests, auction_type );
+	SortRequestsByPrice( session_id, requests, sorted_requests, auction_type );
 
-	int max_sources = banker.GetCurrentMarketState().GetSourcesAmount();
-	int max_products = banker.GetCurrentMarketState().GetProductsAmount();
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
+	int max_sources = const_cast<Banker&>(banker).GetCurrentMarketState().GetSourcesAmount();
+	int max_products = const_cast<Banker&>(banker).GetCurrentMarketState().GetProductsAmount();
 
 	for ( Item<MarketData>* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
 	{
@@ -492,53 +513,50 @@ void Server::StartAuction( const List<Item<MarketData>>& requests, int auction_t
 	}
 }
 
-void Server::PrepareNewTurn()
+void Server::PrepareNewTurn( int session_id )
 {
-	ChangeMarketState();
-	banker.SetTurnNumber( banker.GetTurnNumber() + 1 );
-	banker.SetReadyPlayers( 0 );
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
+	ChangeMarketState( session_id );
+	const_cast<Banker&>(banker).SetTurnNumber( banker.GetTurnNumber() + 1 );
+	const_cast<Banker&>(banker).SetReadyPlayers( 0 );
+
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_NEW_TURN_TOKEN );
 }
 
-void Server::PrepareGameState()
+void Server::PrepareGameState( int session_id )
 {
-	banker.SetAlivePlayers( banker.GetLobbyPlayers() );
-	banker.SetLobbyPlayers( 0 );
-	banker.SetTurnNumber( 1 );
-	banker.SetCurrentMarketLvl( START_MARKET_LEVEL );
-	banker.GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
-	banker.GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
-	banker.GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
-	banker.GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+	const Banker& banker = *session_planner.GetSessionById( session_id );
+
+	const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
+	const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
+	const_cast<Banker&>(banker).SetTurnNumber( 1 );
+	const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_PLAYERS_STATE_TOKEN );
 
-	banker.SetGameStatePrepared();
+	const_cast<Banker&>(banker).SetGameStatePrepared();
 }
 
-bool Server::QuitPlayer( int player_number )
+void Server::EndGameTurn( int session_id )
 {
-	itoa( player_number, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+	const Banker& banker = *session_planner.GetSessionById( session_id );
 
-	CloseConnection( player_number );
+	StartAuction( session_id, const_cast<Banker&>(banker).GetSourcesRequests(), SOURCE_AUCTION );
+	StartAuction( session_id, const_cast<Banker&>(banker).GetProductsRequests(), PRODUCTION_AUCTION );
 
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
-
-	if ( banker.GetAlivePlayers() <= 1 )
-	{
-		SetExitFlag();
-		return true;
-	}
-
-	return false;
-}
-
-void Server::EndGameTurn()
-{
-	StartAuction( banker.GetSourcesRequests(), SOURCE_AUCTION );
-	StartAuction( banker.GetProductsRequests(), PRODUCTION_AUCTION );
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_AUCTIONS_RESULTS_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_BUILDING_FACTORIES_TOKEN );
@@ -550,12 +568,92 @@ void Server::EndGameTurn()
 		const Player* p = banker.GetPlayers()[i];
 		if ( !p->IsFree() )
 			if ( p->IsBankrot() )
-				if ( QuitPlayer( p->GetUID() ) )
+				if ( QuitPlayer( session_id, p->GetUID() ) )
 					return;
 	}
 
-	//ReportOnTurn();
-	PrepareNewTurn();
+	//ReportOnTurn( session_id );
+	PrepareNewTurn( session_id );
+}
+
+bool Server::QuitPlayer( int session_id, int player_number )
+{
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	itoa( player_number, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+
+	CloseConnection( session_id, player_number );
+
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
+
+	if ( session_planner.GetSessionById( session_id )->GetAlivePlayers() <= 1 )
+	{
+		SetExitFlag();
+		return true;
+	}
+
+	return false;
+}
+
+void Server::ErrorEvent( int cs, const char* new_client_addr, int event_code )
+{
+	if ( event_code == INTERNAL_SERVER_ERROR )
+	{
+		sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
+	}
+	else
+	{
+		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( event_code ), cs, new_client_addr );
+	}
+
+	SetSentMsgsCount( GetSentMsgsCount() + 1 );
+	ShowSentMessage();
+
+	close(cs);
+	printf("Lost connection from (%s)\n", new_client_addr);
+}
+
+void Server::AddNewClientToSession( int cs, const char* new_client_addr )
+{
+	int i;
+	for ( i = session_planner.DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
+	{
+		const Banker& banker = *session_planner.GetSessionById( i );
+		if ( banker.IsGameStarted() )
+		{
+			continue;
+		}
+
+		const Player* p = banker.GetFree();
+		if ( p == nullptr )
+		{
+			ErrorEvent( cs, new_client_addr, GameMessages::SERVER_FULL_TOKEN );
+		}
+		else
+		{
+			try
+			{
+				const_cast<Player*>(p)->SetNewPlayer( cs, address_buffer );
+			}
+			catch ( ... )
+			{
+				ErrorEvent( cs, new_client_addr, INTERNAL_SERVER_ERROR );
+				return;
+			}
+
+			const_cast<Banker&>(banker).SetLobbyPlayers( banker.GetLobbyPlayers() + 1 );
+
+			itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
+
+			const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_NEW_PLAYER_CONNECT_TOKEN );
+		}
+	}
+
+	if ( i > session_planner.GetSessionsCount() )
+	{
+		ErrorEvent( cs, new_client_addr, GameMessages::GAME_ALREADY_STARTED_TOKEN );
+	}
 }
 
 void Server::NewClientHandle()
@@ -587,120 +685,78 @@ void Server::NewClientHandle()
 
 		printf("New connection from (%s)\n", new_client_addr);
 
-		if ( banker.IsGameStarted() )
-		{
-			sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_ALREADY_STARTED_TOKEN ), cs, new_client_addr );
-			SetSentMsgsCount( GetSentMsgsCount() + 1 );
-			ShowSentMessage();
-
-			close(cs);
-			printf("Lost connection from (%s)\n", new_client_addr);
-		}
-		else
-		{
-			const Player* p = nullptr;
-			int i;
-			for ( i = 0; i < MAX_PLAYERS; ++i )
-			{
-				p = banker.GetPlayers()[i];
-				if ( p->IsFree() )
-					break;
-			}
-
-			if ( i >= MAX_PLAYERS )
-			{
-				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
-				SetSentMsgsCount( GetSentMsgsCount() + 1 );
-				ShowSentMessage();
-
-				close(cs);
-				printf("Lost connection from (%s)\n", new_client_addr);
-			}
-			else
-			{
-				try
-				{
-					const_cast<Player*>(p)->SetNewPlayer( cs, address_buffer );
-				}
-				catch ( ... )
-				{
-					sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
-					SetSentMsgsCount( GetSentMsgsCount() + 1 );
-					ShowSentMessage();
-
-					close(cs);
-					printf("Lost connection from [%s]\n", new_client_addr);
-					return;
-				}
-
-				banker.SetLobbyPlayers( banker.GetLobbyPlayers() + 1 );
-				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_NEW_PLAYER_CONNECT_TOKEN );
-			}
-		}
+		AddNewClientToSession( cs, new_client_addr );
 	}
 }
 
 void Server::ClientsInputHandle()
 {
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = session_planner.DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
 	{
-		const Player* p = banker.GetPlayers()[i];
-		if ( !p->IsFree() )
+		const Banker& banker = *session_planner.GetSessionById( i );
+
+		for ( int j = 0; j < MAX_PLAYERS; ++j )
 		{
-			int sender_p_fd = p->GetFd();
-			const char* sender_p_addr = p->GetAddr();
-
-			if ( FD_ISSET(sender_p_fd, &readfds) )
+			const Player* p = banker.GetPlayers()[j];
+			if ( !p->IsFree() )
 			{
-				receiver.RecvMessage( sender_p_fd, sender_p_addr );
-				SetRecvMsgsCount( GetRecvMsgsCount() + 1 );
-				ShowReceivedMessage();
+				int sender_p_fd = p->GetFd();
+				const char* sender_p_addr = p->GetAddr();
 
-				if ( receiver.GetRecvBytes() > 0 )
+				if ( FD_ISSET(sender_p_fd, &readfds) )
 				{
-					const_cast<Player*>(p)->SetMessageBuffer( receiver.GetMessage(), receiver.GetMessageLength() );
+					receiver.RecvMessage( sender_p_fd, sender_p_addr );
+					SetRecvMsgsCount( GetRecvMsgsCount() + 1 );
+					ShowReceivedMessage();
 
-					if ( !banker.IsGameStarted() )
+					if ( receiver.GetRecvBytes() > 0 )
 					{
-						if ( !p->IsIdentMsgRecv() )
-						{
-							if ( IsCorrectIdentityMsg( p->GetMessageBuffer() ) )
-								const_cast<Player*>(p)->SetBot();
-							else
-								const_cast<Player*>(p)->UnsetBot();
+						const_cast<Player*>(p)->SetMessageBuffer( receiver.GetMessage(), receiver.GetMessageLength() );
 
-							const_cast<Player*>(p)->SetIdentMsgRecv();
+						if ( !banker.IsGameStarted() )
+						{
+							if ( !p->IsIdentMsgRecv() )
+							{
+								if ( IsCorrectIdentityMsg( p->GetMessageBuffer() ) )
+									const_cast<Player*>(p)->SetBot();
+								else
+									const_cast<Player*>(p)->UnsetBot();
+
+								const_cast<Player*>(p)->SetIdentMsgRecv();
+							}
+							else
+							{
+								itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+								const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
+
+								sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), sender_p_fd, sender_p_addr );
+								SetSentMsgsCount( GetSentMsgsCount() + 1 );
+								ShowSentMessage();
+							}
 						}
 						else
 						{
-							sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), sender_p_fd, sender_p_addr );
+							// Обработка данных от игрока, когда игра началась
+							cmds_exec.ProcessCommand( banker.GetId(), p->GetMessageBuffer(), p->GetUID(), EBCbroker.GetBroker() );
+							sender.SendMessage( cmds_exec.GetCmdResultTokens(), cmds_exec.GetCmdResultTokensAmount(), sender_p_fd, sender_p_addr );
 							SetSentMsgsCount( GetSentMsgsCount() + 1 );
 							ShowSentMessage();
+
+							const char* info_token = cmds_exec.GetCmdToken( 0 );
+							if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )
+							{
+								QuitPlayer( banker.GetId(), p->GetUID() );
+							}
+							else if ( strcmp(info_token, error_game_messages[INTERNAL_SERVER_ERROR]) == 0 )
+							{
+								QuitPlayer( banker.GetId(), p->GetUID() );
+							}
 						}
 					}
 					else
 					{
-						// Обработка данных от игрока, когда игра началась
-						cmds_exec.MakeCmdTokens( p->GetMessageBuffer() );
-						cmds_exec.ProcessCommand( p->GetUID(), EBCbroker.GetBroker());
-						sender.SendMessage( cmds_exec.GetCmdResultTokens(), cmds_exec.GetCmdResultTokensAmount(), sender_p_fd, sender_p_addr );
-						SetSentMsgsCount( GetSentMsgsCount() + 1 );
-						ShowSentMessage();
-
-						const char* info_token = cmds_exec.GetCmdToken( 0 );
-						if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )
-						{
-							QuitPlayer( p->GetUID() );
-						}
-						else if ( strcmp(info_token, error_game_messages[INTERNAL_SERVER_ERROR]) == 0 )
-						{
-							QuitPlayer( p->GetUID() );
-						}
+						QuitPlayer( banker.GetId(), p->GetUID() );
 					}
-				}
-				else
-				{
-					QuitPlayer( p->GetUID() );
 				}
 			}
 		}
@@ -709,42 +765,49 @@ void Server::ClientsInputHandle()
 
 void Server::GameEventsHandle()
 {
-	// Игровые события
-	if ( !banker.IsGameStarted() )
+	for ( int i = session_planner.DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
 	{
-		if ( !IsTimerFlag() && ( banker.GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( banker.GetLobbyPlayers() <= MAX_PLAYERS ) )
-		{
-			alarm(TIME_TO_START);
-			SetTimerFlag();
-			const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_TIME_TOKEN );
-		}
+		const Banker& banker = *session_planner.GetSessionById( i );
 
-		if ( IsAlrmFlag() )
-		{
-			UnsetAlrmFlag();
-			UnsetTimerFlag();
+		itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
-			if ( banker.GetLobbyPlayers() < MIN_PLAYERS_TO_START )
+		if ( !banker.IsGameStarted() )
+		{
+			if ( !IsTimerFlag() && ( banker.GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( banker.GetLobbyPlayers() <= MAX_PLAYERS ) )
 			{
-				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_CANCELLED_TOKEN );
+				alarm(TIME_TO_START);
+				SetTimerFlag();
+				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_TIME_TOKEN );
 			}
-			else
-			{
-				banker.SetGameStarted();
-				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_GAME_STARTED_TOKEN );
-			}
-		}
-	}
-	else
-	{
-		if ( !banker.IsGameStatePrepared() )
-		{
-			PrepareGameState();
-		}
 
-		if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
+			if ( IsAlrmFlag() )
+			{
+				UnsetAlrmFlag();
+				UnsetTimerFlag();
+
+				if ( banker.GetLobbyPlayers() < MIN_PLAYERS_TO_START )
+				{
+					const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_CANCELLED_TOKEN );
+				}
+				else
+				{
+					const_cast<Banker&>(banker).SetGameStarted();
+					const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_GAME_STARTED_TOKEN );
+				}
+			}
+		}
+		else
 		{
-			EndGameTurn();
+			if ( !banker.IsGameStatePrepared() )
+			{
+				PrepareGameState( banker.GetId() );
+			}
+
+			if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
+			{
+				EndGameTurn( banker.GetId() );
+			}
 		}
 	}
 }
@@ -757,16 +820,19 @@ void Server::FillReadfds()
 
 	max_fd = ls;
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = SessionsPlanner::DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
 	{
-		const Player* p = banker.GetPlayers()[i];
-		if ( !p->IsFree() )
+		for ( int j = 0; j < MAX_PLAYERS; ++j )
 		{
-			int p_fd = p->GetFd();
+			const Player* p = session_planner.GetSessionById( i )->GetPlayers()[j];
+			if ( !p->IsFree() )
+			{
+				int p_fd = p->GetFd();
 
-			FD_SET( p_fd, &readfds );
-			if ( p_fd > max_fd )
-				max_fd = p_fd;
+				FD_SET( p_fd, &readfds );
+				if ( p_fd > max_fd )
+					max_fd = p_fd;
+			}
 		}
 	}
 }
@@ -785,7 +851,7 @@ int Server::Run()
 
 		FillReadfds();
 
-		timeval tv { 2, 500000 };
+		timeval tv { 0, 300000 };
 		int res = select(max_fd+1, &readfds, nullptr, nullptr, &tv);
 		if ( res == -1 )
 		{

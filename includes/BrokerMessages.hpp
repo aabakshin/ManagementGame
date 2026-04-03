@@ -2,7 +2,7 @@
 #define BROKER_MESSAGES_HPP_SENTINEL
 
 
-#include "Banker.hpp"
+#include "SessionsPlanner.hpp"
 #include "Sender.hpp"
 #include "MessageTokens.hpp"
 #include <functional>
@@ -86,6 +86,7 @@ public:
 
 	enum
 	{
+				SESSION_ID_PARAM_TOKEN,
 				AUCTION_TYPE_PARAM_TOKEN,
 				LEFT_PLAYER_ID_PARAM_TOKEN
 	};
@@ -102,21 +103,22 @@ public:
 	};
 
 private:
+	int session_id;
 	int auction_type;
 	int left_player_id;
 
-	const Banker& game_session;
+	const SessionsPlanner& game_sessions;
 	const Sender& sender;
 	const MessageTokens& msg_tokens;
-	const EncapsulatedBrokerMessages<GameMessages, Banker>& EGameMessages;
+	const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& EGameMessages;
 
 	char result_message[MESSAGE_SIZE];
 public:
-	MulticastActionsExec( const Banker&, const Sender&, const MessageTokens&, const EncapsulatedBrokerMessages<GameMessages, Banker>& );
-	const Banker& GetGameSession() const { return game_session; }
+	MulticastActionsExec( const SessionsPlanner&, const Sender&, const MessageTokens&, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& );
+	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	const Sender& GetSender() const { return sender; }
 	const MessageTokens& GetMsgTokens() const { return msg_tokens; }
-	const EncapsulatedBrokerMessages<GameMessages, Banker>& GetEGameMessages() const { return EGameMessages; }
+	const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& GetEGameMessages() const { return EGameMessages; }
 	virtual void PutMessage( const char**, int ) override;
 	virtual ~MulticastActionsExec() {}
 private:
@@ -187,6 +189,7 @@ public:
 
 	enum
 	{
+				SESSION_ID_PARAM_TOKEN,
 				SENDER_PLAYER_ID_PARAM_TOKEN,
 				TARGET_PLAYER_ID_PARAM_TOKEN,
 				SOURCES_AMOUNT_PARAM_TOKEN,
@@ -206,6 +209,7 @@ public:
 	};
 
 private:
+	int session_id;
 	int sender_player_id;
 	int target_player_id;
 	int sources_amount;
@@ -213,12 +217,12 @@ private:
 	int products_amount;
 	int product_price;
 
-	const Banker& game_session;
+	const SessionsPlanner& game_sessions;
 
 	char result_message[MESSAGE_SIZE];
 public:
-	BCBrokerMessages( const Banker& );
-	const Banker& GetGameSession() const { return game_session; }
+	BCBrokerMessages( const SessionsPlanner& );
+	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	virtual void PutMessage( const char**, int ) override;
 	virtual ~BCBrokerMessages() {}
 private:
@@ -294,6 +298,7 @@ public:
 
 	enum
 	{
+				SESSION_ID_PARAM_TOKEN,
 				LEFT_PLAYER_ID_PARAM_TOKEN,
 				TIME_TO_START_PARAM_TOKEN,
 				SENDER_ID_PARAM_TOKEN,
@@ -312,18 +317,19 @@ public:
 	};
 
 private:
+	int session_id;
 	int left_player_id;
 	int time_to_start;
 	int sender_id;
 	int produced;
 	int total_charges;
 
-	const Banker& game_session;
+	const SessionsPlanner& game_sessions;
 
 	char result_message[MESSAGE_SIZE];
 public:
-	GameMessages( const Banker& );
-	const Banker& GetGameSession() const { return game_session; }
+	GameMessages( const SessionsPlanner& );
+	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	virtual void PutMessage( const char**, int ) override;
 	virtual ~GameMessages() {}
 private:

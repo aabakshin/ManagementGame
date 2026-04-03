@@ -65,12 +65,12 @@ HelpCommand::HelpCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[HELP_COMMAND_NUM]);
 }
 
-void HelpCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void HelpCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void HelpCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void HelpCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
 	strncpy( const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[0]), info_game_messages[HELP_COMMAND_SUCCESS], MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 	for ( int i = 1, j = 0; i < HELP_CMD_TOKENS_NUM; ++j, ++i )
@@ -84,14 +84,17 @@ MarketCommand::MarketCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[MARKET_COMMAND_NUM]);
 }
 
-void MarketCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void MarketCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void MarketCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void MarketCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
 	const int tokens[] { BCbroker.MARKET_SOURCES_AMOUNT_TOKEN, BCbroker.MARKET_SOURCE_MIN_PRICE_TOKEN, BCbroker.MARKET_PRODUCTS_AMOUNT_TOKEN, BCbroker.MARKET_PRODUCT_MAX_PRICE_TOKEN };
+
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
+	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SESSION_ID_PARAM_TOKEN+1 );
 
 	strncpy( const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[0]), info_game_messages[MARKET_COMMAND_SUCCESS], MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 	for ( int i = 1, j = 0; i < MARKET_CMD_TOKENS_NUM; ++j, ++i )
@@ -105,7 +108,7 @@ PlayerCommand::PlayerCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[PLAYER_COMMAND_NUM]);
 }
 
-void PlayerCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void PlayerCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount >= 2 )
 	{
@@ -117,10 +120,10 @@ void PlayerCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount,
 		SetCmdParams(reinterpret_cast<void*>(&player_number), nullptr);
 	}
 
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void PlayerCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void PlayerCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
 	int target_player_id = *( reinterpret_cast<int*>(const_cast<void*>(params.GetParam1())) );
 
@@ -131,6 +134,7 @@ void PlayerCommand::Process( int sender_player_id, const Command::CommandParams&
 		return;
 	}
 
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	itoa(target_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.TARGET_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.TARGET_PLAYER_ID_PARAM_TOKEN+1 );
@@ -176,13 +180,16 @@ ListCommand::ListCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[LIST_COMMAND_NUM]);
 }
 
-void ListCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void ListCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void ListCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void ListCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
+	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SESSION_ID_PARAM_TOKEN+1 );
+
 	strncpy( const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[0]), info_game_messages[LIST_COMMAND_SUCCESS], MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 	strncpy( const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[1]), const_cast<BCBrokerMessages&>(BCbroker).TakeMessage( BCbroker.ALIVE_PLAYERS_TOKEN ), MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 	const_cast<MessageTokens&>(GetMessageTokens()).SetMsgTokensCount( LIST_CMD_TOKENS_NUM );
@@ -194,13 +201,14 @@ ProdCommand::ProdCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[PROD_COMMAND_NUM]);
 }
 
-void ProdCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void ProdCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void ProdCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void ProdCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN+1 );
 
@@ -242,7 +250,7 @@ BuildCommand::BuildCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[BUILD_COMMAND_NUM]);
 }
 
-void BuildCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void BuildCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount >= 2 )
 	{
@@ -254,11 +262,12 @@ void BuildCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, 
 		SetCmdParams(reinterpret_cast<void*>(&builds_count), nullptr);
 	}
 
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void BuildCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void BuildCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN+1 );
 
@@ -315,7 +324,7 @@ BuyCommand::BuyCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[BUY_COMMAND_NUM]);
 }
 
-void BuyCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void BuyCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount < 3 )
 	{
@@ -335,11 +344,12 @@ void BuyCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, co
 
 	SetCmdParams(reinterpret_cast<void*>(&sources_amount), reinterpret_cast<void*>(&sources_price));
 
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void BuyCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void BuyCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN+1 );
 
@@ -403,7 +413,7 @@ SellCommand::SellCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[SELL_COMMAND_NUM]);
 }
 
-void SellCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void SellCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount < 3 )
 	{
@@ -423,11 +433,12 @@ void SellCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, c
 
 	SetCmdParams(reinterpret_cast<void*>(&products_amount), reinterpret_cast<void*>(&products_price));
 
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void SellCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void SellCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN+1 );
 
@@ -484,13 +495,14 @@ TurnCommand::TurnCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[TURN_COMMAND_NUM]);
 }
 
-void TurnCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void TurnCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void TurnCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void TurnCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
+	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SESSION_ID_PARAM_TOKEN]), 9);
 	itoa(sender_player_id, const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN]), 9);
 	const_cast<BCBrokerMessages&>(BCbroker).PutMessage( GetMessageTokens().GetValue(), BCbroker.SENDER_PLAYER_ID_PARAM_TOKEN+1 );
 
@@ -515,16 +527,15 @@ QuitCommand::QuitCommand( int tokens_count ) : Command( tokens_count )
 	SetName(valid_commands[QUIT_COMMAND_NUM]);
 }
 
-void QuitCommand::PrepareAndProc( int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
+void QuitCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
-	Process( sender_player_id, GetCmdParams(), BCbroker );
+	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
 
-void QuitCommand::Process( int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
+void QuitCommand::Process( int session_id, int sender_player_id, const Command::CommandParams& params, const BCBrokerMessages& BCbroker )
 {
 	strncpy(const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[0]), info_game_messages[QUIT_COMMAND_SUCCESS], MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 	const_cast<MessageTokens&>(GetMessageTokens()).SetMsgTokensCount( QUIT_CMD_TOKENS_NUM );
-	return;
 }
 
 #endif

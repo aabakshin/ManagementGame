@@ -27,12 +27,12 @@ public:
 	int GetCmdResultTokensAmount() const { return cmd_result_tokens_amount; }
 	const char* GetCmdResultToken( int ) const;
 	const char* const* GetCmdResultTokens() const { return static_cast<const char* const*>(cmd_result_tokens); }
-	void ProcessCommand( int, const BCBrokerMessages& );
-	void MakeCmdTokens( const char* );
+	void ProcessCommand( int, const char*, int, const BCBrokerMessages& );
 private:
 	CommandExecutor( const CommandExecutor& ) = delete;
 	CommandExecutor( CommandExecutor&& ) = delete;
-	void operator=( const CommandExecutor& ) {}
+	void operator=( const CommandExecutor& ) = delete;
+	void MakeCmdTokens( const char* );
 	void SetCmdTokensAmount( int );
 	void SetCmdToken( int, const char* );
 	void SetCmdResultTokensAmount( int );

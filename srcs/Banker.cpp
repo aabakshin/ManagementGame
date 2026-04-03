@@ -3,6 +3,7 @@
 
 
 #include "Banker.hpp"
+#include "Player.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -280,8 +281,9 @@ void List<Item<MarketData>>::Print() const
 }
 
 
-Banker::Banker()
+Banker::Banker( int id_value )
 {
+	SetId( id_value );
 	UnsetPlayersPrepared();
 	UnsetGameStarted();
 	SetLobbyPlayers(0);
@@ -289,6 +291,29 @@ Banker::Banker()
 	SetReadyPlayers(0);
 	SetTurnNumber(0);
 	SetCurrentMarketLvl(0);
+}
+
+const Player* Banker::GetFree() const
+{
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = GetPlayers()[i];
+		if ( p->IsFree() )
+			return p;
+	}
+
+	return nullptr;
+}
+
+void Banker::SetId( int value )
+{
+	if ( value < 0 )
+	{
+		return;
+		// throw InvalidSessionIdValueException();
+	}
+
+	session_id = value;
 }
 
 void Banker::SetTurnNumber( int value )

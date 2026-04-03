@@ -4,6 +4,7 @@
 
 #include "BrokerMessages.hpp"
 #include "MGLib.h"
+#include "SessionsPlanner.hpp"
 #include <cstring>
 
 
@@ -73,12 +74,13 @@ const char* BrokerMessages::TakeMessage( int message_code )
 }
 
 
-MulticastActionsExec::MulticastActionsExec( const Banker& banker, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, Banker>& egm )
-	: game_session( banker ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
+MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& egm )
+	: game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.MakeBrokerActions( MulticastActionsExec::BROKER_ACTIONS_COUNT );
 
+	session_id				=			0;
 	auction_type			=			0;
 	left_player_id			=			0;
 
@@ -101,12 +103,15 @@ MulticastActionsExec::MulticastActionsExec( const Banker& banker, const Sender& 
 
 void MulticastActionsExec::PutMessage( const char** message_tokens, int tokens_count )
 {
-	for ( int i = AUCTION_TYPE_PARAM_TOKEN; i < tokens_count; ++i )
+	for ( int i = SESSION_ID_PARAM_TOKEN; i < tokens_count; ++i )
 	{
 		if ( ( message_tokens[i] != nullptr ) && ( strcmp(message_tokens[i], "") != 0 ) )
 		{
 			switch ( i )
 			{
+				case SESSION_ID_PARAM_TOKEN:
+					session_id = atoi(message_tokens[i]);
+					break;
 				case AUCTION_TYPE_PARAM_TOKEN:
 					auction_type = atoi(message_tokens[i]);
 					break;
@@ -130,6 +135,7 @@ void MulticastActionsExec::CheckMessageCode( int message_code ) const
 
 void MulticastActionsExec::SendReportOnTurn()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -142,6 +148,8 @@ void MulticastActionsExec::SendReportOnTurn()
 
 void MulticastActionsExec::AddEmptyAuctionRequest()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	List<Item<MarketData>>& requests = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(game_session).GetSourcesRequests() : const_cast<Banker&>(game_session).GetProductsRequests();
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
@@ -166,6 +174,8 @@ void MulticastActionsExec::AddEmptyAuctionRequest()
 
 void MulticastActionsExec::PayCharges()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -199,6 +209,8 @@ void MulticastActionsExec::PayCharges()
 
 void MulticastActionsExec::CheckBuildingFactories()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -248,6 +260,8 @@ void MulticastActionsExec::CheckBuildingFactories()
 
 void MulticastActionsExec::PrepareNewTurn()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -289,6 +303,8 @@ void MulticastActionsExec::PrepareNewTurn()
 
 void MulticastActionsExec::PreparePlayersState()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -310,6 +326,8 @@ void MulticastActionsExec::PreparePlayersState()
 
 void MulticastActionsExec::SendAuctionsResults()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -322,6 +340,8 @@ void MulticastActionsExec::SendAuctionsResults()
 
 void MulticastActionsExec::SendPlayersBankrot()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -337,6 +357,8 @@ void MulticastActionsExec::SendPlayersBankrot()
 
 void MulticastActionsExec::SendNewPlayerConnect()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -349,6 +371,8 @@ void MulticastActionsExec::SendNewPlayerConnect()
 
 void MulticastActionsExec::SendStartTime()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -363,6 +387,8 @@ void MulticastActionsExec::SendStartTime()
 
 void MulticastActionsExec::SendStartCancelled()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -373,6 +399,8 @@ void MulticastActionsExec::SendStartCancelled()
 
 void MulticastActionsExec::SendGameStarted()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -383,6 +411,8 @@ void MulticastActionsExec::SendGameStarted()
 
 void MulticastActionsExec::QuitPlayer()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -415,11 +445,12 @@ void MulticastActionsExec::QuitPlayer()
 }
 
 
-GameMessages::GameMessages( const Banker& banker ) : game_session( banker )
+GameMessages::GameMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.MakeBrokerActions( GameMessages::BROKER_ACTIONS_COUNT );
 
+	sender_id				=			0;
 	left_player_id			=			0;
 	time_to_start			=			0;
 	sender_id				=			0;
@@ -450,12 +481,15 @@ GameMessages::GameMessages( const Banker& banker ) : game_session( banker )
 
 void GameMessages::PutMessage( const char** message_tokens, int tokens_count )
 {
-	for ( int i = LEFT_PLAYER_ID_PARAM_TOKEN; i < tokens_count; ++i )
+	for ( int i = SESSION_ID_PARAM_TOKEN; i < tokens_count; ++i )
 	{
 		if ( ( message_tokens[i] != nullptr ) && ( strcmp(message_tokens[i], "") != 0 ) )
 		{
 			switch ( i )
 			{
+				case SESSION_ID_PARAM_TOKEN:
+					session_id = atoi(message_tokens[i]);
+					break;
 				case LEFT_PLAYER_ID_PARAM_TOKEN:
 					left_player_id = atoi(message_tokens[i]);
 					break;
@@ -488,8 +522,10 @@ void GameMessages::CheckMessageCode( int message_code ) const
 
 void GameMessages::LostLobbyPlayerMessage()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	char lp_buf[10];
-	itoa(GetGameSession().GetLobbyPlayers(), lp_buf, 9);
+	itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
 	itoa(MAX_PLAYERS, max_pl_buf, 9);
@@ -508,8 +544,10 @@ void GameMessages::LostLobbyPlayerMessage()
 
 void GameMessages::LostAlivePlayerMessage()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	char ap_buf[10];
-	itoa( GetGameSession().GetAlivePlayers(), ap_buf, 9 );
+	itoa( game_session.GetAlivePlayers(), ap_buf, 9 );
 
 	char left_p_num_buf[10];
 	itoa( left_player_id, left_p_num_buf, 9 );
@@ -577,7 +615,9 @@ void GameMessages::GameAlreadyStartedMessage()
 
 void GameMessages::StartGameInfoMessage()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_id );
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
+	const Player* sender_p = game_session.GetPlayers().GetPlayerByUID( sender_id );
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
@@ -596,10 +636,10 @@ void GameMessages::StartGameInfoMessage()
 	itoa(sender_p->GetUID(), p_num, 9);
 
 	char ap[10];
-	itoa(GetGameSession().GetAlivePlayers(), ap, 9);
+	itoa(game_session.GetAlivePlayers(), ap, 9);
 
 	char tn[10];
-	itoa(GetGameSession().GetTurnNumber(), tn, 9);
+	itoa(game_session.GetTurnNumber(), tn, 9);
 
 	char p_money[20];
 	itoa(sender_p->GetMoney(), p_money, 19);
@@ -620,16 +660,16 @@ void GameMessages::StartGameInfoMessage()
 	itoa(sender_p->GetBuiltFactories(), p_bf, 9);
 
 	char sa[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
 
 	char smp[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
 
 	char pa[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductsAmount(), pa, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
 
 	char pmp[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
 
 
 	const char* message_tokens[] =
@@ -667,8 +707,10 @@ void GameMessages::StartCancelledMessage()
 
 void GameMessages::NewPlayerConnectMessage()
 {
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	char lp_buf[10];
-	itoa(GetGameSession().GetLobbyPlayers(), lp_buf, 9);
+	itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
 	itoa(MAX_PLAYERS, max_pl_buf, 9);
@@ -722,6 +764,7 @@ void GameMessages::AuctionResultsMessage()
 	player_report pr[MAX_PLAYERS];
 	memset(pr, 0, sizeof(player_report) * MAX_PLAYERS);
 
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
 	const char* message_tokens[ PL_REP_FIELDS_NUM * MAX_PLAYERS + 1 ] { nullptr };
 
@@ -729,29 +772,29 @@ void GameMessages::AuctionResultsMessage()
 	message_tokens[0] = info_game_messages[AUCTION_RESULTS];
 
 	int tokens_amount = 1;
-	for ( int i = 0; i < GetGameSession().GetReadyPlayers(); ++i )
+	for ( int i = 0; i < game_session.GetReadyPlayers(); ++i )
 	{
-		itoa(GetGameSession().GetTurnNumber(), pr[i].tn, TURN_SIZE);
+		itoa(game_session.GetTurnNumber(), pr[i].tn, TURN_SIZE);
 		message_tokens[tokens_amount] = pr[i].tn;
 		++tokens_amount;
 
-		itoa(GetGameSession().GetPlayers()[i]->GetUID(), pr[i].pnum, PLAYER_NUM_SIZE);
+		itoa(game_session.GetPlayers()[i]->GetUID(), pr[i].pnum, PLAYER_NUM_SIZE);
 		message_tokens[tokens_amount] = pr[i].pnum;
 		++tokens_amount;
 
-		itoa(GetGameSession().GetPlayers()[i]->GetAuctionReport().GetSoldSources(), pr[i].ssnum, SOLD_SOURCES_SIZE);
+		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldSources(), pr[i].ssnum, SOLD_SOURCES_SIZE);
 		message_tokens[tokens_amount] = pr[i].ssnum;
 		++tokens_amount;
 
-		itoa(GetGameSession().GetPlayers()[i]->GetAuctionReport().GetSoldPrice(), pr[i].spnum, SOLD_PRICE_SIZE);
+		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldPrice(), pr[i].spnum, SOLD_PRICE_SIZE);
 		message_tokens[tokens_amount] = pr[i].spnum;
 		++tokens_amount;
 
-		itoa(GetGameSession().GetPlayers()[i]->GetAuctionReport().GetBoughtProducts(), pr[i].bpnum, BOUGHT_PRODS_SIZE);
+		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtProducts(), pr[i].bpnum, BOUGHT_PRODS_SIZE);
 		message_tokens[tokens_amount] = pr[i].bpnum;
 		++tokens_amount;
 
-		itoa(GetGameSession().GetPlayers()[i]->GetAuctionReport().GetBoughtPrice(), pr[i].bprnum, BOUGHT_PRICE_SIZE);
+		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtPrice(), pr[i].bprnum, BOUGHT_PRICE_SIZE);
 		message_tokens[tokens_amount] = pr[i].bprnum;
 		++tokens_amount;
 	}
@@ -761,7 +804,9 @@ void GameMessages::AuctionResultsMessage()
 
 void GameMessages::NewTurnMessage()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_id );
+	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
+	const Player* sender_p = game_session.GetPlayers().GetPlayerByUID( sender_id );
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
@@ -777,19 +822,19 @@ void GameMessages::NewTurnMessage()
 	}
 
 	char tn[10];
-	itoa(GetGameSession().GetTurnNumber(), tn, 9);
+	itoa(game_session.GetTurnNumber(), tn, 9);
 
 	char sa[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
 
 	char smp[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
 
 	char pa[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductsAmount(), pa, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
 
 	char pmp[10];
-	itoa(const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
+	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
 
 
 	const char* message_tokens[] =
@@ -888,11 +933,12 @@ void GameMessages::ServerFullMessage()
 }
 
 
-BCBrokerMessages::BCBrokerMessages( const Banker& banker ) : game_session( banker )
+BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.MakeBrokerActions( BCBrokerMessages::BROKER_ACTIONS_COUNT );
 
+	session_id				=			0;
 	sender_player_id		=			0;
 	target_player_id		=			0;
 	sources_amount			=			0;
@@ -942,12 +988,15 @@ BCBrokerMessages::BCBrokerMessages( const Banker& banker ) : game_session( banke
 
 void BCBrokerMessages::PutMessage( const char** message_tokens, int tokens_count )
 {
-	for ( int i = SENDER_PLAYER_ID_PARAM_TOKEN; i < tokens_count; ++i )
+	for ( int i = SESSION_ID_PARAM_TOKEN; i < tokens_count; ++i )
 	{
 		if ( ( message_tokens[i] != nullptr ) && ( strcmp(message_tokens[i], "") != 0 ) )
 		{
 			switch ( i )
 			{
+				case SESSION_ID_PARAM_TOKEN:
+					session_id = atoi(message_tokens[i]);
+					break;
 				case SENDER_PLAYER_ID_PARAM_TOKEN:
 					sender_player_id = atoi(message_tokens[i]);
 					break;
@@ -983,27 +1032,27 @@ void BCBrokerMessages::CheckMessageCode( int message_code ) const
 
 void BCBrokerMessages::MarketCmdSourcesAmount()
 {
-	itoa( const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourcesAmount(), result_message, MESSAGE_SIZE-1 );
+	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourcesAmount(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdSourceMinPrice()
 {
-	itoa( const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourceMinPrice(), result_message, MESSAGE_SIZE-1 );
+	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourceMinPrice(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdProductsAmount()
 {
-	itoa( const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductsAmount(), result_message, MESSAGE_SIZE-1 );
+	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductsAmount(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdProductMaxPrice()
 {
-	itoa( const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice(), result_message, MESSAGE_SIZE-1 );
+	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductMaxPrice(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::PlayerCmdIsTargetNotFound()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1021,7 +1070,7 @@ void BCBrokerMessages::PlayerCmdIsTargetNotFound()
 
 void BCBrokerMessages::PlayerCmdGetTargetUID()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1040,7 +1089,7 @@ void BCBrokerMessages::PlayerCmdGetTargetUID()
 
 void BCBrokerMessages::PlayerCmdGetTargetMoney()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1059,7 +1108,7 @@ void BCBrokerMessages::PlayerCmdGetTargetMoney()
 
 void BCBrokerMessages::PlayerCmdGetTargetIncome()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1078,7 +1127,7 @@ void BCBrokerMessages::PlayerCmdGetTargetIncome()
 
 void BCBrokerMessages::PlayerCmdGetTargetSources()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1097,7 +1146,7 @@ void BCBrokerMessages::PlayerCmdGetTargetSources()
 
 void BCBrokerMessages::PlayerCmdGetTargetProducts()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1116,7 +1165,7 @@ void BCBrokerMessages::PlayerCmdGetTargetProducts()
 
 void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1135,7 +1184,7 @@ void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
 
 void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1154,7 +1203,7 @@ void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
 
 void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1173,7 +1222,7 @@ void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
 
 void BCBrokerMessages::PlayerSenderIsBot()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1198,7 +1247,7 @@ void BCBrokerMessages::PlayerSenderIsBot()
 
 void BCBrokerMessages::PlayerCmdGetTargetProduced()
 {
-	const Player* target_p = GetGameSession().GetPlayers().GetPlayerByUID( target_player_id );
+	const Player* target_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( target_player_id );
 
 	if ( target_p != nullptr )
 	{
@@ -1217,12 +1266,12 @@ void BCBrokerMessages::PlayerCmdGetTargetProduced()
 
 void BCBrokerMessages::ListCmdGetAlivePlayers()
 {
-	itoa( GetGameSession().GetAlivePlayers(), result_message, MESSAGE_SIZE-1 );
+	itoa( (*game_sessions.GetSessionById(session_id)).GetAlivePlayers(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::PlayerSenderIsTurn()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1247,7 +1296,7 @@ void BCBrokerMessages::PlayerSenderIsTurn()
 
 void BCBrokerMessages::ProdCmdSourcesCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1272,7 +1321,7 @@ void BCBrokerMessages::ProdCmdSourcesCondition()
 
 void BCBrokerMessages::ProdCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1297,7 +1346,7 @@ void BCBrokerMessages::ProdCmdMoneyCondition()
 
 void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1322,7 +1371,7 @@ void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
 
 void BCBrokerMessages::ProdCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1344,7 +1393,7 @@ void BCBrokerMessages::ProdCmdUpdateGameState()
 
 void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID(sender_player_id);
 
 	if ( sender_p != nullptr )
 	{
@@ -1371,7 +1420,7 @@ void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID(sender_player_id);
 
 	if ( sender_p != nullptr )
 	{
@@ -1390,7 +1439,7 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID(sender_player_id);
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID(sender_player_id);
 
 	if ( sender_p != nullptr )
 	{
@@ -1422,7 +1471,7 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 
 void BCBrokerMessages::BuildCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1447,7 +1496,7 @@ void BCBrokerMessages::BuildCmdMoneyCondition()
 
 void BCBrokerMessages::BuildCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1471,7 +1520,7 @@ void BCBrokerMessages::BuildCmdUpdateGameState()
 
 void BCBrokerMessages::BuyCmdIsSentSourceRequest()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1496,7 +1545,7 @@ void BCBrokerMessages::BuyCmdIsSentSourceRequest()
 
 void BCBrokerMessages::BuyCmdSourcesCondition()
 {
-	if ( ( sources_amount > 0 ) && ( sources_amount <= const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourcesAmount() ) )
+	if ( ( sources_amount > 0 ) && ( sources_amount <= const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetCurrentMarketState().GetSourcesAmount() ) )
 	{
 		strcpy(result_message, true_str);
 		return;
@@ -1507,7 +1556,7 @@ void BCBrokerMessages::BuyCmdSourcesCondition()
 
 void BCBrokerMessages::BuyCmdPriceCondition()
 {
-	if ( ( source_price >= const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetSourceMinPrice() ) )
+	if ( ( source_price >= const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetCurrentMarketState().GetSourceMinPrice() ) )
 	{
 		strcpy(result_message, true_str);
 		return;
@@ -1518,7 +1567,7 @@ void BCBrokerMessages::BuyCmdPriceCondition()
 
 void BCBrokerMessages::BuyCmdMoneyCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1543,7 +1592,7 @@ void BCBrokerMessages::BuyCmdMoneyCondition()
 
 void BCBrokerMessages::BuyCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1556,7 +1605,7 @@ void BCBrokerMessages::BuyCmdUpdateGameState()
 		MarketData data;
 		data.MakeData( sender_player_id, sources_amount, source_price );
 
-		const_cast<Banker&>(GetGameSession()).GetSourcesRequests().Insert( data );
+		const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetSourcesRequests().Insert( data );
 		const_cast<Player*>(sender_p)->SetSentSourceRequest();
 		return;
 	}
@@ -1566,7 +1615,7 @@ void BCBrokerMessages::BuyCmdUpdateGameState()
 
 void BCBrokerMessages::SellCmdIsSentProductRequest()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1591,7 +1640,7 @@ void BCBrokerMessages::SellCmdIsSentProductRequest()
 
 void BCBrokerMessages::SellCmdAmountCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1616,7 +1665,7 @@ void BCBrokerMessages::SellCmdAmountCondition()
 
 void BCBrokerMessages::SellCmdPriceCondition()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1626,7 +1675,7 @@ void BCBrokerMessages::SellCmdPriceCondition()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		if ( ( product_price > 0 ) && ( product_price <= const_cast<Banker&>(GetGameSession()).GetCurrentMarketState().GetProductMaxPrice() ) )
+		if ( ( product_price > 0 ) && ( product_price <= const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetCurrentMarketState().GetProductMaxPrice() ) )
 		{
 			strcpy(result_message, true_str);
 			return;
@@ -1641,7 +1690,7 @@ void BCBrokerMessages::SellCmdPriceCondition()
 
 void BCBrokerMessages::SellCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
 
 	if ( sender_p != nullptr )
 	{
@@ -1654,7 +1703,7 @@ void BCBrokerMessages::SellCmdUpdateGameState()
 		MarketData data;
 		data.MakeData( sender_player_id, products_amount, product_price );
 
-		const_cast<Banker&>(GetGameSession()).GetProductsRequests().Insert( data );
+		const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetProductsRequests().Insert( data );
 		const_cast<Player*>(sender_p)->SetSentProductsRequest();
 		return;
 	}
@@ -1664,7 +1713,8 @@ void BCBrokerMessages::SellCmdUpdateGameState()
 
 void BCBrokerMessages::TurnCmdUpdateGameState()
 {
-	const Player* sender_p = GetGameSession().GetPlayers().GetPlayerByUID( sender_player_id );
+	const Player* sender_p = (*game_sessions.GetSessionById(session_id)).GetPlayers().GetPlayerByUID( sender_player_id );
+	const Banker& game_session = *game_sessions.GetSessionById(session_id);
 
 	if ( sender_p != nullptr )
 	{
@@ -1675,7 +1725,7 @@ void BCBrokerMessages::TurnCmdUpdateGameState()
 		}
 
 		const_cast<Player*>(sender_p)->SetTurn();
-		const_cast<Banker&>(GetGameSession()).SetReadyPlayers( GetGameSession().GetReadyPlayers() + 1 );
+		const_cast<Banker&>(game_session).SetReadyPlayers( game_session.GetReadyPlayers() + 1 );
 		return;
 	}
 
@@ -1683,7 +1733,9 @@ void BCBrokerMessages::TurnCmdUpdateGameState()
 }
 void BCBrokerMessages::TurnCmdGetWypaToken()
 {
-	itoa( GetGameSession().GetAlivePlayers() - GetGameSession().GetReadyPlayers(), result_message, MESSAGE_SIZE-1 );
+	const Banker& game_session = *game_sessions.GetSessionById(session_id);
+
+	itoa( game_session.GetAlivePlayers() - game_session.GetReadyPlayers(), result_message, MESSAGE_SIZE-1 );
 }
 
 #endif

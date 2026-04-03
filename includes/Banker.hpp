@@ -108,6 +108,7 @@ private:
 class Banker
 {
 private:
+	int session_id;
 	bool game_state_prepared;
 	bool game_started;
 	int turn_number;
@@ -120,7 +121,7 @@ private:
 	List<Item<MarketData>> sources_requests;
 	List<Item<MarketData>> products_requests;
 public:
-	Banker();
+	Banker( int );
 	bool IsGameStatePrepared() const { return game_state_prepared; }
 	void SetGameStatePrepared() { game_state_prepared = true; }
 	void UnsetPlayersPrepared() { game_state_prepared = false; }
@@ -128,6 +129,8 @@ public:
 	void SetGameStarted() { game_started = true; }
 	void UnsetGameStarted() { game_started = false; }
 
+	const Player* GetFree() const;
+	int GetId() const { return session_id; }
 	int GetTurnNumber() const { return turn_number; }
 	int GetAlivePlayers() const { return alive_players; }
 	int GetReadyPlayers() const { return ready_players; }
@@ -146,6 +149,8 @@ public:
 
 	void CleanPlayer( int );
 private:
+	void SetId( int );
+	Banker() = delete;
 	Banker( const Banker& ) = delete;
 	Banker( Banker&& ) = delete;
 	void operator=( const Banker& ) = delete;
