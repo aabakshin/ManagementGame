@@ -77,10 +77,6 @@ static void reverse(char* s);
 static int num_digit_cnt(int number);
 
 
-
-
-
-
 int cut_str(char* s, int s_size, int ch)
 {
 	if (

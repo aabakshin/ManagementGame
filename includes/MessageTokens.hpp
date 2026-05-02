@@ -18,7 +18,7 @@ private:
 	int msg_tokens_count;
 public:
 	MessageTokens() {}
-	void MakeMessageTokens( int );
+	void Make( int );
 	const char*& operator[]( int );
 	const char** GetValue() const { return message_tokens; }
 	int GetMsgTokensCount() const { return msg_tokens_count; }

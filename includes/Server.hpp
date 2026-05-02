@@ -43,7 +43,7 @@ private:
 	Receiver receiver;
 	MessageTokens msg_tokens;
 public:
-	Server( const char*, const char* );
+	Server() {}
 	~Server();
 	static void SetAlrmFlag() { alrm_flag = true; }
 	static void UnsetAlrmFlag() { alrm_flag = false; }
@@ -60,9 +60,9 @@ public:
 	void SetTimerFlag() { timer_flag = true; }
 	void UnsetTimerFlag() { timer_flag = false; }
 	bool IsTimerFlag() { return timer_flag; }
+	void Make( const char*, const char* );
 	int Run();
 private:
-	Server() = delete;
 	Server( const Server& ) = delete;
 	Server( Server&& ) = delete;
 	void operator=( const Server& ) = delete;

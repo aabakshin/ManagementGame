@@ -15,9 +15,9 @@ private:
 	T* brokerPTR { nullptr };
 public:
 	EncapsulatedBrokerMessages() {}
-	void MakeBroker( const U& );
+	void Make( const U& );
 	template <class X, class Y, class Z>
-	void MakeBroker( const U&, const X&, const Y&, const Z& );
+	void Make( const U&, const X&, const Y&, const Z& );
 	const T& GetBroker() const;
 	~EncapsulatedBrokerMessages();
 private:
@@ -37,7 +37,7 @@ public:
 		int actions_count;
 	public:
 		BrokerActions() {}
-		void MakeBrokerActions( int );
+		void Make( int );
 		std::function<void()>& operator[]( int );
 		~BrokerActions();
 	private:

@@ -36,7 +36,7 @@ static const char* const valid_commands[] = {
 
 Command::Command( int tokens_count )
 {
-	msg_tokens.MakeMessageTokens( tokens_count );
+	msg_tokens.Make( tokens_count );
 }
 
 void Command::SetName( const char* cmd_name )

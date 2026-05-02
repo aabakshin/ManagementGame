@@ -18,7 +18,7 @@ void MessageTokens::NullifyMessageTokens()
 	}
 }
 
-void MessageTokens::MakeMessageTokens( int tokens_count )
+void MessageTokens::Make( int tokens_count )
 {
 	message_tokens = new const char*[tokens_count];
 

@@ -16,14 +16,14 @@ extern const char* info_game_messages[];
 
 
 template <class T, class U>
-void EncapsulatedBrokerMessages<T,U>::MakeBroker( const U& context_object )
+void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object )
 {
 	brokerPTR = new T( context_object );
 }
 
 template <class T, class U>
 template <class X, class Y, class Z>
-void EncapsulatedBrokerMessages<T,U>::MakeBroker( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4 )
+void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4 )
 {
 	brokerPTR = new T( context_object1, context_object2, context_object3, context_object4 );
 }
@@ -40,7 +40,7 @@ EncapsulatedBrokerMessages<T,U>::~EncapsulatedBrokerMessages()
 	delete brokerPTR;
 }
 
-void BrokerMessages::BrokerActions::MakeBrokerActions( int a_count )
+void BrokerMessages::BrokerActions::Make( int a_count )
 {
 	actions_count = a_count;
 
@@ -78,7 +78,7 @@ MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, con
 	: game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.MakeBrokerActions( MulticastActionsExec::BROKER_ACTIONS_COUNT );
+	br_acts.Make( MulticastActionsExec::BROKER_ACTIONS_COUNT );
 
 	session_id				=			0;
 	auction_type			=			0;
@@ -448,7 +448,7 @@ void MulticastActionsExec::QuitPlayer()
 GameMessages::GameMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.MakeBrokerActions( GameMessages::BROKER_ACTIONS_COUNT );
+	br_acts.Make( GameMessages::BROKER_ACTIONS_COUNT );
 
 	sender_id				=			0;
 	left_player_id			=			0;
@@ -936,7 +936,7 @@ void GameMessages::ServerFullMessage()
 BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.MakeBrokerActions( BCBrokerMessages::BROKER_ACTIONS_COUNT );
+	br_acts.Make( BCBrokerMessages::BROKER_ACTIONS_COUNT );
 
 	session_id				=			0;
 	sender_player_id		=			0;

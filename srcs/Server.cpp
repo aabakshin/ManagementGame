@@ -185,15 +185,15 @@ void Server::ListenSocketInit()
 	}
 }
 
-Server::Server( const char* addr, const char* port )
+void Server::Make( const char* addr, const char* port )
 {
 	session_planner.Make( SESSIONS_COUNT );
 
-	EBCbroker.MakeBroker( session_planner );
-	EGameMessages.MakeBroker( session_planner );
-	EMultiActionsExec.MakeBroker( session_planner, sender, msg_tokens, EGameMessages );
+	EBCbroker.Make( session_planner );
+	EGameMessages.Make( session_planner );
+	EMultiActionsExec.Make( session_planner, sender, msg_tokens, EGameMessages );
 
-	msg_tokens.MakeMessageTokens( MessageTokens::MESSAGE_TOKENS_COUNT );
+	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
 
 	UnsetAlrmFlag();
 	UnsetExitFlag();
