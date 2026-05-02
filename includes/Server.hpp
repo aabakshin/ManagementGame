@@ -22,12 +22,12 @@ private:
 				SESSIONS_COUNT					=			  4
 	};
 
-	static bool alrm_flag;
+	//static bool alrm_flag;
 	static bool exit_flag;
 	static int sig_number;
 	int sent_msgs_count;
 	int recv_msgs_count;
-	bool timer_flag;
+	//bool timer_flag;
 	int ls;
 	struct addrinfo* bind_address;
 	char address_buffer[ADDRESS_SIZE];
@@ -45,9 +45,9 @@ private:
 public:
 	Server() {}
 	~Server();
-	static void SetAlrmFlag() { alrm_flag = true; }
-	static void UnsetAlrmFlag() { alrm_flag = false; }
-	static bool IsAlrmFlag() { return alrm_flag; };
+	//static void SetAlrmFlag() { alrm_flag = true; }
+	//static void UnsetAlrmFlag() { alrm_flag = false; }
+	//static bool IsAlrmFlag() { return alrm_flag; };
 	static void SetExitFlag() { exit_flag = true; }
 	static void UnsetExitFlag() { exit_flag = false; }
 	static bool IsExitFlag() { return exit_flag; }
@@ -57,9 +57,9 @@ public:
 	void SetSentMsgsCount( int msgs_value );
 	int GetRecvMsgsCount() const { return recv_msgs_count; }
 	void SetRecvMsgsCount( int msgs_value );
-	void SetTimerFlag() { timer_flag = true; }
-	void UnsetTimerFlag() { timer_flag = false; }
-	bool IsTimerFlag() { return timer_flag; }
+	//void SetTimerFlag() { timer_flag = true; }
+	//void UnsetTimerFlag() { timer_flag = false; }
+	//bool IsTimerFlag() { return timer_flag; }
 	void Make( const char*, const char* );
 	int Run();
 private:
@@ -82,19 +82,21 @@ private:
 	void ShowReceivedMessage() const;
 	void NewClientHandle();
 	void ClientsInputHandle();
-	void GameEventsHandle();
-	void ErrorEvent( int, const char*, int );
+	void CheckGameEvents();
+	void ErrorNewClient( int, const char*, int );
 	void AddNewClientToSession( int, const char* );
 	bool QuitPlayer( int, int );
 	void ChangeMarketState( int );
 	void PrepareNewTurn( int );
 	void ShowAuctionInfo( int, const char* auction_type_msg, const Item<MarketData>* );
 	void ReportOnTurn( int );
-	void EndGameTurn( int );
 	void SortRequestsByPrice( int session_id, const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
 	bool CheckPlayersReports( int, List<Item<MarketData>>&, int );
 	void StartAuction( int, const List<Item<MarketData>>&, int auction_type );
-	void PrepareGameState( int );
+	void EndGameTurnEvent( int );
+	void PrepareGameStateEvent( int );
+	void InitStartEvent( int );
+	void CheckStartEvent( int );
 };
 
 
