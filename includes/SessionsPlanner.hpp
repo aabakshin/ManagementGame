@@ -10,6 +10,8 @@
 #include <sys/timerfd.h>
 #include <cstdint>
 #include <utility>
+#include <list>
+#include <string>
 
 
 class MessageTokens;
@@ -86,23 +88,27 @@ public:
 	const Banker* GetSessionById( int ) const;
 	int GetSessionsCount() const { return current_sessions_count; }
 	const StartSessionsTimers& GetStartTimers() const { return start_timers; }
+	std::list<int> GetValidFdsList() const;
 	void AddSessions();
 	void AddNewClientToSession( int, const char* );
 	bool IsCorrectIdentityMsg( const char* );
 	bool IsPlayerFd( int, std::pair<int,int>& ) const;
 	void PlayerEventHandle( const std::pair<int,int>& );
-	void ShowAuctionInfo( int, const char* auction_type_msg, const Item<MarketData>* );
-	void ReportOnTurn( int );
+	void QuitPlayer( int, int );
+
+	void ShowAuctionInfo( int, const char*, const Item<MarketData>* );
 	void ChangeMarketState( int );
 	bool CheckPlayersReports( int, List<Item<MarketData>>&, int );
 	void SortRequestsByPrice( int session_id, const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
 	void StartAuction( int, const List<Item<MarketData>>&, int auction_type );
-	void PrepareNewTurn( int );
-	void EndGameTurnEvent( int );
+
+	void EndGameTurnEvent( int, std::list<std::pair<int,std::string>>& );
 	void PrepareGameStateEvent( int );
 	void InitStartEvent( int );
 	void CheckStartEvent( int );
-	void GameEventsHandle();
+	void ReportOnTurnEvent( int );
+	void PrepareNewTurnEvent( int );
+	void GameEventsHandle( std::list<std::pair<int,std::string>>& );
 private:
 	SessionsPlanner( const SessionsPlanner& ) = delete;
 	SessionsPlanner( SessionsPlanner&& ) = delete;

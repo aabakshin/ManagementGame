@@ -3,7 +3,6 @@
 
 
 #include "Server.hpp"
-#include "BrokerMessages.hpp"
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
@@ -14,18 +13,13 @@
 #include <netdb.h>
 #include <ctime>
 #include <list>
+#include <string>
 
 
 enum
 {
 					LISTEN_QUEUE_LEN			=						  5
 };
-
-
-// Описаны в модуле Banker
-extern const double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
-extern const int price_table[MARKET_LEVEL_NUMBER][2];
-extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
 
 /* Ф-я-обработчик сигнала SIGINT */
@@ -136,13 +130,13 @@ void Server::ListenSocketInit()
 
 void Server::Make( const char* addr, const char* port )
 {
-	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT );
-
 	UnsetExitFlag();
 	SetSignalNum( 0 );
 	SetAddrBuffer( addr, port );
 	ListenSocketInit();
 	SetMaxFd( 0 );
+
+	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT );
 
 	printf("Waiting connections to %s port...\n", port);
 }
@@ -163,26 +157,11 @@ void Server::ConcatAddrPort( int service_size )
 	address_buffer[i] = '\0';
 }
 
-void Server::CloseConnection( int session_id, int player_number )
+void Server::CloseConnection( int fd, std::string address )
 {
-	const Banker& banker = *sessions_planner.GetSessionById( session_id );
-
-	const Player* p = banker.GetPlayers().GetPlayerByUID( player_number );
-	if ( p != nullptr )
-	{
-		int p_fd = p->GetFd();
-
-		char ip[100] = { 0 };
-		strncpy( ip, p->GetAddr(),  Receiver::ADDRESS_SIZE );
-
-		const_cast<Banker&>(banker).CleanPlayer(player_number);
-		close(p_fd);
-		FD_CLR(p_fd, &readfds);
-		printf("[-] Lost connection from [%s]\n", ip);
-		return;
-	}
-
-	//throw InvalidPlayerException();
+	close(fd);
+	FD_CLR(fd, &readfds);
+	printf("[-] Lost connection from [%s]\n", address.c_str());
 }
 
 void Server::Stop( int forcely )
@@ -190,36 +169,20 @@ void Server::Stop( int forcely )
 	if ( forcely )
 		printf("%s", "\n\n========== SERVER IS STOPPING WORK FORCELY ==========\n");
 
-	for ( int i = SessionsPlanner::DEFAULT_NEXT_SESSION_ID; i <= sessions_planner.GetSessionsCount(); ++i )
-	{
-		const Banker& banker = *sessions_planner.GetSessionById( i );
-		for ( int j = 0; j < MAX_PLAYERS; ++j )
-			CloseConnection( i, banker.GetPlayers().GetUIDByIdx( j ) );
-	}
+	std::list<std::pair<int, std::string>> players_fds;
+	sessions_planner.QuitAllPlayers( players_fds );
+
+	for ( const auto& close_pair : players_fds )
+		CloseConnection( close_pair.first, close_pair.second );
+
+
+	// here need to add closing timers fds
+
 
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
 
 	exit(0);
-}
-
-bool Server::QuitPlayer( int session_id, int player_number )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( player_number, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
-
-	CloseConnection( session_id, player_number );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
-
-	if ( sessions_planner.GetSessionById( session_id )->GetAlivePlayers() <= 1 )
-	{
-		SetExitFlag();
-		return true;
-	}
-
-	return false;
 }
 
 void Server::NewClientHandle()
@@ -255,9 +218,7 @@ void Server::NewClientHandle()
 	}
 	catch( ... )
 	{
-		close(cs);
-		printf("Lost connection from (%s)\n", new_client_addr);
-		return;
+		CloseConnection(cs, new_client_addr);
 	}
 }
 
@@ -291,17 +252,17 @@ void Server::IncomingEventsHandle()
 				}
 				catch ( const QuitCommandSuccessException& ex )
 				{
-					QuitPlayer( ex.GetSessionID(), ex.GetUID() );
+					CloseConnection( ex.GetFd(), ex.GetAddress() );
 					continue;
 				}
 				catch ( const InternalServerErrorException& ex )
 				{
-					QuitPlayer( ex.GetSessionID(), ex.GetUID() );
+					CloseConnection( ex.GetFd(), ex.GetAddress() );
 					continue;
 				}
 				catch ( const LostConnectionException& ex )
 				{
-					QuitPlayer( ex.GetSessionID(), ex.GetUID() );
+					CloseConnection( ex.GetFd(), ex.GetAddress() );
 				}
 			}
 		}
@@ -324,22 +285,6 @@ void Server::RefillReadfds()
 		if ( fd > max_fd )
 			max_fd = fd;
 	}
-
-	/*for ( int i = SessionsPlanner::DEFAULT_NEXT_SESSION_ID; i <= session_planner.GetSessionsCount(); ++i )
-	{
-		for ( int j = 0; j < MAX_PLAYERS; ++j )
-		{
-			const Player* p = session_planner.GetSessionById( i )->GetPlayers()[j];
-			if ( !p->IsFree() )
-			{
-				int p_fd = p->GetFd();
-
-				FD_SET( p_fd, &readfds );
-				if ( p_fd > max_fd )
-					max_fd = p_fd;
-			}
-		}
-	}*/
 }
 
 int Server::Run()
@@ -374,7 +319,12 @@ int Server::Run()
 			IncomingEventsHandle();
 		}
 
-		sessions_planner.GameEventsHandle();
+		std::list<std::pair<int,std::string>> bankrots_fds;
+		sessions_planner.GameEventsHandle( bankrots_fds );
+
+		if ( !bankrots_fds.empty() )
+			for ( const auto& bankrot_pair : bankrots_fds )
+				CloseConnection( bankrot_pair.first, bankrot_pair.second );
 	}
 }
 

@@ -4,6 +4,7 @@
 
 #include "SessionsPlanner.hpp"
 #include <sys/select.h>
+#include <string>
 
 
 class Server
@@ -39,9 +40,8 @@ private:
 	int GetMaxFd() const { return max_fd; }
 	void SetMaxFd( int );
 	void ListenSocketInit();
-	void CloseConnection( int, int );
+	void CloseConnection( int, std::string );
 	void Stop( int forcely );
-	bool QuitPlayer( int, int );
 	void RefillReadfds();
 	void ConcatAddrPort( int );
 	void NewClientHandle();
