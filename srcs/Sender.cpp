@@ -6,6 +6,7 @@
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <cstdio>
 
 
 void Sender::SendMessage( const char* const* message_tokens, int tokens_count, int cs, const char* address )
@@ -74,6 +75,34 @@ void Sender::SendMessage( const char* msg, int cs, const char* address )
 		return;
 		// throw UnableSendDataException();
 	}
+}
+
+void Sender::SetSentMsgsCount( int msgs_value )
+{
+	if ( msgs_value < 0 )
+	{
+		return;
+		// throw InvalidValueException();
+	}
+
+	sent_msgs_count = msgs_value;
+}
+
+void Sender::ShowSentMessage() const
+{
+	printf("\n==================== (%d) ====================\n", GetSentMsgsCount());
+
+	for ( int i = 0; ( i < Sender::BUFSIZE ) && ( i < GetMessageLength() ); ++i )
+	{
+		printf("%3d ", GetMessage()[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Sent to [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", GetMessage(), GetTargetAddress(), GetSentBytes(), GetMessageLength(), GetSentMsgsCount());
 }
 
 bool Sender::IsSentMessage() const

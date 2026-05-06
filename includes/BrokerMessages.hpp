@@ -2,10 +2,12 @@
 #define BROKER_MESSAGES_HPP_SENTINEL
 
 
-#include "SessionsPlanner.hpp"
-#include "Sender.hpp"
-#include "MessageTokens.hpp"
 #include <functional>
+
+
+class SessionsPlanner;
+class Sender;
+class MessageTokens;
 
 
 template <class T, class U>

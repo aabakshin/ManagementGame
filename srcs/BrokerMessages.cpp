@@ -3,9 +3,10 @@
 
 
 #include "BrokerMessages.hpp"
-#include "MGLib.h"
 #include "SessionsPlanner.hpp"
+#include "MGLib.h"
 #include <cstring>
+#include <cstdio>
 
 
 static const char* const true_str = "true";

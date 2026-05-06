@@ -5,6 +5,7 @@
 #include "Receiver.hpp"
 #include "MGLib.h"
 #include <cstring>
+#include <cstdio>
 
 
 void Receiver::RecvMessage( int cs, const char* address )
@@ -38,6 +39,34 @@ bool Receiver::IsRecvMessage() const
 		return true;
 
 	return false;
+}
+
+void Receiver::SetRecvMsgsCount( int msgs_value )
+{
+	if ( msgs_value < 0 )
+	{
+		return;
+		// throw InvalidValueException();
+	}
+
+	recv_msgs_count = msgs_value;
+}
+
+void Receiver::ShowReceivedMessage() const
+{
+	printf("\n==================== (%d) ====================\n", GetRecvMsgsCount());
+
+	for ( int i = 0; ( i < Receiver::BUFSIZE ) && ( i < GetMessageLength() ); ++i )
+	{
+		printf("%3d ", GetMessage()[i]);
+		if ( ( (i+1) % 10 ) == 0 )
+			putchar('\n');
+	}
+	putchar('\n');
+
+	printf("\nmessage: <[ %s ]>\n"
+			"Received from [%s] %d\\%d bytes\n"
+			"==================== (%d) ====================\n\n", GetMessage(), GetTargetAddress(), GetRecvBytes(), GetMessageLength(), GetRecvMsgsCount());
 }
 
 void Receiver::Reset()

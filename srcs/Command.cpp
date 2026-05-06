@@ -5,7 +5,6 @@
 #include "Command.hpp"
 #include "BrokerMessages.hpp"
 #include "MGLib.h"
-#include "MessageTokens.hpp"
 #include <cstring>
 #include <cstdlib>
 

@@ -4,7 +4,7 @@
 
 class Sender
 {
-private:
+public:
 
 	enum
 	{
@@ -13,11 +13,13 @@ private:
 				SERVICE_SIZE					=            10
 	};
 
+private:
 	char message[BUFSIZE] { 0x00 };
 	int message_length { 0 };
 	int cur_pos { 0 };
 	int sent_bytes { 0 };
 	int target_socket { -1 };
+	int sent_msgs_count { 0 };
 	char target_address[ADDRESS_SIZE] { 0x00 };
 public:
 	Sender() {}
@@ -28,6 +30,9 @@ public:
 	const int GetSentBytes() const { return sent_bytes; }
 	const int GetTargetSocket() const { return target_socket; }
 	const char* GetTargetAddress() const { return target_address; }
+	int GetSentMsgsCount() const { return sent_msgs_count; }
+	void SetSentMsgsCount( int );
+	void ShowSentMessage() const;
 private:
 	Sender( const Sender& ) = delete;
 	Sender( Sender&& ) = delete;
