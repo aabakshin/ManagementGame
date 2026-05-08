@@ -163,7 +163,10 @@ void Server::CloseConnection( int fd, std::string address )
 	close(fd);
 	FD_CLR(fd, &readfds);
 
-	if ( strcmp( address.c_str(), "start_timers" ) != 0 )
+	if (
+			( strcmp( address.c_str(), "start_timers" ) != 0 )	&&
+			( strcmp( address.c_str(), "ls" ) != 0 )
+		)
 		printf("[-] Lost connection from [%s]\n", address.c_str());
 }
 
@@ -184,6 +187,8 @@ void Server::Stop( int forcely )
 		int fd = const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[i].GetTimerFd();
 		CloseConnection( fd, "start_timers" );
 	}
+
+	CloseConnection( ls, "ls" );
 
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");

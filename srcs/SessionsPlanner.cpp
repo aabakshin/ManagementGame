@@ -5,6 +5,7 @@
 #include "SessionsPlanner.hpp"
 #include "BrokerMessages.hpp"
 #include "MGLib.h"
+#include "Player.hpp"
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -687,6 +688,24 @@ bool SessionsPlanner::IsCorrectIdentityMsg( const char* identity_msg )
 			return true;
 
 	return false;
+}
+
+void SessionsPlanner::QuitAllPlayers( std::list<std::pair<int,std::string>>& players_fds )
+{
+	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
+	{
+		const Banker& banker = *GetSessionById( i );
+
+		for ( int j = 0; j < MAX_PLAYERS; ++j )
+		{
+			const Player* p = banker.GetPlayers()[j];
+			if ( !p->IsFree() )
+			{
+				std::pair<int,std::string> p_pair { p->GetFd(), p->GetAddr() };
+				players_fds.push_back( p_pair );
+			}
+		}
+	}
 }
 
 void SessionsPlanner::QuitPlayer( int session_id, int player_id )

@@ -97,6 +97,7 @@ public:
 	bool IsPlayerFd( int, std::pair<int,int>& ) const;
 	void PlayerEventHandle( const std::pair<int,int>& );
 	void QuitPlayer( int, int );
+	void QuitAllPlayers( std::list<std::pair<int, std::string>>& );
 
 	void ShowAuctionInfo( int, const char*, const Item<MarketData>* );
 	void ChangeMarketState( int );
