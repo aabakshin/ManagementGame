@@ -3,6 +3,7 @@
 
 
 #include "Server.hpp"
+#include "SessionsPlanner.hpp"
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
@@ -161,7 +162,9 @@ void Server::CloseConnection( int fd, std::string address )
 {
 	close(fd);
 	FD_CLR(fd, &readfds);
-	printf("[-] Lost connection from [%s]\n", address.c_str());
+
+	if ( strcmp( address.c_str(), "start_timers" ) != 0 )
+		printf("[-] Lost connection from [%s]\n", address.c_str());
 }
 
 void Server::Stop( int forcely )
@@ -172,12 +175,15 @@ void Server::Stop( int forcely )
 	std::list<std::pair<int, std::string>> players_fds;
 	sessions_planner.QuitAllPlayers( players_fds );
 
-	for ( const auto& close_pair : players_fds )
-		CloseConnection( close_pair.first, close_pair.second );
+	if ( !players_fds.empty() )
+		for ( const auto& close_pair : players_fds )
+			CloseConnection( close_pair.first, close_pair.second );
 
-
-	// here need to add closing timers fds
-
+	for ( int i = 0; i < SessionsPlanner::DEFAULT_MAX_SESSIONS_COUNT; ++i )
+	{
+		int fd = const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[i].GetTimerFd();
+		CloseConnection( fd, "start_timers" );
+	}
 
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
@@ -244,7 +250,7 @@ void Server::IncomingEventsHandle()
 			}
 
 			std::pair<int, int> player_pos { -1, -1 };
-			if ( sessions_planner.IsPlayerFd(i, player_pos) )
+			if ( sessions_planner.IsPlayerFd( i, player_pos ) )
 			{
 				try
 				{
@@ -319,12 +325,16 @@ int Server::Run()
 			IncomingEventsHandle();
 		}
 
-		std::list<std::pair<int,std::string>> bankrots_fds;
-		sessions_planner.GameEventsHandle( bankrots_fds );
-
-		if ( !bankrots_fds.empty() )
-			for ( const auto& bankrot_pair : bankrots_fds )
-				CloseConnection( bankrot_pair.first, bankrot_pair.second );
+		try
+		{
+			sessions_planner.GameEventsHandle();
+		}
+		catch ( const KickBankrotsException& ex )
+		{
+			if ( !ex.bankrots.empty() )
+				for ( const auto& bankrot : ex.bankrots )
+					CloseConnection( bankrot.first, bankrot.second );
+		}
 	}
 }
 

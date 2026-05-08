@@ -616,7 +616,7 @@ void SessionsPlanner::PrepareGameStateEvent( int session_id )
 	const_cast<Banker&>(banker).SetGameStatePrepared();
 }
 
-void SessionsPlanner::EndGameTurnEvent( int session_id, std::list<std::pair<int,std::string>>& b_list )
+void SessionsPlanner::EndGameTurnEvent( int session_id )
 {
 	const Banker& banker = *GetSessionById( session_id );
 
@@ -630,25 +630,10 @@ void SessionsPlanner::EndGameTurnEvent( int session_id, std::list<std::pair<int,
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_BUILDING_FACTORIES_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PAY_CHARGES_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_PLAYERS_BANKROT_TOKEN );
-	//const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_BANKROT_PLAYERS_TOKEN );
-
-
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
-	{
-		const Player* p = banker.GetPlayers()[i];
-		if ( !p->IsFree() )
-		{
-			if ( p->IsBankrot() )
-			{
-				QuitPlayer( session_id, p->GetUID() );
-				std::pair<int, std::string> bankrot_player { p->GetFd(), p->GetAddr() };
-				b_list.push_back(bankrot_player);
-			}
-		}
-	}
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_BANKROT_PLAYERS_TOKEN );
 }
 
-void SessionsPlanner::GameEventsHandle( std::list<std::pair<int,std::string>>& b_list )
+void SessionsPlanner::GameEventsHandle()
 {
 	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
 	{
@@ -675,11 +660,23 @@ void SessionsPlanner::GameEventsHandle( std::list<std::pair<int,std::string>>& b
 
 			if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
 			{
-				EndGameTurnEvent( banker.GetId(), b_list );
+				EndGameTurnEvent( banker.GetId() );
 				//ReportOnTurnEvent( banker.GetId() );
 				PrepareNewTurnEvent( banker.GetId() );
 			}
+
+			if ( !banker.GetBankrotsList().empty() )
+			{
+				sessions_bankrots.splice( sessions_bankrots.end(), const_cast<Banker::BankrotsList&>(banker.GetBankrotsList()) );
+			}
 		}
+	}
+
+	if ( !sessions_bankrots.empty() )
+	{
+		SessionsPlanner::BankrotsList bankrots_copy = sessions_bankrots;
+		sessions_bankrots.clear();
+		throw KickBankrotsException( bankrots_copy );
 	}
 }
 
@@ -692,10 +689,10 @@ bool SessionsPlanner::IsCorrectIdentityMsg( const char* identity_msg )
 	return false;
 }
 
-void SessionsPlanner::QuitPlayer( int session_id, int player_number )
+void SessionsPlanner::QuitPlayer( int session_id, int player_id )
 {
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( player_number, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	itoa( player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );

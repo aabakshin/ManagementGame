@@ -83,7 +83,8 @@ public:
 				SEND_START_TIME_TOKEN,
 				SEND_START_CANCELLED_TOKEN,
 				SEND_GAME_STARTED_TOKEN,
-				QUIT_PLAYER_TOKEN
+				QUIT_PLAYER_TOKEN,
+				QUIT_BANKROT_PLAYERS_TOKEN
 	};
 
 	enum
@@ -95,7 +96,7 @@ public:
 
 	enum
 	{
-				BROKER_ACTIONS_COUNT	=		 13
+				BROKER_ACTIONS_COUNT	=		 14
 	};
 
 	enum
@@ -142,6 +143,7 @@ private:
 	void SendStartCancelled();
 	void SendGameStarted();
 	void QuitPlayer();
+	void QuitBankrotPlayers();
 };
 
 class BCBrokerMessages : public BrokerMessages

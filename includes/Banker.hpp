@@ -4,6 +4,8 @@
 
 #include "RegisteredPlayers.hpp"
 #include "List.hpp"
+#include <list>
+#include <string>
 
 
 enum
@@ -107,6 +109,8 @@ private:
 
 class Banker
 {
+public:
+	typedef std::list<std::pair<int,std::string>> BankrotsList;
 private:
 	int session_id;
 	bool game_state_prepared;
@@ -120,6 +124,7 @@ private:
 	MarketState cur_market_state;
 	List<Item<MarketData>> sources_requests;
 	List<Item<MarketData>> products_requests;
+	BankrotsList bankrots_on_turn;
 public:
 	Banker( int );
 	bool IsGameStatePrepared() const { return game_state_prepared; }
@@ -140,6 +145,7 @@ public:
 	MarketState& GetCurrentMarketState() { return cur_market_state; }
 	List<Item<MarketData>>& GetSourcesRequests() { return sources_requests; }
 	List<Item<MarketData>>& GetProductsRequests() { return products_requests; }
+	const BankrotsList& GetBankrotsList() const { return bankrots_on_turn; }
 
 	void SetTurnNumber( int );
 	void SetAlivePlayers( int );

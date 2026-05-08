@@ -3,6 +3,7 @@
 
 
 #include "BrokerMessages.hpp"
+#include "Player.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGLib.h"
 #include <cstring>
@@ -100,6 +101,7 @@ MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, con
 	br_acts[SEND_START_CANCELLED_TOKEN]							=					[this]() {	SendStartCancelled();		};
 	br_acts[SEND_GAME_STARTED_TOKEN]							=					[this]() {	SendGameStarted();			};
 	br_acts[QUIT_PLAYER_TOKEN]									=					[this]() {	QuitPlayer();				};
+	br_acts[QUIT_BANKROT_PLAYERS_TOKEN]							=					[this]() {	QuitBankrotPlayers();		};
 }
 
 void MulticastActionsExec::PutMessage( const char** message_tokens, int tokens_count )
@@ -410,6 +412,28 @@ void MulticastActionsExec::SendGameStarted()
 	}
 }
 
+void MulticastActionsExec::QuitBankrotPlayers()
+{
+	Banker& game_session = const_cast<Banker&>(*game_sessions.GetSessionById( session_id ));
+
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		const Player* p = game_session.GetPlayers()[i];
+		if ( !p->IsFree() )
+		{
+			if ( p->IsBankrot() )
+			{
+				const_cast<Player*>(p)->SetFree();
+				game_session.SetAlivePlayers(game_session.GetAlivePlayers() - 1);
+				left_player_id = p->GetUID();
+				QuitPlayer();
+				std::pair<int, std::string> bankrot_record { p->GetFd(), p->GetAddr() };
+				const_cast<Banker::BankrotsList&>(game_session.GetBankrotsList()).push_back(bankrot_record);
+			}
+		}
+	}
+}
+
 void MulticastActionsExec::QuitPlayer()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
@@ -431,14 +455,13 @@ void MulticastActionsExec::QuitPlayer()
 					{
 						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
 						printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
+						return;
 					}
-					else
-					{
-						itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
-						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
-					}
+					itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
 				}
 			}
 		}

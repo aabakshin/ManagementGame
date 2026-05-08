@@ -11,7 +11,6 @@
 #include <cstdint>
 #include <utility>
 #include <list>
-#include <string>
 
 
 class MessageTokens;
@@ -30,7 +29,7 @@ public:
 					DEFAULT_MAX_SESSIONS_COUNT						=			8
 	};
 
-private:
+	typedef std::list<std::pair<int, std::string>> BankrotsList;
 
 	class StartSessionsTimers
 	{
@@ -69,6 +68,7 @@ private:
 		int GetTimerIdxById( int ) const;
 	};
 
+private:
 	static int next_session_id;
 	Banker** game_sessions { nullptr };
 	int current_sessions_count { };
@@ -80,6 +80,7 @@ private:
 	Sender sender;
 	Receiver receiver;
 	MessageTokens msg_tokens;
+	BankrotsList sessions_bankrots;
 public:
 	SessionsPlanner();
 	~SessionsPlanner();
@@ -89,6 +90,7 @@ public:
 	int GetSessionsCount() const { return current_sessions_count; }
 	const StartSessionsTimers& GetStartTimers() const { return start_timers; }
 	std::list<int> GetValidFdsList() const;
+	const BankrotsList& GetBankrotsList() const { return sessions_bankrots; }
 	void AddSessions();
 	void AddNewClientToSession( int, const char* );
 	bool IsCorrectIdentityMsg( const char* );
@@ -102,13 +104,13 @@ public:
 	void SortRequestsByPrice( int session_id, const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
 	void StartAuction( int, const List<Item<MarketData>>&, int auction_type );
 
-	void EndGameTurnEvent( int, std::list<std::pair<int,std::string>>& );
+	void EndGameTurnEvent( int );
 	void PrepareGameStateEvent( int );
 	void InitStartEvent( int );
 	void CheckStartEvent( int );
 	void ReportOnTurnEvent( int );
 	void PrepareNewTurnEvent( int );
-	void GameEventsHandle( std::list<std::pair<int,std::string>>& );
+	void GameEventsHandle();
 private:
 	SessionsPlanner( const SessionsPlanner& ) = delete;
 	SessionsPlanner( SessionsPlanner&& ) = delete;
