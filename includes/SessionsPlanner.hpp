@@ -98,12 +98,7 @@ public:
 	void PlayerEventHandle( const std::pair<int,int>& );
 	void QuitPlayer( int, int );
 	void QuitAllPlayers( std::list<std::pair<int, std::string>>& );
-
 	void ShowAuctionInfo( int, const char*, const Item<MarketData>* );
-	void ChangeMarketState( int );
-	bool CheckPlayersReports( int, List<Item<MarketData>>&, int );
-	void SortRequestsByPrice( int session_id, const List<Item<MarketData>>&, List<Item<MarketData>>&, int auction_type );
-	void StartAuction( int, const List<Item<MarketData>>&, int auction_type );
 
 	void EndGameTurnEvent( int );
 	void PrepareGameStateEvent( int );

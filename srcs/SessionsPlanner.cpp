@@ -3,9 +3,7 @@
 
 
 #include "SessionsPlanner.hpp"
-#include "BrokerMessages.hpp"
 #include "MGLib.h"
-#include "Player.hpp"
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -24,11 +22,6 @@ static const char* const bot_identity_messages[] = {
 // Описаны в модуле MGLib
 extern const char* info_game_messages[];
 extern const char* error_game_messages[];
-
-// Описаны в модуле Banker
-extern const double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
-extern const int price_table[MARKET_LEVEL_NUMBER][2];
-extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
 
 SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartSessionTimer()
@@ -247,13 +240,13 @@ int SessionsPlanner::GetSessionIdxById( int sid ) const
 
 void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr )
 {
-	bool server_full = false;
+	bool session_full = false;
 	bool game_started = false;
 
 	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
 	{
 		game_started = false;
-		server_full = false;
+		session_full = false;
 
 		const Banker& banker = *GetSessionById( i );
 		const Player* p = banker.GetFree();
@@ -266,7 +259,7 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 
 		if ( p == nullptr )
 		{
-			server_full = true;
+			session_full = true;
 			continue;
 		}
 
@@ -299,7 +292,7 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 		throw ErrorNewClientGameAlreadyStartedException();
 	}
 
-	if ( server_full )
+	if ( session_full )
 	{
 		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
 		sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
@@ -368,202 +361,25 @@ void SessionsPlanner::ShowAuctionInfo( int session_id, const char* auction_type_
 
 void SessionsPlanner::ReportOnTurnEvent( int session_id )
 {
-	const Banker& banker = *GetSessionById( session_id );
-
-	printf("\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
-	printf("\n%s\n", "Players statistics:");
-
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_REPORT_ON_TURN_TOKEN );
 
-	ShowAuctionInfo( session_id, "Sources auction", const_cast<Banker&>(banker).GetSourcesRequests().GetFirst());
-	ShowAuctionInfo( session_id, "Products auction", const_cast<Banker&>(banker).GetProductsRequests().GetFirst());
 
-	printf("\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber());
-}
-
-void SessionsPlanner::ChangeMarketState( int session_id )
-{
+	/*
 	const Banker& banker = *GetSessionById( session_id );
+	printf( "\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
+	printf( "\n%s\n", "Players statistics:" );
 
-	int r = 1 + (int)( 12.0 * rand() / (RAND_MAX + 1.0) );
+	ShowAuctionInfo( session_id, "Sources auction", const_cast<Banker&>(banker).GetSourcesRequests().GetFirst() );
+	ShowAuctionInfo( session_id, "Products auction", const_cast<Banker&>(banker).GetProductsRequests().GetFirst() );
 
-	int sum = 0;
-	int i;
-	for ( i = 0; i < MARKET_LEVEL_NUMBER; i++ )
-	{
-		sum += states_market_chance[banker.GetCurrentMarketLvl()-1][i];
-		if ( sum >= r )
-			break;
-	}
-
-	if ( i < MARKET_LEVEL_NUMBER )
-		const_cast<Banker&>(banker).SetCurrentMarketLvl( i+1 );
-
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
-}
-
-bool SessionsPlanner::CheckPlayersReports( int session_id, List<Item<MarketData>>& requests, int auction_type )
-{
-	// если список заявок на аукцион пуст, то не нужно его проводить
-	if ( requests.IsEmpty() )
-		return false;
-
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( auction_type, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
-
-	// Если какой-либо игрок не заявился на аукцион, добавить его пустую заявку
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::ADD_EMPTY_AUCTION_REQUEST_TOKEN );
-
-	return true;
-}
-
-void SessionsPlanner::SortRequestsByPrice( int session_id, const List<Item<MarketData>>& requests, List<Item<MarketData>>& sorted_requests, int auction_type )
-{
-	const int ready_players = (*GetSessionById( session_id )).GetReadyPlayers();
-
-	Item<MarketData>* arr_reqs[ready_players];
-	int prices[ready_players];
-	bool reqs_checked[ready_players];
-
-
-	Item<MarketData>* request = requests.GetFirst();
-	for ( int i = 0; request != nullptr; request = request->GetNext(), ++i )
-	{
-		arr_reqs[i] = request;
-		prices[i] = arr_reqs[i]->GetData().GetPrice();
-		reqs_checked[i] = false;
-	}
-
-	heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
-
-	int j = 0;
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
-	{
-		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
-		{
-			MarketData data;
-			data.MakeData( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
-
-			sorted_requests.Insert( data );
-			reqs_checked[i] = true;
-			i = 0;
-			++j;
-			if ( j == ready_players )
-				break;
-
-			continue;
-		}
-	}
-}
-
-void SessionsPlanner::StartAuction( int session_id, const List<Item<MarketData>>& requests, int auction_type )
-{
-	if ( !CheckPlayersReports( session_id, const_cast<List<Item<MarketData>>&>(requests), auction_type ) )
-		return;
-
-	List<Item<MarketData>> sorted_requests;
-	SortRequestsByPrice( session_id, requests, sorted_requests, auction_type );
-
-	const Banker& banker = *GetSessionById( session_id );
-
-	int max_sources = const_cast<Banker&>(banker).GetCurrentMarketState().GetSourcesAmount();
-	int max_products = const_cast<Banker&>(banker).GetCurrentMarketState().GetProductsAmount();
-
-	for ( Item<MarketData>* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
-	{
-		if ( node->GetData().GetPrice() < 1 )
-			continue;
-
-		const Player* cur_p = banker.GetPlayers().GetPlayerByUID( node->GetData().GetPlayerNum() );
-
-		if ( cur_p->IsFree() )
-			continue;
-
-		if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
-		{
-			if ( node->GetData().GetAmount() > 0 )
-			{
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - node->GetData().GetAmount() * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + node->GetData().GetAmount() );
-					max_sources -= node->GetData().GetAmount();
-				}
-				else
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + node->GetData().GetAmount() * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - node->GetData().GetAmount() );
-					max_products -= node->GetData().GetAmount();
-				}
-
-				const_cast<MarketData&>(node->GetData()).SetSuccess();
-
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(node->GetData().GetAmount());
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
-				}
-				else
-				{
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(node->GetData().GetAmount());
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
-				}
-			}
-		}
-		else
-		{
-			int saved_max_sources = 0;
-			int saved_max_products = 0;
-
-			if ( ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products) > 0 )
-			{
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - max_sources * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + max_sources );
-				}
-				else
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + max_products * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
-				}
-
-				const_cast<MarketData&>(node->GetData()).SetSuccess();
-
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					saved_max_sources = max_sources;
-					max_sources = 0;
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(saved_max_sources);
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
-				}
-				else
-				{
-					saved_max_products = max_products;
-					max_products = 0;
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(saved_max_products);
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
-				}
-			}
-		}
-	}
+	printf( "\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
+	*/
 }
 
 void SessionsPlanner::PrepareNewTurnEvent( int session_id )
 {
-	const Banker& banker = *GetSessionById( session_id );
-
-	ChangeMarketState( session_id );
-	const_cast<Banker&>(banker).SetTurnNumber( banker.GetTurnNumber() + 1 );
-	const_cast<Banker&>(banker).SetReadyPlayers( 0 );
-
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
@@ -592,41 +408,35 @@ void SessionsPlanner::CheckStartEvent( int session_id )
 	else
 	{
 		const_cast<Banker&>(banker).SetGameStarted();
+
+		if ( !banker.IsGameStatePrepared() )
+			PrepareGameStateEvent( banker.GetId() );
+
 		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_GAME_STARTED_TOKEN );
 	}
 }
 
 void SessionsPlanner::PrepareGameStateEvent( int session_id )
 {
-	const Banker& banker = *GetSessionById( session_id );
-
-	const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
-	const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
-	const_cast<Banker&>(banker).SetTurnNumber( 1 );
-	const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
-
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_PLAYERS_STATE_TOKEN );
-
-	const_cast<Banker&>(banker).SetGameStatePrepared();
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_SESSION_STATE_TOKEN );
 }
 
 void SessionsPlanner::EndGameTurnEvent( int session_id )
 {
-	const Banker& banker = *GetSessionById( session_id );
-
-	StartAuction( session_id, const_cast<Banker&>(banker).GetSourcesRequests(), SOURCE_AUCTION );
-	StartAuction( session_id, const_cast<Banker&>(banker).GetProductsRequests(), PRODUCTION_AUCTION );
-
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
+	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
+
+	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
+
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_AUCTIONS_RESULTS_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_BUILDING_FACTORIES_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PAY_CHARGES_TOKEN );
@@ -654,21 +464,11 @@ void SessionsPlanner::GameEventsHandle()
 		}
 		else
 		{
-			if ( !banker.IsGameStatePrepared() )
-			{
-				PrepareGameStateEvent( banker.GetId() );
-			}
-
 			if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
 			{
-				EndGameTurnEvent( banker.GetId() );
-				//ReportOnTurnEvent( banker.GetId() );
-				PrepareNewTurnEvent( banker.GetId() );
-			}
-
-			if ( !banker.GetBankrotsList().empty() )
-			{
-				sessions_bankrots.splice( sessions_bankrots.end(), const_cast<Banker::BankrotsList&>(banker.GetBankrotsList()) );
+				EndGameTurnEvent( i );
+				ReportOnTurnEvent( i );
+				PrepareNewTurnEvent( i );
 			}
 		}
 	}
@@ -710,11 +510,11 @@ void SessionsPlanner::QuitAllPlayers( std::list<std::pair<int,std::string>>& pla
 
 void SessionsPlanner::QuitPlayer( int session_id, int player_id )
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+	itoa( session_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	itoa( player_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
+	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
 }
 
 void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
@@ -729,7 +529,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 	}
 
 	const Banker& banker = *GetSessionById( sid );
-	const Player* p = banker.GetPlayers().GetPlayerByUID(uid);
+	const Player* p = banker.GetPlayers().GetPlayerByUID( uid );
 
 	int p_fd = p->GetFd();
 	const char* p_addr = p->GetAddr();
@@ -796,10 +596,8 @@ SessionsPlanner::~SessionsPlanner()
 		return;
 
 	for ( int i = 0; i < current_sessions_count; ++i )
-	{
 		if ( game_sessions[i] != nullptr )
 			delete game_sessions[i];
-	}
 
 	delete[] game_sessions;
 	game_sessions = nullptr;

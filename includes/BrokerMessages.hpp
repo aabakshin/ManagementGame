@@ -3,8 +3,10 @@
 
 
 #include <functional>
+#include "List.hpp"
 
 
+class MarketData;
 class SessionsPlanner;
 class Sender;
 class MessageTokens;
@@ -84,7 +86,9 @@ public:
 				SEND_START_CANCELLED_TOKEN,
 				SEND_GAME_STARTED_TOKEN,
 				QUIT_PLAYER_TOKEN,
-				QUIT_BANKROT_PLAYERS_TOKEN
+				QUIT_BANKROT_PLAYERS_TOKEN,
+				START_AUCTION_TOKEN,
+				PREPARE_SESSION_STATE_TOKEN
 	};
 
 	enum
@@ -96,7 +100,7 @@ public:
 
 	enum
 	{
-				BROKER_ACTIONS_COUNT	=		 14
+				BROKER_ACTIONS_COUNT	=		 16
 	};
 
 	enum
@@ -130,6 +134,9 @@ private:
 	MulticastActionsExec( MulticastActionsExec&& ) = delete;
 	void operator=( const MulticastActionsExec& ) = delete;
 
+	void SortRequestsByPrice( const List<Item<MarketData>>&, List<Item<MarketData>>& );
+	void ChangeMarketState();
+
 	void SendReportOnTurn();
 	void AddEmptyAuctionRequest();
 	void PayCharges();
@@ -144,6 +151,8 @@ private:
 	void SendGameStarted();
 	void QuitPlayer();
 	void QuitBankrotPlayers();
+	void StartAuction();
+	void PrepareSessionState();
 };
 
 class BCBrokerMessages : public BrokerMessages

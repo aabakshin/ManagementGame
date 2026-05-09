@@ -3,7 +3,6 @@
 
 
 #include "BrokerMessages.hpp"
-#include "Player.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGLib.h"
 #include <cstring>
@@ -13,8 +12,13 @@
 static const char* const true_str = "true";
 static const char* const false_str = "false";
 
+// Описан в модуле MGLib
 extern const char* info_game_messages[];
 
+// Описаны в модуле Banker
+extern const double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
+extern const int price_table[MARKET_LEVEL_NUMBER][2];
+extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
 
 template <class T, class U>
@@ -102,6 +106,8 @@ MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, con
 	br_acts[SEND_GAME_STARTED_TOKEN]							=					[this]() {	SendGameStarted();			};
 	br_acts[QUIT_PLAYER_TOKEN]									=					[this]() {	QuitPlayer();				};
 	br_acts[QUIT_BANKROT_PLAYERS_TOKEN]							=					[this]() {	QuitBankrotPlayers();		};
+	br_acts[START_AUCTION_TOKEN]								=					[this]() {	StartAuction();				};
+	br_acts[PREPARE_SESSION_STATE_TOKEN]						=					[this]() {	PrepareSessionState();		};
 }
 
 void MulticastActionsExec::PutMessage( const char** message_tokens, int tokens_count )
@@ -261,9 +267,37 @@ void MulticastActionsExec::CheckBuildingFactories()
 	}
 }
 
+void MulticastActionsExec::ChangeMarketState()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
+	int r = 1 + (int)( 12.0 * rand() / (RAND_MAX + 1.0) );
+
+	int sum = 0;
+	int i;
+	for ( i = 0; i < MARKET_LEVEL_NUMBER; i++ )
+	{
+		sum += states_market_chance[banker.GetCurrentMarketLvl()-1][i];
+		if ( sum >= r )
+			break;
+	}
+
+	if ( i < MARKET_LEVEL_NUMBER )
+		const_cast<Banker&>(banker).SetCurrentMarketLvl( i+1 );
+
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
+}
+
 void MulticastActionsExec::PrepareNewTurn()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
+	ChangeMarketState();
+	const_cast<Banker&>( game_session ).SetTurnNumber( game_session.GetTurnNumber() + 1 );
+	const_cast<Banker&>( game_session ).SetReadyPlayers( 0 );
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
@@ -302,6 +336,21 @@ void MulticastActionsExec::PrepareNewTurn()
 			}
 		}
 	}
+}
+
+void MulticastActionsExec::PrepareSessionState()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
+	const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
+	const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
+	const_cast<Banker&>(banker).SetTurnNumber( 1 );
+	const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
+	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+	const_cast<Banker&>(banker).SetGameStatePrepared();
 }
 
 void MulticastActionsExec::PreparePlayersState()
@@ -423,20 +472,28 @@ void MulticastActionsExec::QuitBankrotPlayers()
 		{
 			if ( p->IsBankrot() )
 			{
-				const_cast<Player*>(p)->SetFree();
-				game_session.SetAlivePlayers(game_session.GetAlivePlayers() - 1);
+				std::pair<int, std::string> bankrot_record { p->GetFd(), p->GetAddr() };
 				left_player_id = p->GetUID();
 				QuitPlayer();
-				std::pair<int, std::string> bankrot_record { p->GetFd(), p->GetAddr() };
 				const_cast<Banker::BankrotsList&>(game_session.GetBankrotsList()).push_back(bankrot_record);
 			}
 		}
+	}
+
+	if ( !game_session.GetBankrotsList().empty() )
+	{
+		SessionsPlanner::BankrotsList sessions_bankrots = game_sessions.GetBankrotsList();
+		sessions_bankrots.splice( sessions_bankrots.end(), const_cast<Banker::BankrotsList&>( game_session.GetBankrotsList() ) );
 	}
 }
 
 void MulticastActionsExec::QuitPlayer()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+	const Player* left_player = game_session.GetPlayers().GetPlayerByUID( left_player_id );
+
+	const_cast<Player*>( left_player )->SetFree();
+	const_cast<Banker&>( game_session ).SetAlivePlayers( game_session.GetAlivePlayers() - 1 );
 
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
@@ -462,6 +519,143 @@ void MulticastActionsExec::QuitPlayer()
 					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
 					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
+				}
+			}
+		}
+	}
+}
+
+void MulticastActionsExec::SortRequestsByPrice( const List<Item<MarketData>>& requests, List<Item<MarketData>>& sorted_requests )
+{
+	const int ready_players = (*game_sessions.GetSessionById( session_id )).GetReadyPlayers();
+
+	Item<MarketData>* arr_reqs[ready_players];
+	int prices[ready_players];
+	bool reqs_checked[ready_players];
+
+
+	Item<MarketData>* request = requests.GetFirst();
+	for ( int i = 0; request != nullptr; request = request->GetNext(), ++i )
+	{
+		arr_reqs[i] = request;
+		prices[i] = arr_reqs[i]->GetData().GetPrice();
+		reqs_checked[i] = false;
+	}
+
+	heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
+
+	int j = 0;
+	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	{
+		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
+		{
+			MarketData data;
+			data.MakeData( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
+
+			sorted_requests.Insert( data );
+			reqs_checked[i] = true;
+			i = 0;
+			++j;
+			if ( j == ready_players )
+				break;
+
+			continue;
+		}
+	}
+}
+
+void MulticastActionsExec::StartAuction()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
+	// если список заявок на аукцион пуст, то не нужно его проводить
+	List<Item<MarketData>>& requests = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(banker).GetSourcesRequests() : const_cast<Banker&>(banker).GetProductsRequests();
+	if ( requests.IsEmpty() )
+		return;
+
+	// Если какой-либо игрок не заявился на аукцион, добавить его пустую заявку
+	AddEmptyAuctionRequest();
+
+	List<Item<MarketData>> sorted_requests;
+	SortRequestsByPrice( requests, sorted_requests );
+
+	int max_sources = const_cast<Banker&>(banker).GetCurrentMarketState().GetSourcesAmount();
+	int max_products = const_cast<Banker&>(banker).GetCurrentMarketState().GetProductsAmount();
+
+	for ( Item<MarketData>* node = sorted_requests.GetFirst(); node != nullptr; node = node->GetNext() )
+	{
+		if ( node->GetData().GetPrice() < 1 )
+			continue;
+
+		const Player* cur_p = banker.GetPlayers().GetPlayerByUID( node->GetData().GetPlayerNum() );
+
+		if ( cur_p->IsFree() )
+			continue;
+
+		if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
+		{
+			if ( node->GetData().GetAmount() > 0 )
+			{
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - node->GetData().GetAmount() * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + node->GetData().GetAmount() );
+					max_sources -= node->GetData().GetAmount();
+				}
+				else
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + node->GetData().GetAmount() * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - node->GetData().GetAmount() );
+					max_products -= node->GetData().GetAmount();
+				}
+
+				const_cast<MarketData&>(node->GetData()).SetSuccess();
+
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(node->GetData().GetAmount());
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+				}
+				else
+				{
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(node->GetData().GetAmount());
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+				}
+			}
+		}
+		else
+		{
+			int saved_max_sources = 0;
+			int saved_max_products = 0;
+
+			if ( ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products) > 0 )
+			{
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - max_sources * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + max_sources );
+				}
+				else
+				{
+					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + max_products * node->GetData().GetPrice() );
+					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
+				}
+
+				const_cast<MarketData&>(node->GetData()).SetSuccess();
+
+				if ( auction_type == SOURCE_AUCTION )
+				{
+					saved_max_sources = max_sources;
+					max_sources = 0;
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(saved_max_sources);
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+				}
+				else
+				{
+					saved_max_products = max_products;
+					max_products = 0;
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(saved_max_products);
+					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
 				}
 			}
 		}

@@ -108,7 +108,6 @@ private:
 	bool is_bot;
 	bool is_ident_message_recv;
 	bool is_turn;
-	//bool is_prod;
 	bool is_bankrot;
 	bool sent_source_request;
 	bool sent_products_request;
@@ -153,8 +152,6 @@ public:
 	void UnsetIdentMsgRecv() { is_ident_message_recv = false; }
 	void SetTurn() { is_turn = true; }
 	void UnsetTurn() { is_turn = false; }
-	//void SetProd() { is_prod = true; }
-	//void UnsetProd() { is_prod = false; }
 	void SetBankrot() { is_bankrot = true; }
 	void UnsetBankrot() { is_bankrot = false; }
 	void SetSentSourceRequest() { sent_source_request = true; }
@@ -166,7 +163,6 @@ public:
 	bool IsBot() const { return is_bot; }
 	bool IsIdentMsgRecv() const { return is_ident_message_recv; }
 	bool IsTurn() const { return is_turn; }
-	//bool IsProd() const { return is_prod; }
 	bool IsBankrot() const { return is_bankrot; }
 	bool IsSentSourceRequest() const { return sent_source_request; }
 	bool IsSentProductsRequest() const { return sent_products_request; }

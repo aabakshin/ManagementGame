@@ -245,21 +245,20 @@ void Player::Reset()
 	SetFd( -1 );
 	SetAddr( "0.0.0.0" );
 
-	SetMoney(0);
-	SetOldMoney(0);
-	SetIncome(0);
-	SetSources(0);
-	SetProducts(0);
-	SetWaitFactories(0);
-	SetWorkFactories(0);
-	SetBuiltFactories(0);
-	SetProduced(0);
+	SetMoney( 0 );
+	SetOldMoney( 0 );
+	SetIncome( 0 );
+	SetSources( 0 );
+	SetProducts( 0 );
+	SetWaitFactories( 0 );
+	SetWorkFactories( 0 );
+	SetBuiltFactories( 0 );
+	SetProduced( 0 );
 	SetFree();
 
 	UnsetBot();
 	UnsetIdentMsgRecv();
 	UnsetTurn();
-	//UnsetProd();
 	UnsetBankrot();
 	UnsetSentSourceRequest();
 	UnsetSentProductsRequest();

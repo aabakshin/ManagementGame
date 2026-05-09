@@ -3,7 +3,6 @@
 
 
 #include "Server.hpp"
-#include "SessionsPlanner.hpp"
 #include <signal.h>
 #include <errno.h>
 #include <unistd.h>
@@ -203,7 +202,7 @@ void Server::NewClientHandle()
 	struct sockaddr_storage client_address;
 	socklen_t client_address_len = sizeof(client_address);
 
-	int cs = accept(ls, (struct sockaddr*) &client_address, &client_address_len);
+	int cs = accept( ls, (struct sockaddr*) &client_address, &client_address_len );
 	if ( cs == -1 )
 	{
 		fprintf(stderr, "accept() failed. (errno code = %d)\n", errno);
@@ -217,11 +216,12 @@ void Server::NewClientHandle()
 			sizeof(new_client_addr),
 			new_client_serv,
 			sizeof(new_client_serv),
-			NI_NUMERICHOST | NI_NUMERICSERV);
+			NI_NUMERICHOST | NI_NUMERICSERV
+			);
 
 	ConcatAddrPort( Receiver::SERVICE_SIZE );
 
-	printf("New connection from (%s)\n", new_client_addr);
+	printf( "New connection from %s\n", new_client_addr );
 
 	try
 	{
@@ -229,7 +229,7 @@ void Server::NewClientHandle()
 	}
 	catch( ... )
 	{
-		CloseConnection(cs, new_client_addr);
+		CloseConnection( cs, new_client_addr );
 	}
 }
 
@@ -237,7 +237,7 @@ void Server::IncomingEventsHandle()
 {
 	for ( int i = 0; i < max_fd + 1; ++i )
 	{
-		if ( FD_ISSET(i, &readfds) )
+		if ( FD_ISSET( i, &readfds ) )
 		{
 			if ( i == ls )
 			{
@@ -259,7 +259,7 @@ void Server::IncomingEventsHandle()
 			{
 				try
 				{
-					sessions_planner.PlayerEventHandle(player_pos);
+					sessions_planner.PlayerEventHandle( player_pos );
 				}
 				catch ( const QuitCommandSuccessException& ex )
 				{
@@ -312,7 +312,7 @@ int Server::Run()
 		RefillReadfds();
 
 		timeval tv { 0, 500000 };
-		int res = select(max_fd+1, &readfds, nullptr, nullptr, &tv);
+		int res = select( max_fd+1, &readfds, nullptr, nullptr, &tv );
 		if ( res == -1 )
 		{
 			if ( errno == EINTR )
@@ -322,7 +322,7 @@ int Server::Run()
 			}
 			else
 			{
-				fprintf(stderr, "\nselect() failed. (errno code = %d)\n", errno);
+				fprintf( stderr, "\nselect() failed. (errno code = %d)\n", errno );
 			}
 		}
 		else if ( res > 0 )
