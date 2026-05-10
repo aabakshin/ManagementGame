@@ -245,12 +245,10 @@ void Server::IncomingEventsHandle()
 				continue;
 			}
 
-			if ( sessions_planner.GetStartTimers().IsTimerFd(i)  )
+			if ( sessions_planner.GetStartTimers().IsTimerFd( i )  )
 			{
-				// обработка таймера
-				//
-				//
-
+				int t_idx = sessions_planner.GetStartTimers().GetTimerIdxByFd( i );
+				const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[t_idx].StopTimer();
 				continue;
 			}
 
@@ -282,9 +280,9 @@ void Server::IncomingEventsHandle()
 
 void Server::RefillReadfds()
 {
-	FD_ZERO(&readfds);
+	FD_ZERO( &readfds );
 
-	FD_SET(ls, &readfds);
+	FD_SET( ls, &readfds );
 
 	max_fd = ls;
 
@@ -295,6 +293,14 @@ void Server::RefillReadfds()
 		FD_SET( fd, &readfds );
 		if ( fd > max_fd )
 			max_fd = fd;
+	}
+
+	for ( int i = 0; i < SessionsPlanner::DEFAULT_MAX_SESSIONS_COUNT; ++i )
+	{
+		int timer_fd = const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[i].GetTimerFd();
+		FD_SET( timer_fd, &readfds );
+		if ( timer_fd > max_fd )
+			max_fd = timer_fd;
 	}
 }
 

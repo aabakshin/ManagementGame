@@ -3,6 +3,7 @@
 
 
 #include "BrokerMessages.hpp"
+#include "Banker.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGLib.h"
 #include <cstring>
@@ -108,6 +109,8 @@ MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, con
 	br_acts[QUIT_BANKROT_PLAYERS_TOKEN]							=					[this]() {	QuitBankrotPlayers();		};
 	br_acts[START_AUCTION_TOKEN]								=					[this]() {	StartAuction();				};
 	br_acts[PREPARE_SESSION_STATE_TOKEN]						=					[this]() {	PrepareSessionState();		};
+	br_acts[SHOW_REPORT_ON_TURN_TOKEN]							=					[this]() {	ShowReportOnTurn();			};
+	br_acts[CHECK_START_TOKEN]									=					[this]() {	CheckStart();				};
 }
 
 void MulticastActionsExec::PutMessage( const char** message_tokens, int tokens_count )
@@ -267,6 +270,38 @@ void MulticastActionsExec::CheckBuildingFactories()
 	}
 }
 
+void MulticastActionsExec::ShowReportOnTurn()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+	printf( "\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
+	printf( "\n%s\n", "Players statistics:" );
+
+	ShowAuctionInfo();
+
+	printf( "\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
+}
+
+void MulticastActionsExec::CheckStart()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
+	if (  banker.GetLobbyPlayers() < MIN_PLAYERS_TO_START )
+	{
+		SendStartCancelled();
+	}
+	else
+	{
+		const_cast<Banker&>(banker).SetGameStarted();
+		SendGameStarted();
+
+		if ( !banker.IsGameStatePrepared() )
+		{
+			PreparePlayersState();
+			PrepareSessionState();
+		}
+	}
+}
+
 void MulticastActionsExec::ChangeMarketState()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
@@ -289,6 +324,25 @@ void MulticastActionsExec::ChangeMarketState()
 	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
 	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
 	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
+}
+
+void MulticastActionsExec::ShowAuctionInfo()
+{
+	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
+	printf("\n%s\n", ( auction_type == SOURCE_AUCTION ) ? "Sources auction" : "Products auction" );
+
+	Item<MarketData>* node = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(banker).GetSourcesRequests().GetFirst() : const_cast<Banker&>(banker).GetProductsRequests().GetFirst();
+
+	for ( ; node != nullptr; node = node->GetNext() )
+	{
+		const Player* p = banker.GetPlayers().GetPlayerByUID(node->GetData().GetPlayerNum());
+		printf("Request of Player #%d:\n", p->GetUID());
+		printf("\tPrice: %d\n\tAmount: %d\n\tIs proceed: %s\n\n",
+				node->GetData().GetPrice(),
+				(node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount(),
+				node->GetData().IsSuccess() ? "yes" : "no");
+	}
 }
 
 void MulticastActionsExec::PrepareNewTurn()

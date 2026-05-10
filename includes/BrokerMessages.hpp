@@ -88,7 +88,9 @@ public:
 				QUIT_PLAYER_TOKEN,
 				QUIT_BANKROT_PLAYERS_TOKEN,
 				START_AUCTION_TOKEN,
-				PREPARE_SESSION_STATE_TOKEN
+				PREPARE_SESSION_STATE_TOKEN,
+				SHOW_REPORT_ON_TURN_TOKEN,
+				CHECK_START_TOKEN
 	};
 
 	enum
@@ -100,7 +102,7 @@ public:
 
 	enum
 	{
-				BROKER_ACTIONS_COUNT	=		 16
+				BROKER_ACTIONS_COUNT	=		 18
 	};
 
 	enum
@@ -136,6 +138,7 @@ private:
 
 	void SortRequestsByPrice( const List<Item<MarketData>>&, List<Item<MarketData>>& );
 	void ChangeMarketState();
+	void ShowAuctionInfo();
 
 	void SendReportOnTurn();
 	void AddEmptyAuctionRequest();
@@ -153,6 +156,8 @@ private:
 	void QuitBankrotPlayers();
 	void StartAuction();
 	void PrepareSessionState();
+	void ShowReportOnTurn();
+	void CheckStart();
 };
 
 class BCBrokerMessages : public BrokerMessages

@@ -37,6 +37,9 @@ SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartSessionTimer()
 	timer_settings.it_value.tv_nsec			=		0;
 	timer_settings.it_interval.tv_sec		=		0;
 	timer_settings.it_interval.tv_nsec		=		0;
+
+	UnsetLaunched();
+	UnsetAlarmed();
 }
 
 SessionsPlanner::StartSessionsTimers::StartSessionTimer::~StartSessionTimer()
@@ -77,6 +80,9 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer( uint64
 		//throw TimerStartException();
 	}
 
+	SetLaunched();
+	UnsetAlarmed();
+
 	/*printf("\n-----------------\n"
 			"StartTimer[%d] has launched.\n"
 			"Timer settings:\n"
@@ -93,6 +99,8 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer( uint64
 void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StopTimer()
 {
 	StartTimer( 0, 0, 0, 0 );
+	UnsetLaunched();
+	SetAlarmed();
 }
 
 
@@ -116,6 +124,18 @@ int SessionsPlanner::StartSessionsTimers::GetTimerIdxById( int session_id ) cons
 	}
 
 	return session_id - 1;
+}
+
+int SessionsPlanner::StartSessionsTimers::GetTimerIdxByFd( int fd ) const
+{
+	if ( fd < 0 )
+		return -1;
+
+	for ( int i = 0; i < DEFAULT_MAX_SESSIONS_COUNT; ++i )
+		if ( sessions_timers_fds[i].GetTimerFd() == fd )
+			return i;
+
+	return -1;
 }
 
 bool SessionsPlanner::StartSessionsTimers::IsTimerFd( int fd ) const
@@ -342,23 +362,6 @@ std::list<int> SessionsPlanner::GetValidFdsList() const
 	return valid_fds;
 }
 
-void SessionsPlanner::ShowAuctionInfo( int session_id, const char* auction_type_msg, const Item<MarketData>* node )
-{
-	const Banker& banker = *GetSessionById( session_id );
-
-	printf("\n%s\n", auction_type_msg);
-
-	for ( ; node != nullptr; node = node->GetNext() )
-	{
-		const Player* p = banker.GetPlayers().GetPlayerByUID(node->GetData().GetPlayerNum());
-		printf("Request of Player #%d:\n", p->GetUID());
-		printf("\tPrice: %d\n\tAmount: %d\n\tIs proceed: %s\n\n",
-				node->GetData().GetPrice(),
-				(node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount(),
-				node->GetData().IsSuccess() ? "yes" : "no");
-	}
-}
-
 void SessionsPlanner::ReportOnTurnEvent( int session_id )
 {
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
@@ -366,16 +369,13 @@ void SessionsPlanner::ReportOnTurnEvent( int session_id )
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_REPORT_ON_TURN_TOKEN );
 
 
-	/*
-	const Banker& banker = *GetSessionById( session_id );
-	printf( "\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
-	printf( "\n%s\n", "Players statistics:" );
+	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
 
-	ShowAuctionInfo( session_id, "Sources auction", const_cast<Banker&>(banker).GetSourcesRequests().GetFirst() );
-	ShowAuctionInfo( session_id, "Products auction", const_cast<Banker&>(banker).GetProductsRequests().GetFirst() );
-
-	printf( "\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
-	*/
+	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
 }
 
 void SessionsPlanner::PrepareNewTurnEvent( int session_id )
@@ -399,30 +399,7 @@ void SessionsPlanner::CheckStartEvent( int session_id )
 	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
-	const Banker& banker = *GetSessionById(session_id);
-
-	if (  banker.GetLobbyPlayers() < MIN_PLAYERS_TO_START )
-	{
-		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_CANCELLED_TOKEN );
-	}
-	else
-	{
-		const_cast<Banker&>(banker).SetGameStarted();
-
-		if ( !banker.IsGameStatePrepared() )
-			PrepareGameStateEvent( banker.GetId() );
-
-		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_GAME_STARTED_TOKEN );
-	}
-}
-
-void SessionsPlanner::PrepareGameStateEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_PLAYERS_STATE_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_SESSION_STATE_TOKEN );
+	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_START_TOKEN );
 }
 
 void SessionsPlanner::EndGameTurnEvent( int session_id )
@@ -452,13 +429,22 @@ void SessionsPlanner::GameEventsHandle()
 
 		if ( !banker.IsGameStarted() )
 		{
-			if ( !IsTimerFlag() && ( banker.GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( banker.GetLobbyPlayers() <= MAX_PLAYERS ) )
+			int t_idx = GetStartTimers().GetTimerIdxById( i );
+			bool is_launched_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsLaunched();
+			bool is_alarmed_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsAlarmed();
+
+			if ( ( banker.GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( banker.GetLobbyPlayers() <= MAX_PLAYERS ) )
 			{
-				InitStartEvent( banker.GetId() );
+				if ( !is_launched_flag )
+				{
+					const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
+					InitStartEvent( banker.GetId() );
+				}
 			}
 
-			if ( IsAlrmFlag() )
+			if ( is_alarmed_flag )
 			{
+				const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].UnsetAlarmed();
 				CheckStartEvent( banker.GetId() );
 			}
 		}

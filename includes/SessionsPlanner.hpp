@@ -1,5 +1,5 @@
-#ifndef SESSIONS_PLANNER_HPP_SENTINEL
-#define SESSIONS_PLANNER_HPP_SENTINEL
+#ifndef SESSIONS_PLANNER_HPP_SENTRY
+#define SESSIONS_PLANNER_HPP_SENTRY
 
 
 #include "Banker.hpp"
@@ -33,16 +33,24 @@ public:
 
 	class StartSessionsTimers
 	{
-	private:
+	public:
 
 		class StartSessionTimer
 		{
 		private:
 			int timerfd;
 			itimerspec timer_settings;
+			bool launched;
+			bool alarmed;
 		public:
 			StartSessionTimer();
 			~StartSessionTimer();
+			bool IsLaunched() const { return launched; }
+			void SetLaunched() { launched = true; }
+			void UnsetLaunched() { launched = false; }
+			bool IsAlarmed() const { return alarmed; }
+			void SetAlarmed() { alarmed = true; }
+			void UnsetAlarmed() { alarmed = false; }
 			void StartTimer( uint64_t, uint64_t, uint64_t, uint64_t );
 			void StopTimer();
 			int GetTimerFd() const { return timerfd; }
@@ -54,10 +62,13 @@ public:
 			void GetTimerSettings( itimerspec* );
 		};
 
+	private:
 		StartSessionTimer sessions_timers_fds[DEFAULT_MAX_SESSIONS_COUNT];
 	public:
 		StartSessionsTimers() {}
 		StartSessionTimer& operator[]( int );
+		int GetTimerIdxByFd( int ) const;
+		int GetTimerIdxById( int ) const;
 		bool IsTimerFd( int ) const;
 		void ResetTimerFd( int );
 		void ResetTimers();
@@ -65,7 +76,6 @@ public:
 		StartSessionsTimers( const StartSessionsTimers& ) = delete;
 		StartSessionsTimers( StartSessionsTimers&& ) = delete;
 		void operator=( const StartSessionsTimers& ) = delete;
-		int GetTimerIdxById( int ) const;
 	};
 
 private:
@@ -98,10 +108,8 @@ public:
 	void PlayerEventHandle( const std::pair<int,int>& );
 	void QuitPlayer( int, int );
 	void QuitAllPlayers( std::list<std::pair<int, std::string>>& );
-	void ShowAuctionInfo( int, const char*, const Item<MarketData>* );
 
 	void EndGameTurnEvent( int );
-	void PrepareGameStateEvent( int );
 	void InitStartEvent( int );
 	void CheckStartEvent( int );
 	void ReportOnTurnEvent( int );
