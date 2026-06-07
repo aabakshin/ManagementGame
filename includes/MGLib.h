@@ -67,8 +67,12 @@ void delete_spaces(char* buffer, int* bufsize);
 /* Превращает число в строку */
 void itoa(int number, char* num_buf, int max_buf_len);
 
-/* Читает строку из станд. потока ввода. Является аналогом fgets */
+/* Читает строку из буфера ввода ядра */
 int readline(int fd, char* buf, int bufsize);
+
+/* Записывает строку в буфер вывода ядра. В случае неполной записи возвращает через bufsize общее кол-во записанных данных.
+ * Возвращает возвращаемое значение из send */
+int sendall( int fd, const char* buf, int* bufsize );
 
 /* Обрезать строку по символу ch, затирая его. Область памяти s должна быть изменяемая! */
 int cut_str( char* s, int s_size, int ch );

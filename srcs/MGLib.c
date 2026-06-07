@@ -1,11 +1,14 @@
 #ifndef MGLIB_C
 #define MGLIB_C
 
+
 #include "MGLib.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 
 const char* info_game_messages[] =
@@ -302,35 +305,51 @@ void itoa(int number, char* num_buf, int max_buf_len)
 	reverse(num_buf);
 }
 
+int sendall( int fd, const char* buf, int* bufsize )
+{
+	int total = 0;
+	int bytesleft = *bufsize;
+	int n = -1;
+
+	while ( total < *bufsize )
+	{
+		n = send( fd, buf+total, bytesleft, 0 );
+		if ( n == -1 )
+			break;
+		total += n;
+		bytesleft -= n;
+	}
+	*bufsize = total;
+
+	return n == -1 ? -1 : 0;
+}
+
 int readline(int fd, char* buf, int bufsize)
 {
-	unsigned int total_read = 0;
-	char buffer[bufsize];
+	int total_read = 0;
 	int rc = 0;
 	int lf_flag = 0;
 
 	do
 	{
-		rc = read(fd, buffer+total_read, bufsize-total_read);
+		rc = read( fd, buf+total_read, bufsize-total_read );
 		if ( rc < 1 )
 			return rc;
 
-		int i;
-		for (i = total_read; i < total_read+rc; i++)
-			if (buffer[i] == '\n')
+		for ( int i = total_read; i < total_read+rc; ++i )
+			if ( buf[i] == '\n' )
 				lf_flag = 1;
 		total_read += rc;
 
-		if ( (total_read >= bufsize) && (!lf_flag) )
+		if ( ( total_read >= bufsize-1 ) && ( !lf_flag ) )
 		{
-			buffer[total_read-1] = '\n';
+			buf[total_read-1] = '\n';
 			break;
 		}
 	}
 	while ( !lf_flag );
 
-	strncpy(buf, buffer, total_read);
-
+	buf[total_read] = '\0';
 	return total_read;
 }
 

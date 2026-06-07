@@ -143,7 +143,7 @@ void Server::Make( const char* addr, const char* port )
 
 Server::~Server()
 {
-	freeaddrinfo(bind_address);
+	freeaddrinfo( bind_address );
 }
 
 void Server::ConcatAddrPort( int service_size )
@@ -192,7 +192,7 @@ void Server::Stop( int forcely )
 	if ( forcely )
 		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
 
-	exit(0);
+	exit( 0 );
 }
 
 void Server::NewClientHandle()

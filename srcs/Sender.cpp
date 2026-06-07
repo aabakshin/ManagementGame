@@ -3,6 +3,7 @@
 
 
 #include "Sender.hpp"
+#include "MGLib.h"
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -44,9 +45,10 @@ void Sender::SendMessage( const char* const* message_tokens, int tokens_count, i
 
 	strncpy(target_address, address, ADDRESS_SIZE-1);
 
-	sent_bytes = send( target_socket, message, message_length, 0 );
+	int sent_code = sendall( target_socket, message, &message_length );
+	sent_bytes = message_length;
 
-	if ( sent_bytes < 0 )
+	if ( sent_code < 0 )
 	{
 		return;
 		// throw UnableSendDataException();
@@ -68,9 +70,10 @@ void Sender::SendMessage( const char* msg, int cs, const char* address )
 
 	strncpy(target_address, address, ADDRESS_SIZE-1);
 
-	sent_bytes = send( target_socket, message, message_length, 0 );
+	int sent_code = sendall( target_socket, message, &message_length );
+	sent_bytes = message_length;
 
-	if ( !IsSentMessage() )
+	if ( sent_code < 0 )
 	{
 		return;
 		// throw UnableSendDataException();
@@ -103,14 +106,6 @@ void Sender::ShowSentMessage() const
 	printf("\nmessage: <[ %s ]>\n"
 			"Sent to [%s] %d\\%d bytes\n"
 			"==================== (%d) ====================\n\n", GetMessage(), GetTargetAddress(), GetSentBytes(), GetMessageLength(), GetSentMsgsCount());
-}
-
-bool Sender::IsSentMessage() const
-{
-	if ( ( sent_bytes >= 0 ) && ( sent_bytes <= BUFSIZE-1 ) )
-		return true;
-
-	return false;
 }
 
 void Sender::Reset()

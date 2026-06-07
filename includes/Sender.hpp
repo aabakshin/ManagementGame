@@ -44,7 +44,6 @@ private:
 	void ResetTargetSocket();
 	void ResetTargetAddress();
 	void ResetSentBytes();
-	bool IsSentMessage() const;
 };
 
 #endif
