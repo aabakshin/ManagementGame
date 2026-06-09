@@ -3,7 +3,6 @@
 
 
 #include "Server.hpp"
-#include <signal.h>
 #include <errno.h>
 #include <unistd.h>
 #include <cstring>
@@ -25,13 +24,37 @@ enum
 /* Ф-я-обработчик сигнала SIGINT */
 void exit_handler( int sig_no )
 {
-	int save_errno = errno;
-	signal(SIGINT, exit_handler);
-
 	Server::SetSignalNum( sig_no );
 	Server::SetExitFlag();
+}
 
-	errno = save_errno;
+void Server::IgnoreUnusedSignals()
+{
+	struct sigaction old_act;
+
+	int max_sig = SIGRTMAX;
+
+	for ( int sig = 1; sig <= max_sig; ++sig )
+	{
+		if (
+				sig == SIGKILL			||
+				sig == SIGSTOP			||
+				sig == SIGSEGV
+			)
+			continue;
+
+		if ( sigaction( sig, nullptr, &old_act ) == 0 )
+		{
+			if ( old_act.sa_handler == SIG_DFL )
+			{
+				struct sigaction new_act;
+				new_act.sa_handler = SIG_IGN;
+				sigemptyset(&new_act.sa_mask);
+				new_act.sa_flags = 0;
+				sigaction(sig, &new_act, nullptr);
+			}
+		}
+	}
 }
 
 void Server::SetSignalNum( int value )
@@ -306,9 +329,16 @@ void Server::RefillReadfds()
 
 int Server::Run()
 {
-	signal(SIGINT, exit_handler);
+	struct sigaction sa;
+	sa.sa_handler = exit_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, nullptr);
+
+	IgnoreUnusedSignals();
 
 	srand(time(0));
+
 
 	while ( 1 )
 	{

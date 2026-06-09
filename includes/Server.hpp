@@ -3,13 +3,14 @@
 
 
 #include "SessionsPlanner.hpp"
+#include <csignal>
 
 
 class Server
 {
 private:
-	static bool exit_flag;
-	static int sig_number;
+	static volatile sig_atomic_t exit_flag;
+	static volatile sig_atomic_t sig_number;
 	int ls;
 	struct addrinfo* bind_address;
 	char address_buffer[Sender::ADDRESS_SIZE];
@@ -31,6 +32,7 @@ private:
 	Server( const Server& ) = delete;
 	Server( Server&& ) = delete;
 	void operator=( const Server& ) = delete;
+	void IgnoreUnusedSignals();
 	int GetListenSocket() const { return ls; }
 	void SetListenSocket( int );
 	const char* GetAddrBuffer() const { return address_buffer; }
