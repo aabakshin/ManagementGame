@@ -180,10 +180,12 @@ SessionsPlanner::SessionsPlanner()
 
 void SessionsPlanner::Make( int sessions_count )
 {
+	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
+
 	EBCbroker.Make( *this );
 	EGameMessages.Make( *this );
 	EMultiActionsExec.Make( *this, sender, msg_tokens, EGameMessages );
-	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
+	EGameEvents.Make( *this, msg_tokens, EMultiActionsExec );
 
 	if ( sessions_count < 1 )
 		current_sessions_count = DEFAULT_START_SESSIONS_COUNT;
@@ -362,65 +364,6 @@ std::list<int> SessionsPlanner::GetValidFdsList() const
 	return valid_fds;
 }
 
-void SessionsPlanner::ReportOnTurnEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_REPORT_ON_TURN_TOKEN );
-
-
-	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
-
-	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
-}
-
-void SessionsPlanner::PrepareNewTurnEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_NEW_TURN_TOKEN );
-}
-
-void SessionsPlanner::InitStartEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_TIME_TOKEN );
-}
-
-void SessionsPlanner::CheckStartEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_START_TOKEN );
-}
-
-void SessionsPlanner::EndGameTurnEvent( int session_id )
-{
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
-
-	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
-
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_AUCTIONS_RESULTS_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_BUILDING_FACTORIES_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PAY_CHARGES_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_PLAYERS_BANKROT_TOKEN );
-	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_BANKROT_PLAYERS_TOKEN );
-}
-
 void SessionsPlanner::GameEventsHandle()
 {
 	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
@@ -438,23 +381,31 @@ void SessionsPlanner::GameEventsHandle()
 				if ( !is_launched_flag )
 				{
 					const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
-					InitStartEvent( banker.GetId() );
+
+					itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::INIT_START_EVENT_TOKEN );
 				}
 			}
 
 			if ( is_alarmed_flag )
 			{
 				const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].UnsetAlarmed();
-				CheckStartEvent( banker.GetId() );
+
+				itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::CHECK_START_EVENT_TOKEN );
 			}
 		}
 		else
 		{
 			if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
 			{
-				EndGameTurnEvent( i );
-				ReportOnTurnEvent( i );
-				PrepareNewTurnEvent( i );
+				itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::END_GAME_TURN_EVENT_TOKEN );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::REPORT_ON_TURN_EVENT_TOKEN );
+				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::PREPARE_NEW_TURN_EVENT_TOKEN );
 			}
 		}
 	}

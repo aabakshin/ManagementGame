@@ -20,6 +20,8 @@ private:
 public:
 	EncapsulatedBrokerMessages() {}
 	void Make( const U& );
+	template <class X, class Y>
+	void Make( const U&, const X&, const Y& );
 	template <class X, class Y, class Z>
 	void Make( const U&, const X&, const Y&, const Z& );
 	const T& GetBroker() const;
@@ -64,6 +66,63 @@ private:
 	BrokerMessages( const BrokerMessages& ) = delete;
 	BrokerMessages( BrokerMessages&& ) = delete;
 	void operator=( const BrokerMessages& ) = delete;
+};
+
+class MulticastActionsExec;
+class GameEvents : public BrokerMessages
+{
+public:
+
+	enum
+	{
+				END_GAME_TURN_EVENT_TOKEN,
+				INIT_START_EVENT_TOKEN,
+				CHECK_START_EVENT_TOKEN,
+				REPORT_ON_TURN_EVENT_TOKEN,
+				PREPARE_NEW_TURN_EVENT_TOKEN
+	};
+
+	enum
+	{
+				SESSION_ID_PARAM_TOKEN
+	};
+
+	enum
+	{
+				BROKER_ACTIONS_COUNT	=		  5
+	};
+
+	enum
+	{
+				MESSAGE_SIZE			=		300
+	};
+
+private:
+	int session_id;
+
+	const SessionsPlanner& game_sessions;
+	const MessageTokens&  msg_tokens;
+	const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& EMultiActionsExec;
+
+	char result_message[MESSAGE_SIZE];
+public:
+	GameEvents( const SessionsPlanner&, const MessageTokens&, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& );
+	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
+	const MessageTokens& GetMsgTokens() const { return msg_tokens; }
+	const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& GetEMultiActionsExec() const { return EMultiActionsExec; }
+	virtual void PutMessage( const char**, int ) override;
+	virtual ~GameEvents() {}
+private:
+	virtual void CheckMessageCode( int ) const override;
+	GameEvents( const GameEvents& ) = delete;
+	GameEvents( GameEvents&& ) = delete;
+	void operator=( const GameEvents& ) = delete;
+
+	void EndGameTurnEvent();
+	void InitStartEvent();
+	void CheckStartEvent();
+	void ReportOnTurnEvent();
+	void PrepareNewTurnEvent();
 };
 
 class GameMessages;

@@ -13,10 +13,6 @@
 #include <list>
 
 
-class MessageTokens;
-class MulticastActionsExec;
-
-
 class SessionsPlanner
 {
 public:
@@ -87,6 +83,7 @@ private:
 	EncapsulatedBrokerMessages<BCBrokerMessages,SessionsPlanner> EBCbroker;
 	EncapsulatedBrokerMessages<GameMessages,SessionsPlanner> EGameMessages;
 	EncapsulatedBrokerMessages<MulticastActionsExec,SessionsPlanner> EMultiActionsExec;
+	EncapsulatedBrokerMessages<GameEvents,SessionsPlanner> EGameEvents;
 	Sender sender;
 	Receiver receiver;
 	MessageTokens msg_tokens;
@@ -108,12 +105,6 @@ public:
 	void PlayerEventHandle( const std::pair<int,int>& );
 	void QuitPlayer( int, int );
 	void QuitAllPlayers( std::list<std::pair<int, std::string>>& );
-
-	void EndGameTurnEvent( int );
-	void InitStartEvent( int );
-	void CheckStartEvent( int );
-	void ReportOnTurnEvent( int );
-	void PrepareNewTurnEvent( int );
 	void GameEventsHandle();
 private:
 	SessionsPlanner( const SessionsPlanner& ) = delete;
