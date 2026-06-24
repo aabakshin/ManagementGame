@@ -3,7 +3,7 @@
 
 
 #include "Receiver.hpp"
-#include "MGLib.h"
+#include "Utility.hpp"
 #include <cstring>
 #include <cstdio>
 
@@ -16,7 +16,7 @@ void Receiver::RecvMessage( int cs, const char* address )
 
 	strncpy(target_address, address, ADDRESS_SIZE );
 
-	recv_bytes = readline( target_socket, message, BUFSIZE-1 );
+	recv_bytes = Utility::readline( target_socket, message, BUFSIZE-1 );
 
 	if ( !IsRecvMessage() )
 	{
@@ -25,10 +25,10 @@ void Receiver::RecvMessage( int cs, const char* address )
 	}
 
 	message[recv_bytes] = '\0';
-	cut_str(message, recv_bytes, '\n');
+	Utility::cut_str(message, recv_bytes, '\n');
 
 	int message_size = strlen(message) + 1;
-	delete_spaces(message, &message_size);
+	Utility::delete_spaces(message, &message_size);
 
 	message_length = message_size - 1;
 }

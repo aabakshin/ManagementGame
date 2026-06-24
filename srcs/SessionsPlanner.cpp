@@ -3,7 +3,8 @@
 
 
 #include "SessionsPlanner.hpp"
-#include "MGLib.h"
+#include "MGProto.hpp"
+#include "Utility.hpp"
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
@@ -299,7 +300,7 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 
 		const_cast<Banker&>(banker).SetLobbyPlayers( banker.GetLobbyPlayers() + 1 );
 
-		itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+		Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_NEW_PLAYER_CONNECT_TOKEN );
@@ -382,7 +383,7 @@ void SessionsPlanner::GameEventsHandle()
 				{
 					const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
 
-					itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 					const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
 					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::INIT_START_EVENT_TOKEN );
 				}
@@ -392,7 +393,7 @@ void SessionsPlanner::GameEventsHandle()
 			{
 				const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].UnsetAlarmed();
 
-				itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::CHECK_START_EVENT_TOKEN );
 			}
@@ -401,7 +402,7 @@ void SessionsPlanner::GameEventsHandle()
 		{
 			if ( banker.GetReadyPlayers() == banker.GetAlivePlayers() )
 			{
-				itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::END_GAME_TURN_EVENT_TOKEN );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::REPORT_ON_TURN_EVENT_TOKEN );
@@ -447,8 +448,8 @@ void SessionsPlanner::QuitAllPlayers( std::list<std::pair<int,std::string>>& pla
 
 void SessionsPlanner::QuitPlayer( int session_id, int player_id )
 {
-	itoa( session_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( player_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( player_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
 	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
@@ -492,7 +493,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 			}
 			else
 			{
-				itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
 				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), p_fd, p_addr );

@@ -1,5 +1,5 @@
-#ifndef MGLIB_H
-#define MGLIB_H
+#ifndef MGPROTO_HPP
+#define MGPROTO_HPP
 
 
 enum
@@ -56,29 +56,5 @@ enum
 {
 					INTERNAL_SERVER_ERROR
 };
-
-
-/* Пирамидальная сортировка */
-void heap_sort(int* values, int size, int ascending);
-
-/* Удаляет лишние пробелы из строки */
-void delete_spaces(char* buffer, int* bufsize);
-
-/* Превращает число в строку */
-void itoa(int number, char* num_buf, int max_buf_len);
-
-/* Читает строку из буфера ввода ядра */
-int readline(int fd, char* buf, int bufsize);
-
-/* Записывает строку в буфер вывода ядра. В случае неполной записи возвращает через bufsize общее кол-во записанных данных.
- * Возвращает возвращаемое значение из send */
-int sendall( int fd, const char* buf, int* bufsize );
-
-/* Обрезать строку по символу ch, затирая его. Область памяти s должна быть изменяемая! */
-int cut_str( char* s, int s_size, int ch );
-
-void concat_to_str( int number, char* number_buf, int number_len, char* str, int* str_offset );
-
-int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count );
 
 #endif

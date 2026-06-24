@@ -3,7 +3,7 @@
 
 
 #include "CommandExecutor.hpp"
-#include "MGLib.h"
+#include "MGProto.hpp"
 #include <cstdlib>
 #include <cstring>
 

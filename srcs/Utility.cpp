@@ -1,89 +1,18 @@
-#ifndef MGLIB_C
-#define MGLIB_C
+#ifndef UTILITY_CPP_SENTINEL
+#define UTILITY_CPP_SENTINEL
 
 
-#include "MGLib.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "Utility.hpp"
+#include <cstring>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
 
-const char* info_game_messages[] =
-{
-				"*INFO_MESSAGE|AUCTION_RESULTS",
-				"*INFO_MESSAGE|SUCCESS_CHARGES_PAY",
-				"*INFO_MESSAGE|PLAYER_BANKROT",
-				"*INFO_MESSAGE|LOST_ALIVE_PLAYER",
-				"*INFO_MESSAGE|PRODUCED",
-				"*INFO_MESSAGE|STARTINSECONDS",
-				"*INFO_MESSAGE|GAME_STARTED",
-				"*INFO_MESSAGE|STARTING_GAME_INFORMATION",
-				"*INFO_MESSAGE|STARTCANCELLED",
-				"*INFO_MESSAGE|PAY_FACTORY_SUCCESS",
-				"*INFO_MESSAGE|FACTORY_BUILT",
-				"*INFO_MESSAGE|VICTORY_MESSAGE",
-				"*INFO_MESSAGE|GAME_ALREADY_STARTED",
-				"*INFO_MESSAGE|SERVER_FULL",
-				"*INFO_MESSAGE|NEW_PLAYER_CONNECT",
-				"*INFO_MESSAGE|GAME_NOT_STARTED",
-				"*INFO_MESSAGE|LOST_LOBBY_PLAYER",
-				"*INFO_MESSAGE|NEW_TURN",
-				"*INFO_MESSAGE|WAIT_FOR_NEXT_TURN",
-				"*INFO_MESSAGE|UNKNOWN_COMMAND",
-				"*INFO_MESSAGE|HELP_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|MARKET_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|PLAYER_COMMAND_NOT_FOUND",
-				"*INFO_MESSAGE|PLAYER_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|PLAYER_COMMAND_INCORRECT_ID",
-				"*INFO_MESSAGE|LIST_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|PROD_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|PROD_COMMAND_NO_FACTORIES",
-				"*INFO_MESSAGE|PROD_COMMAND_NO_MONEY",
-				"*INFO_MESSAGE|PROD_COMMAND_NO_SOURCE",
-				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST",
-				"*INFO_MESSAGE|BUILDING_FACTORIES_LIST_EMPTY",
-				"*INFO_MESSAGE|BUILD_COMMAND_INCORRECT_ARG",
-				"*INFO_MESSAGE|BUILD_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|BUILD_COMMAND_NO_MONEY",
-				"*INFO_MESSAGE|BUY_COMMAND_ALREADY_SENT",
-				"*INFO_MESSAGE|BUY_COMMAND_NO_MONEY",
-				"*INFO_MESSAGE|BUY_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_PRICE",
-				"*INFO_MESSAGE|BUY_COMMAND_INCORRECT_AMOUNT",
-				"*INFO_MESSAGE|SELL_COMMAND_ALREADY_SENT",
-				"*INFO_MESSAGE|SELL_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_PRICE",
-				"*INFO_MESSAGE|SELL_COMMAND_INCORRECT_AMOUNT",
-				"*INFO_MESSAGE|TURN_COMMAND_SUCCESS",
-				"*INFO_MESSAGE|QUIT_COMMAND_SUCCESS",
-				NULL
-};
-
-const char* error_game_messages[] =
-{
-				"*ERROR_MESSAGE|INTERNAL_SERVER_ERROR",
-				NULL
-};
-
-
-// Вспомогательная ф-я для heap_sort. Превращает массив целых в древовидную структуру "куча"
-// ascending: 1(по убыванию), 0(по возрастанию)
-static void heap_make(int* values, int size, int ascending);
-
-// Вспомогательная ф-я для itoa. Делает реверс строки
-static void reverse(char* s);
-
-// Вспомогательная функция для itoa. Подсчитывает кол-во цифр в числе
-static int num_digit_cnt(int number);
-
-
-int cut_str(char* s, int s_size, int ch)
+int Utility::cut_str( char* s, int s_size, int ch )
 {
 	if (
-				( s == NULL )			||
+				( s == nullptr )			||
 				( s[0] == '\0' )
 		)
 	{
@@ -109,7 +38,7 @@ int cut_str(char* s, int s_size, int ch)
 	return 1;
 }
 
-static void heap_make(int* values, int size, int ascending)
+void Utility::heap_make( int* values, int size, int ascending )
 {
 	int i;
 	for ( i = size-1; i > 0; i-- )
@@ -139,9 +68,9 @@ static void heap_make(int* values, int size, int ascending)
 	}
 }
 
-void heap_sort(int* values, int size, int ascending)
+void Utility::heap_sort(int* values, int size, int ascending)
 {
-	heap_make(values, size, ascending);
+	heap_make( values, size, ascending );
 
 	int i;
 	for ( i = size-1; i > 0; i-- )
@@ -150,13 +79,13 @@ void heap_sort(int* values, int size, int ascending)
 		values[i] = values[0];
 		values[0] = temp;
 
-		heap_make(values, i, ascending);
+		heap_make( values, i, ascending );
 	}
 }
 
-void delete_spaces(char* buffer, int* bufsize)
+void Utility::delete_spaces( char* buffer, int* bufsize )
 {
-	if ( buffer == NULL )
+	if ( buffer == nullptr )
 		return;
 
 	if ( *bufsize < 2 )
@@ -234,7 +163,7 @@ void delete_spaces(char* buffer, int* bufsize)
 	*bufsize = i+1;
 }
 
-static void reverse(char* s)
+void Utility::reverse( char* s )
 {
 	int i = 0;
 	int j = strlen(s)-1;
@@ -247,7 +176,7 @@ static void reverse(char* s)
 	}
 }
 
-static int num_digit_cnt(int number)
+int Utility::num_digit_cnt( int number )
 {
 	int counter = 0;
 
@@ -266,7 +195,7 @@ static int num_digit_cnt(int number)
 	return counter;
 }
 
-void itoa(int number, char* num_buf, int max_buf_len)
+void Utility::itoa( int number, char* num_buf, int max_buf_len )
 {
 	if ( number == 0 )
 	{
@@ -305,7 +234,7 @@ void itoa(int number, char* num_buf, int max_buf_len)
 	reverse(num_buf);
 }
 
-int sendall( int fd, const char* buf, int* bufsize )
+int Utility::sendall( int fd, const char* buf, int* bufsize )
 {
 	int total = 0;
 	int bytesleft = *bufsize;
@@ -324,7 +253,7 @@ int sendall( int fd, const char* buf, int* bufsize )
 	return n == -1 ? -1 : 0;
 }
 
-int readline(int fd, char* buf, int bufsize)
+int Utility::readline( int fd, char* buf, int bufsize )
 {
 	int total_read = 0;
 	int rc = 0;
@@ -353,7 +282,7 @@ int readline(int fd, char* buf, int bufsize)
 	return total_read;
 }
 
-void concat_to_str(int number, char* number_buf, int number_len, char* str, int* str_offset)
+void Utility::concat_to_str( int number, char* number_buf, int number_len, char* str, int* str_offset )
 {
 	itoa( number, number_buf, number_len );
 	strcpy(str + *str_offset, number_buf);
@@ -362,7 +291,7 @@ void concat_to_str(int number, char* number_buf, int number_len, char* str, int*
 	++(*str_offset);
 }
 
-int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count )
+int Utility::concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count )
 {
 	int i, j = 0;
 	for ( i = 0; i < tokens_count; ++i )

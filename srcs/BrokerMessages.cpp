@@ -4,7 +4,8 @@
 
 #include "BrokerMessages.hpp"
 #include "SessionsPlanner.hpp"
-#include "MGLib.h"
+#include "MGProto.hpp"
+#include "Utility.hpp"
 #include <cstring>
 #include <cstdio>
 
@@ -131,13 +132,13 @@ void GameEvents::CheckMessageCode( int message_code ) const
 
 void GameEvents::EndGameTurnEvent()
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
 
 
-	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::START_AUCTION_TOKEN );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_AUCTIONS_RESULTS_TOKEN );
@@ -149,36 +150,36 @@ void GameEvents::EndGameTurnEvent()
 
 void GameEvents::InitStartEvent()
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_START_TIME_TOKEN );
 }
 
 void GameEvents::CheckStartEvent()
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::CHECK_START_TOKEN );
 }
 
 void GameEvents::ReportOnTurnEvent()
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_REPORT_ON_TURN_TOKEN );
 
-	itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( SOURCE_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
 
-	itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( PRODUCTION_AUCTION, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::AUCTION_TYPE_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SHOW_REPORT_ON_TURN_TOKEN );
 }
 
 void GameEvents::PrepareNewTurnEvent()
 {
-	itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+	Utility::itoa( session_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 	const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::PREPARE_NEW_TURN_TOKEN );
 }
@@ -304,7 +305,7 @@ void MulticastActionsExec::PayCharges()
 				total_charges += p->GetWaitFactories() * FACTORY_UNIT_CHARGE;
 				total_charges += p->GetWorkFactories() * FACTORY_UNIT_CHARGE;
 
-				itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
 
 				int remains = p->GetMoney() - total_charges;
@@ -339,7 +340,7 @@ void MulticastActionsExec::CheckBuildingFactories()
 					{
 						int total_charges = NEW_FACTORY_UNIT_COST / 2;
 
-						itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						Utility::itoa( total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
 
 						int remains = p->GetMoney() - total_charges;
@@ -470,7 +471,7 @@ void MulticastActionsExec::PrepareNewTurn()
 				const_cast<Player*>(p)->SetIncome( p->GetMoney() - p->GetOldMoney() );
 				const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
 
-				itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
 
 				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_TURN_TOKEN ), p->GetFd(), p->GetAddr() );
@@ -485,7 +486,7 @@ void MulticastActionsExec::PrepareNewTurn()
 
 				if ( p->GetProduced() > 0 )
 				{
-					itoa( p->GetProduced(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					Utility::itoa(p->GetProduced(),const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN+1 );
 
 					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PRODUCED_TOKEN ), p->GetFd(), p->GetAddr() );
@@ -525,7 +526,7 @@ void MulticastActionsExec::PreparePlayersState()
 			const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
 			const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
 
-			itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
 
 			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTING_GAME_INFORMATION_TOKEN ), p->GetFd(), p->GetAddr() );
@@ -587,7 +588,7 @@ void MulticastActionsExec::SendStartTime()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			Utility::itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
 			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
 		}
@@ -672,7 +673,7 @@ void MulticastActionsExec::QuitPlayer()
 						return;
 					}
 
-					itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					Utility::itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
 					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
@@ -699,7 +700,7 @@ void MulticastActionsExec::SortRequestsByPrice( const List<Item<MarketData>>& re
 		reqs_checked[i] = false;
 	}
 
-	heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
+	Utility::heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
 
 	int j = 0;
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
@@ -900,10 +901,10 @@ void GameMessages::LostLobbyPlayerMessage()
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
 	char lp_buf[10];
-	itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
+	Utility::itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
+	Utility::itoa(MAX_PLAYERS, max_pl_buf, 9);
 
 
 	const char* message_tokens[] =
@@ -914,7 +915,7 @@ void GameMessages::LostLobbyPlayerMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
 }
 
 void GameMessages::LostAlivePlayerMessage()
@@ -922,10 +923,10 @@ void GameMessages::LostAlivePlayerMessage()
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
 	char ap_buf[10];
-	itoa( game_session.GetAlivePlayers(), ap_buf, 9 );
+	Utility::itoa( game_session.GetAlivePlayers(), ap_buf, 9 );
 
 	char left_p_num_buf[10];
-	itoa( left_player_id, left_p_num_buf, 9 );
+	Utility::itoa( left_player_id, left_p_num_buf, 9 );
 
 
 	const char* message_tokens[] =
@@ -936,7 +937,7 @@ void GameMessages::LostAlivePlayerMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
 }
 
 void GameMessages::VictoryMessage()
@@ -947,13 +948,13 @@ void GameMessages::VictoryMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::StartInSecondsMessage()
 {
 	char tts[10];
-	itoa(time_to_start, tts, 9);
+	Utility::itoa(time_to_start, tts, 9);
 
 
 	const char* message_tokens[] =
@@ -963,7 +964,7 @@ void GameMessages::StartInSecondsMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
 }
 
 void GameMessages::GameStartedMessage()
@@ -974,7 +975,7 @@ void GameMessages::GameStartedMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::GameAlreadyStartedMessage()
@@ -985,7 +986,7 @@ void GameMessages::GameAlreadyStartedMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::StartGameInfoMessage()
@@ -1008,43 +1009,43 @@ void GameMessages::StartGameInfoMessage()
 	}
 
 	char p_num[10];
-	itoa(sender_p->GetUID(), p_num, 9);
+	Utility::itoa(sender_p->GetUID(), p_num, 9);
 
 	char ap[10];
-	itoa(game_session.GetAlivePlayers(), ap, 9);
+	Utility::itoa(game_session.GetAlivePlayers(), ap, 9);
 
 	char tn[10];
-	itoa(game_session.GetTurnNumber(), tn, 9);
+	Utility::itoa(game_session.GetTurnNumber(), tn, 9);
 
 	char p_money[20];
-	itoa(sender_p->GetMoney(), p_money, 19);
+	Utility::itoa(sender_p->GetMoney(), p_money, 19);
 
 	char p_sources[10];
-	itoa(sender_p->GetSources(), p_sources, 9);
+	Utility::itoa(sender_p->GetSources(), p_sources, 9);
 
 	char p_products[10];
-	itoa(sender_p->GetProducts(), p_products, 9);
+	Utility::itoa(sender_p->GetProducts(), p_products, 9);
 
 	char p_wf[10];
-	itoa(sender_p->GetWaitFactories(), p_wf, 9);
+	Utility::itoa(sender_p->GetWaitFactories(), p_wf, 9);
 
 	char p_wrkf[10];
-	itoa(sender_p->GetWorkFactories(), p_wrkf, 9);
+	Utility::itoa(sender_p->GetWorkFactories(), p_wrkf, 9);
 
 	char p_bf[10];
-	itoa(sender_p->GetBuiltFactories(), p_bf, 9);
+	Utility::itoa(sender_p->GetBuiltFactories(), p_bf, 9);
 
 	char sa[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
 
 	char smp[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
 
 	char pa[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
 
 	char pmp[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
 
 
 	const char* message_tokens[] =
@@ -1066,7 +1067,7 @@ void GameMessages::StartGameInfoMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, sender_p->IsBot() ? 14 : 10 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, sender_p->IsBot() ? 14 : 10 );
 }
 
 void GameMessages::StartCancelledMessage()
@@ -1077,7 +1078,7 @@ void GameMessages::StartCancelledMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::NewPlayerConnectMessage()
@@ -1085,10 +1086,10 @@ void GameMessages::NewPlayerConnectMessage()
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
 	char lp_buf[10];
-	itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
+	Utility::itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
-	itoa(MAX_PLAYERS, max_pl_buf, 9);
+	Utility::itoa(MAX_PLAYERS, max_pl_buf, 9);
 
 
 	const char* message_tokens[] =
@@ -1099,7 +1100,7 @@ void GameMessages::NewPlayerConnectMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 3 );
 }
 
 void GameMessages::GameNotStartedMessage()
@@ -1110,7 +1111,7 @@ void GameMessages::GameNotStartedMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::AuctionResultsMessage()
@@ -1149,32 +1150,32 @@ void GameMessages::AuctionResultsMessage()
 	int tokens_amount = 1;
 	for ( int i = 0; i < game_session.GetReadyPlayers(); ++i )
 	{
-		itoa(game_session.GetTurnNumber(), pr[i].tn, TURN_SIZE);
+		Utility::itoa(game_session.GetTurnNumber(), pr[i].tn, TURN_SIZE);
 		message_tokens[tokens_amount] = pr[i].tn;
 		++tokens_amount;
 
-		itoa(game_session.GetPlayers()[i]->GetUID(), pr[i].pnum, PLAYER_NUM_SIZE);
+		Utility::itoa(game_session.GetPlayers()[i]->GetUID(), pr[i].pnum, PLAYER_NUM_SIZE);
 		message_tokens[tokens_amount] = pr[i].pnum;
 		++tokens_amount;
 
-		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldSources(), pr[i].ssnum, SOLD_SOURCES_SIZE);
+		Utility::itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldSources(), pr[i].ssnum, SOLD_SOURCES_SIZE);
 		message_tokens[tokens_amount] = pr[i].ssnum;
 		++tokens_amount;
 
-		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldPrice(), pr[i].spnum, SOLD_PRICE_SIZE);
+		Utility::itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetSoldPrice(), pr[i].spnum, SOLD_PRICE_SIZE);
 		message_tokens[tokens_amount] = pr[i].spnum;
 		++tokens_amount;
 
-		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtProducts(), pr[i].bpnum, BOUGHT_PRODS_SIZE);
+		Utility::itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtProducts(), pr[i].bpnum, BOUGHT_PRODS_SIZE);
 		message_tokens[tokens_amount] = pr[i].bpnum;
 		++tokens_amount;
 
-		itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtPrice(), pr[i].bprnum, BOUGHT_PRICE_SIZE);
+		Utility::itoa(game_session.GetPlayers()[i]->GetAuctionReport().GetBoughtPrice(), pr[i].bprnum, BOUGHT_PRICE_SIZE);
 		message_tokens[tokens_amount] = pr[i].bprnum;
 		++tokens_amount;
 	}
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, tokens_amount );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, tokens_amount );
 }
 
 void GameMessages::NewTurnMessage()
@@ -1197,19 +1198,19 @@ void GameMessages::NewTurnMessage()
 	}
 
 	char tn[10];
-	itoa(game_session.GetTurnNumber(), tn, 9);
+	Utility::itoa(game_session.GetTurnNumber(), tn, 9);
 
 	char sa[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourcesAmount(), sa, 9);
 
 	char smp[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetSourceMinPrice(), smp, 9);
 
 	char pa[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductsAmount(), pa, 9);
 
 	char pmp[10];
-	itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
+	Utility::itoa(const_cast<Banker&>(game_session).GetCurrentMarketState().GetProductMaxPrice(), pmp, 9);
 
 
 	const char* message_tokens[] =
@@ -1223,13 +1224,13 @@ void GameMessages::NewTurnMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, sender_p->IsBot() ? 6 : 2 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, sender_p->IsBot() ? 6 : 2 );
 }
 
 void GameMessages::ProducedMessage()
 {
 	char am_prd[10];
-	itoa(produced, am_prd, 9);
+	Utility::itoa(produced, am_prd, 9);
 
 
 	const char* message_tokens[] =
@@ -1239,13 +1240,13 @@ void GameMessages::ProducedMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
 }
 
 void GameMessages::SuccessChargesPayMessage()
 {
 	char charges[20];
-	itoa(total_charges, charges, 19);
+	Utility::itoa(total_charges, charges, 19);
 
 
 	const char* message_tokens[] =
@@ -1255,13 +1256,13 @@ void GameMessages::SuccessChargesPayMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
 }
 
 void GameMessages::PlayerBankrotMessage()
 {
 	char charges[20];
-	itoa(total_charges, charges, 19);
+	Utility::itoa(total_charges, charges, 19);
 
 
 	const char* message_tokens[] =
@@ -1271,7 +1272,7 @@ void GameMessages::PlayerBankrotMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 2 );
 }
 
 void GameMessages::PayFactorySuccessMessage()
@@ -1282,7 +1283,7 @@ void GameMessages::PayFactorySuccessMessage()
 			nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::FactoryBuiltMessage()
@@ -1293,7 +1294,7 @@ void GameMessages::FactoryBuiltMessage()
 			nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 void GameMessages::ServerFullMessage()
@@ -1304,7 +1305,7 @@ void GameMessages::ServerFullMessage()
 				nullptr
 	};
 
-	concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
+	Utility::concat_tokens( result_message, MESSAGE_SIZE, message_tokens, 1 );
 }
 
 
@@ -1407,22 +1408,22 @@ void BCBrokerMessages::CheckMessageCode( int message_code ) const
 
 void BCBrokerMessages::MarketCmdSourcesAmount()
 {
-	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourcesAmount(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourcesAmount(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdSourceMinPrice()
 {
-	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourceMinPrice(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetSourceMinPrice(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdProductsAmount()
 {
-	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductsAmount(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductsAmount(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::MarketCmdProductMaxPrice()
 {
-	itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductMaxPrice(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetCurrentMarketState().GetProductMaxPrice(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::PlayerCmdIsTargetNotFound()
@@ -1455,7 +1456,7 @@ void BCBrokerMessages::PlayerCmdGetTargetUID()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetUID(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetUID(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1474,7 +1475,7 @@ void BCBrokerMessages::PlayerCmdGetTargetMoney()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetMoney(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetMoney(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1493,7 +1494,7 @@ void BCBrokerMessages::PlayerCmdGetTargetIncome()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetIncome(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetIncome(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1512,7 +1513,7 @@ void BCBrokerMessages::PlayerCmdGetTargetSources()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetSources(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetSources(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1531,7 +1532,7 @@ void BCBrokerMessages::PlayerCmdGetTargetProducts()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetProducts(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetProducts(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1550,7 +1551,7 @@ void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetWaitFactories(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetWaitFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1569,7 +1570,7 @@ void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetWorkFactories(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetWorkFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1588,7 +1589,7 @@ void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetBuiltFactories(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetBuiltFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1632,7 +1633,7 @@ void BCBrokerMessages::PlayerCmdGetTargetProduced()
 			// throw PlayerRecordIsFreeException();
 		}
 
-		itoa(target_p->GetProduced(), result_message, MESSAGE_SIZE-1);
+		Utility::itoa(target_p->GetProduced(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
@@ -1641,7 +1642,7 @@ void BCBrokerMessages::PlayerCmdGetTargetProduced()
 
 void BCBrokerMessages::ListCmdGetAlivePlayers()
 {
-	itoa( (*game_sessions.GetSessionById(session_id)).GetAlivePlayers(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( (*game_sessions.GetSessionById(session_id)).GetAlivePlayers(), result_message, MESSAGE_SIZE-1 );
 }
 
 void BCBrokerMessages::PlayerSenderIsTurn()
@@ -1806,7 +1807,7 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
 		}
 
 		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
-		itoa( player_builds.GetSize(), result_message, MESSAGE_SIZE-1 );
+		Utility::itoa( player_builds.GetSize(), result_message, MESSAGE_SIZE-1 );
 	}
 
 	//throw NullPointerException();
@@ -1833,8 +1834,8 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 
 		for ( Item<BuildsData>* node = player_builds.GetFirst(); node != nullptr; node = node->GetNext() )
 		{
-			concat_to_str(node->GetData().GetBuildNumber(), build_number, 9, result_message, &offset);
-			concat_to_str(node->GetData().GetTurnsLeft(), turns_left, 9, result_message, &offset);
+			Utility::concat_to_str(node->GetData().GetBuildNumber(), build_number, 9, result_message, &offset);
+			Utility::concat_to_str(node->GetData().GetTurnsLeft(), turns_left, 9, result_message, &offset);
 		}
 
 		result_message[offset-1] = '\0';
@@ -2110,7 +2111,7 @@ void BCBrokerMessages::TurnCmdGetWypaToken()
 {
 	const Banker& game_session = *game_sessions.GetSessionById(session_id);
 
-	itoa( game_session.GetAlivePlayers() - game_session.GetReadyPlayers(), result_message, MESSAGE_SIZE-1 );
+	Utility::itoa( game_session.GetAlivePlayers() - game_session.GetReadyPlayers(), result_message, MESSAGE_SIZE-1 );
 }
 
 #endif

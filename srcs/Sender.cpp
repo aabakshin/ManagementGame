@@ -3,7 +3,7 @@
 
 
 #include "Sender.hpp"
-#include "MGLib.h"
+#include "Utility.hpp"
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -45,7 +45,7 @@ void Sender::SendMessage( const char* const* message_tokens, int tokens_count, i
 
 	strncpy(target_address, address, ADDRESS_SIZE-1);
 
-	int sent_code = sendall( target_socket, message, &message_length );
+	int sent_code = Utility::sendall( target_socket, message, &message_length );
 	sent_bytes = message_length;
 
 	if ( sent_code < 0 )
@@ -70,7 +70,7 @@ void Sender::SendMessage( const char* msg, int cs, const char* address )
 
 	strncpy(target_address, address, ADDRESS_SIZE-1);
 
-	int sent_code = sendall( target_socket, message, &message_length );
+	int sent_code = Utility::sendall( target_socket, message, &message_length );
 	sent_bytes = message_length;
 
 	if ( sent_code < 0 )
