@@ -4,6 +4,7 @@
 
 #include "MessageTokens.hpp"
 #include <cstring>
+#include <stdexcept>
 
 
 void MessageTokens::NullifyMessageTokens()
@@ -35,10 +36,7 @@ void MessageTokens::Make( int tokens_count )
 const char*& MessageTokens::operator[]( int idx )
 {
 	if ( ( idx < 0 ) || ( idx > max_msg_tokens_count-1 ) )
-	{
-		return message_tokens[0];
-		//throw IncorrectMsgTokensIdxException();
-	}
+		throw std::runtime_error("IncorrectMsgTokensIdx error in \"MessageTokens::operator[]\" function!");
 
 	return message_tokens[idx];
 }
@@ -46,10 +44,7 @@ const char*& MessageTokens::operator[]( int idx )
 void MessageTokens::SetMsgTokensCount( int tokens_value )
 {
 	if ( ( tokens_value < 1 ) || ( tokens_value > max_msg_tokens_count ) )
-	{
-		return;
-		// throw IncorrectMsgTokensValueException();
-	}
+		throw std::runtime_error("IncorrectMsgTokensValue error in \"MessageTokens::SetMsgTokensCount\" function!");
 
 	msg_tokens_count = tokens_value;
 }
@@ -60,7 +55,5 @@ MessageTokens::~MessageTokens()
 
 	delete[] message_tokens;
 }
-
-
 
 #endif

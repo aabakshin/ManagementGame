@@ -2,7 +2,6 @@
 #define SESSIONS_PLANNER_HPP_SENTRY
 
 
-#include "Banker.hpp"
 #include "CommandExecutor.hpp"
 #include "BrokerMessages.hpp"
 #include "Sender.hpp"
@@ -11,8 +10,10 @@
 #include <cstdint>
 #include <utility>
 #include <list>
+#include <stdexcept>
 
 
+class Banker;
 class SessionsPlanner
 {
 public:
@@ -26,6 +27,20 @@ public:
 	};
 
 	typedef std::list<std::pair<int, std::string>> BankrotsList;
+
+	class AllGamesAlreadyStartedException : public std::runtime_error
+	{
+	public:
+		explicit AllGamesAlreadyStartedException( const std::string& msg ) : std::runtime_error( msg )
+			{}
+	};
+
+	class ServerFullException : public std::runtime_error
+	{
+	public:
+		explicit ServerFullException( const std::string& msg ) : std::runtime_error( msg )
+			{}
+	};
 
 	class StartSessionsTimers
 	{
@@ -104,7 +119,7 @@ public:
 	bool IsPlayerFd( int, std::pair<int,int>& ) const;
 	void PlayerEventHandle( const std::pair<int,int>& );
 	void QuitPlayer( int, int );
-	void QuitAllPlayers( std::list<std::pair<int, std::string>>& );
+	void GetAllPlayersFds( std::list<std::pair<int, std::string>>& );
 	void GameEventsHandle();
 private:
 	SessionsPlanner( const SessionsPlanner& ) = delete;

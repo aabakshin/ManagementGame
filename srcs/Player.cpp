@@ -5,6 +5,7 @@
 #include "Player.hpp"
 #include <cstdio>
 #include <cstring>
+#include <stdexcept>
 
 
 BuildsData::BuildsData( int num_value, int turns_left_value )
@@ -43,10 +44,7 @@ void BuildsData::MakeData( int num_value, int turns_left_value )
 void BuildsData::SetBuildNumber( int num_value )
 {
 	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::runtime_error("Invalid 'build number' error in \"BuildsData::SetBuildNumber\" function!");
 
 	build_number = num_value;
 }
@@ -54,10 +52,7 @@ void BuildsData::SetBuildNumber( int num_value )
 void BuildsData::SetTurnsLeft( int turns_left_value )
 {
 	if ( turns_left_value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::runtime_error("Invalid 'turns left' error in \"BuildsData::SetTurnsLeft\" function!");
 
 	turns_left = turns_left_value;
 }
@@ -198,10 +193,7 @@ Player::AuctionReport::AuctionReport()
 void Player::AuctionReport::SetSoldSources( int src_value )
 {
 	if ( src_value < 0 )
-	{
-		return;
-		// throw InvalidSourcesException();
-	}
+		throw std::runtime_error("Invalid 'sold sources' error in \"Player::AuctionReport::SetSoldSources\" function!");
 
 	sold_sources = src_value;
 }
@@ -209,10 +201,7 @@ void Player::AuctionReport::SetSoldSources( int src_value )
 void Player::AuctionReport::SetSoldPrice( int price_value )
 {
 	if ( price_value < 0 )
-	{
-		return;
-		// throw InvalidPriceException();
-	}
+		throw std::runtime_error("Invalid 'sold price' error in \"Player::AuctionReport::SetSoldPrice\" function!");
 
 	sold_price = price_value;
 }
@@ -220,10 +209,7 @@ void Player::AuctionReport::SetSoldPrice( int price_value )
 void Player::AuctionReport::SetBoughtProducts( int prod_value )
 {
 	if ( prod_value < 0 )
-	{
-		return;
-		// throw InvalidProductsException();
-	}
+		throw std::runtime_error("Invalid 'bought products' error in \"Player::AuctionReport::SetBoughtProducts\" function!");
 
 	bought_products = prod_value;
 }
@@ -231,10 +217,7 @@ void Player::AuctionReport::SetBoughtProducts( int prod_value )
 void Player::AuctionReport::SetBoughtPrice( int price_value )
 {
 	if ( price_value < 0 )
-	{
-		return;
-		// throw InvalidPriceException();
-	}
+		throw std::runtime_error("Invalid 'bought price' error in \"Player::AuctionReport::SetBoughtPrice\" function!");
 
 	bought_price = price_value;
 }
@@ -276,26 +259,23 @@ Player::Player( int p_fd, const char* p_addr, int p_uid )
 void Player::SetFd( int p_fd )
 {
 	if ( p_fd < -1 )
-	{
-		return;
-		// throw InvalidSocketException();
-	}
+		throw std::runtime_error("Invalid 'socket fd' error in \"Player::SetFd\" function!");
 
 	fd = p_fd;
 }
 
 void Player::SetAddr( const char* p_addr )
 {
+	if ( p_addr == nullptr )
+		throw std::runtime_error("Address pointer is nullptr in \"Player::SetAddr\" function!");
+
 	strncpy(addr, p_addr, ADDRESS_SIZE-1);
 }
 
 void Player::SetUID( int p_uid )
 {
 	if ( p_uid < 0 )
-	{
-		return;
-		// throw InvalidUIDException();
-	}
+		throw std::runtime_error("Invalid 'uid' error in \"Player::SetUID\" function!");
 
 	uid = p_uid;
 }
@@ -333,10 +313,7 @@ void Player::SetIncome( int value )
 void Player::SetSources( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidSourcesException();
-	}
+		throw std::runtime_error("Invalid 'sources' error in \"Player::SetSources\" function!");
 
 	sources = value;
 }
@@ -344,10 +321,7 @@ void Player::SetSources( int value )
 void Player::SetProducts( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidProductsException();
-	}
+		throw std::runtime_error("Invalid 'products' error in \"Player::SetProducts\" function!");
 
 	products = value;
 }
@@ -355,10 +329,7 @@ void Player::SetProducts( int value )
 void Player::SetWaitFactories( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidFactoriesException();
-	}
+		throw std::runtime_error("Invalid 'wait factories' error in \"Player::SetWaitFactories\" function!");
 
 	wait_factories = value;
 }
@@ -366,10 +337,7 @@ void Player::SetWaitFactories( int value )
 void Player::SetWorkFactories( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidFactoriesException();
-	}
+		throw std::runtime_error("Invalid 'work factories' error in \"Player::SetWorkFactories\" function!");
 
 	work_factories = value;
 }
@@ -377,10 +345,7 @@ void Player::SetWorkFactories( int value )
 void Player::SetBuiltFactories( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidFactoriesException();
-	}
+		throw std::runtime_error("Invalid 'built factories' error in \"Player::SetBuiltFactories\" function!");
 
 	built_factories = value;
 }
@@ -388,10 +353,7 @@ void Player::SetBuiltFactories( int value )
 void Player::SetProduced( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidProducedException();
-	}
+		throw std::runtime_error("Invalid 'produced' error in \"Player::SetProduced\" function!");
 
 	produced_on_turn = value;
 }

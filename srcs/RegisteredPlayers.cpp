@@ -3,6 +3,7 @@
 
 
 #include "RegisteredPlayers.hpp"
+#include <stdexcept>
 
 
 RegisteredPlayers::RegisteredPlayers()
@@ -30,10 +31,7 @@ RegisteredPlayers::~RegisteredPlayers()
 const Player* RegisteredPlayers::operator[]( unsigned int idx ) const
 {
 	if ( ( idx < 0 ) || ( idx > ( MAX_PLAYERS-1 ) ) )
-	{
-		return nullptr;
-		// throw IndexOutOfRangeException();
-	}
+		throw std::runtime_error("IndexOutOfRange error in \"RegisteredPlayers::operator[]\" function!");
 
 	return const_cast<const Player*>(registered_players[idx]);
 }

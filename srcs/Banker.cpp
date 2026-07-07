@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
 
 
 /* Таблица множителей для формулы вычисления нового состояния рынка в соответствии с текущим уровнем */
@@ -47,10 +48,7 @@ MarketState::MarketState()
 void MarketState::SetSourcesAmount( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidAmountException();
-	}
+		throw std::range_error("RangeError in \"MarketState::SetSourcesAmount\" function!");
 
 	sources_amount = value;
 }
@@ -58,10 +56,7 @@ void MarketState::SetSourcesAmount( int value )
 void MarketState::SetSourceMinPrice( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidPriceException();
-	}
+		throw std::range_error("RangeError in \"MarketState::SetSourceMinPrice\" function!");
 
 	source_min_price = value;
 }
@@ -69,10 +64,7 @@ void MarketState::SetSourceMinPrice( int value )
 void MarketState::SetProductsAmount( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidAmountException();
-	}
+		throw std::range_error("RangeError in \"MarketState::SetProductsAmount\" function!");
 
 	products_amount = value;
 }
@@ -80,10 +72,7 @@ void MarketState::SetProductsAmount( int value )
 void MarketState::SetProductMaxPrice( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidPriceException();
-	}
+		throw std::range_error("RangeError in \"MarketState::SetProductMaxPrice\" function!");
 
 	product_max_price = value;
 }
@@ -139,10 +128,7 @@ void MarketData::operator=( const MarketData& data )
 void MarketData::SetPlayerNum( int value )
 {
 	if ( ( value < 1 ) || ( value > MAX_PLAYERS ) )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::range_error("RangeError in \"MarketData::SetPlayerNum\" function!");
 
 	player_id = value;
 }
@@ -150,10 +136,7 @@ void MarketData::SetPlayerNum( int value )
 void MarketData::SetAmount( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::range_error("RangeError in \"MarketData::SetAmount\" function!");
 
 	amount = value;
 }
@@ -161,10 +144,7 @@ void MarketData::SetAmount( int value )
 void MarketData::SetPrice( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::range_error("RangeError in \"MarketData::SetPrice\" function!");
 
 	price = value;
 }
@@ -307,10 +287,7 @@ const Player* Banker::GetFree() const
 void Banker::SetId( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidSessionIdValueException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetId\" function!");
 
 	session_id = value;
 }
@@ -318,10 +295,7 @@ void Banker::SetId( int value )
 void Banker::SetTurnNumber( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		//throw InvalidTurnValueException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetTurnNumber\" function!");
 
 	turn_number = value;
 }
@@ -329,10 +303,7 @@ void Banker::SetTurnNumber( int value )
 void Banker::SetAlivePlayers( int value )
 {
 	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
-	{
-		return;
-		// throw InvalidPlayersValueException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetAlivePlayers\" function!");
 
 	alive_players = value;
 }
@@ -340,10 +311,7 @@ void Banker::SetAlivePlayers( int value )
 void Banker::SetReadyPlayers( int value )
 {
 	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
-	{
-		return;
-		// throw InvalidPlayersValueException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetReadyPlayers\" function!");
 
 	ready_players = value;
 }
@@ -351,10 +319,7 @@ void Banker::SetReadyPlayers( int value )
 void Banker::SetLobbyPlayers( int value )
 {
 	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
-	{
-		return;
-		// throw InvalidPlayersValueException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetLobbyPlayers\" function!");
 
 	lobby_players = value;
 }
@@ -362,10 +327,7 @@ void Banker::SetLobbyPlayers( int value )
 void Banker::SetCurrentMarketLvl( int value )
 {
 	if ( value < 0 )
-	{
-		return;
-		// throw InvalidMarketLvlException();
-	}
+		throw std::range_error("RangeError in \"Banker::SetCurrentMarketLvl\" function!");
 
 	cur_market_lvl = value;
 }

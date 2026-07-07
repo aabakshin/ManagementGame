@@ -6,6 +6,7 @@
 #include "Utility.hpp"
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
 
 
 void Receiver::RecvMessage( int cs, const char* address )
@@ -14,15 +15,12 @@ void Receiver::RecvMessage( int cs, const char* address )
 
 	target_socket = cs;
 
-	strncpy(target_address, address, ADDRESS_SIZE );
-
 	recv_bytes = Utility::readline( target_socket, message, BUFSIZE-1 );
 
 	if ( !IsRecvMessage() )
-	{
-		return;
-		// throw UnableRecvDataException();
-	}
+		throw std::runtime_error("Unable to receive data error in \"Receiver::RecvMessage\" function!");
+
+	strncpy(target_address, address, ADDRESS_SIZE );
 
 	message[recv_bytes] = '\0';
 	Utility::cut_str(message, recv_bytes, '\n');
@@ -44,10 +42,7 @@ bool Receiver::IsRecvMessage() const
 void Receiver::SetRecvMsgsCount( int msgs_value )
 {
 	if ( msgs_value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::runtime_error("Invalid 'msgs_value' error in \"Receiver::SetRecvMsgsCount\" function!");
 
 	recv_msgs_count = msgs_value;
 }

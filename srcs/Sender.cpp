@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <cstdio>
+#include <stdexcept>
 
 
 void Sender::SendMessage( const char* const* message_tokens, int tokens_count, int cs, const char* address )
@@ -49,10 +50,7 @@ void Sender::SendMessage( const char* const* message_tokens, int tokens_count, i
 	sent_bytes = message_length;
 
 	if ( sent_code < 0 )
-	{
-		return;
-		// throw UnableSendDataException();
-	}
+		throw std::runtime_error("An error has occurred while sending data in \"Sender::SendMessage\" function!");
 }
 
 void Sender::SendMessage( const char* msg, int cs, const char* address )
@@ -74,19 +72,13 @@ void Sender::SendMessage( const char* msg, int cs, const char* address )
 	sent_bytes = message_length;
 
 	if ( sent_code < 0 )
-	{
-		return;
-		// throw UnableSendDataException();
-	}
+		throw std::runtime_error("An error has occurred while sending data in \"Sender::SendMessage\" function!");
 }
 
 void Sender::SetSentMsgsCount( int msgs_value )
 {
 	if ( msgs_value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
+		throw std::runtime_error("Invalid 'sent_msgs_count' error in \"Sender::SetSentMsgsCount\" function!");
 
 	sent_msgs_count = msgs_value;
 }
@@ -147,6 +139,5 @@ void Sender::ResetSentBytes()
 {
 	sent_bytes = 0;
 }
-
 
 #endif

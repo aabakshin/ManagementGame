@@ -2,16 +2,19 @@
 #define SESSIONS_PLANNER_CPP_SENTINEL
 
 
+#include "Banker.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGProto.hpp"
 #include "Utility.hpp"
+#include "MGExceptions.hpp"
 #include <unistd.h>
 #include <cstdio>
 #include <cstring>
 #include <list>
+#include <stdexcept>
 
 
-/* Список сообщений для идентификации бот-клиента */
+// Список сообщений для идентификации бот-клиента
 static const char* const bot_identity_messages[] = {
 				"./bot_mg_debug4",
 				"./bot_mg_debug4\n",
@@ -20,7 +23,8 @@ static const char* const bot_identity_messages[] = {
 				nullptr
 };
 
-// Описаны в модуле MGLib
+
+// Описаны в модуле MGProto
 extern const char* info_game_messages[];
 extern const char* error_game_messages[];
 
@@ -29,10 +33,7 @@ SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartSessionTimer()
 {
 	timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
 	if ( timerfd == -1 )
-	{
-		perror("timerfd_create");
-		//throw TimerCreateException();
-	}
+		throw std::runtime_error("An error occured during creating sessions timers in \"SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartSessionTimer\" function!");
 
 	timer_settings.it_value.tv_sec			=		0;
 	timer_settings.it_value.tv_nsec			=		0;
@@ -60,11 +61,9 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::GetTimerSettings( 
 {
 	if ( timerfd_gettime(timerfd, cur_value) == -1 )
 	{
-		perror("timerfd_gettime");
 		close(timerfd);
 		timerfd = -1;
-		return;
-		//throw GetTimerSettingsException();
+		throw std::runtime_error("An error has occured during getting timer settings in \"SessionsPlanner::StartSessionsTimers::StartSessionTimer::GetTimerSettings\" function!");
 	}
 }
 
@@ -74,11 +73,9 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer( uint64
 
 	if ( timerfd_settime(timerfd, 0, &timer_settings, nullptr) == -1 )
 	{
-		perror("timerfd_settime");
 		close(timerfd);
 		timerfd = -1;
-		return;
-		//throw TimerStartException();
+		throw std::runtime_error("An error has occured during setting timer settings in \"SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer\" function!");
 	}
 
 	SetLaunched();
@@ -99,19 +96,23 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer( uint64
 
 void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StopTimer()
 {
-	StartTimer( 0, 0, 0, 0 );
+	try
+	{
+		StartTimer( 0, 0, 0, 0 );
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
+
 	UnsetLaunched();
 	SetAlarmed();
 }
 
-
 SessionsPlanner::StartSessionsTimers::StartSessionTimer& SessionsPlanner::StartSessionsTimers::operator[]( int idx )
 {
 	if ( ( idx < 0 ) || ( idx >= DEFAULT_MAX_SESSIONS_COUNT ) )
-	{
-		return sessions_timers_fds[0];
-		// throw IndexOutOfRangeException();
-	}
+		throw std::runtime_error("Index out of range error in \"SessionsPlanner::StartSessionsTimers::operator[]\" function!");
 
 	return sessions_timers_fds[idx];
 }
@@ -119,10 +120,7 @@ SessionsPlanner::StartSessionsTimers::StartSessionTimer& SessionsPlanner::StartS
 int SessionsPlanner::StartSessionsTimers::GetTimerIdxById( int session_id ) const
 {
 	if ( ( session_id < 1 ) || ( session_id > DEFAULT_MAX_SESSIONS_COUNT ) )
-	{
-		return -1;
-		// throw IndexOutOfRangeException();
-	}
+		throw std::runtime_error("Index out of range error in \"SessionsPlanner::StartSessionsTimers::GetTimerIdxById\" function!");
 
 	return session_id - 1;
 }
@@ -130,13 +128,13 @@ int SessionsPlanner::StartSessionsTimers::GetTimerIdxById( int session_id ) cons
 int SessionsPlanner::StartSessionsTimers::GetTimerIdxByFd( int fd ) const
 {
 	if ( fd < 0 )
-		return -1;
+		throw std::runtime_error("Fd out of range in \"SessionsPlanner::StartSessionsTimers::GetTimerIdxByFd\" function!");
 
 	for ( int i = 0; i < DEFAULT_MAX_SESSIONS_COUNT; ++i )
 		if ( sessions_timers_fds[i].GetTimerFd() == fd )
 			return i;
 
-	return -1;
+	throw std::runtime_error("Index out of range in \"SessionsPlanner::StartSessionsTimers::GetTimerIdxByFd\" function!");
 }
 
 bool SessionsPlanner::StartSessionsTimers::IsTimerFd( int fd ) const
@@ -153,21 +151,28 @@ bool SessionsPlanner::StartSessionsTimers::IsTimerFd( int fd ) const
 
 void SessionsPlanner::StartSessionsTimers::ResetTimerFd( int session_id )
 {
-	int idx = GetTimerIdxById( session_id );
-
-	if ( idx == -1 )
+	try
 	{
-		return;
-		// throw IndexOutOfRangeException();
+		int idx = GetTimerIdxById( session_id );
+		sessions_timers_fds[idx].StopTimer();
 	}
-
-	sessions_timers_fds[idx].StopTimer();
+	catch( const std::runtime_error& ex )
+	{
+		throw;
+	}
 }
 
 void SessionsPlanner::StartSessionsTimers::ResetTimers()
 {
-	for ( int i = 0; i < DEFAULT_MAX_SESSIONS_COUNT; ++i )
-		sessions_timers_fds[i].StopTimer();
+	try
+	{
+		for ( int i = 0; i < DEFAULT_MAX_SESSIONS_COUNT; ++i )
+			sessions_timers_fds[i].StopTimer();
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
 }
 
 
@@ -205,10 +210,7 @@ void SessionsPlanner::Make( int sessions_count )
 void SessionsPlanner::AddSessions()
 {
 	if ( current_sessions_count + DEFAULT_ADDITIONAL_SESSIONS_COUNT > DEFAULT_MAX_SESSIONS_COUNT )
-	{
-		return;
-		// throw ReachedMaxSessionsException();
-	}
+		throw std::runtime_error("Exceeded max value of 'current_sessions_count' in \"SessionsPlanner::AddSessions\" function!");
 
 	int prev_sessions_count = current_sessions_count;
 	current_sessions_count += DEFAULT_ADDITIONAL_SESSIONS_COUNT;
@@ -235,10 +237,7 @@ void SessionsPlanner::AddSessions()
 const Banker* SessionsPlanner::operator[]( int index )
 {
 	if ( ( index < 0 ) || ( index >= current_sessions_count ) )
-	{
-		return nullptr;
-		// throw InvalidIndexException();
-	}
+		throw std::runtime_error("Invalid index error in \"SessionsPlanner::operator[]\" function!");
 
 	return game_sessions[index];
 }
@@ -246,7 +245,7 @@ const Banker* SessionsPlanner::operator[]( int index )
 const Banker* SessionsPlanner::GetSessionById( int sid ) const
 {
 	if ( ( sid < 1 ) || ( sid > current_sessions_count ) )
-		return nullptr;
+		throw std::range_error("Invalid 'sid' value, so function \"SessionsPlanner::GetSessionById\" returned null pointer!");
 
 	int idx = GetSessionIdxById( sid );
 
@@ -256,7 +255,7 @@ const Banker* SessionsPlanner::GetSessionById( int sid ) const
 int SessionsPlanner::GetSessionIdxById( int sid ) const
 {
 	if ( ( sid < 1 ) || ( sid > current_sessions_count ) )
-		return -1;
+		throw std::range_error("Invalid 'sid' value in \"SessionsPlanner::GetSessionIdxById\" function!");
 
 	return sid - 1;
 }
@@ -289,6 +288,12 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 		try
 		{
 			const_cast<Player*>(p)->SetNewPlayer( cs, new_client_addr );
+			const_cast<Banker&>(banker).SetLobbyPlayers( banker.GetLobbyPlayers() + 1 );
+
+			Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+			const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
+
+			const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_NEW_PLAYER_CONNECT_TOKEN );
 		}
 		catch ( ... )
 		{
@@ -298,12 +303,6 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 			throw;
 		}
 
-		const_cast<Banker&>(banker).SetLobbyPlayers( banker.GetLobbyPlayers() + 1 );
-
-		Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
-
-		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::SEND_NEW_PLAYER_CONNECT_TOKEN );
 		break;
 	}
 
@@ -312,7 +311,7 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_ALREADY_STARTED_TOKEN ), cs, new_client_addr );
 		sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
 		sender.ShowSentMessage();
-		throw ErrorNewClientGameAlreadyStartedException();
+		throw AllGamesAlreadyStartedException( "All games already started in \"SessionsPlanner::AddNewClientToSession\" function!" );
 	}
 
 	if ( session_full )
@@ -320,7 +319,7 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
 		sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
 		sender.ShowSentMessage();
-		throw ErrorNewClientServerFullException();
+		throw ServerFullException( "Server full in \"SessionsPlanner::AddNewClientToSession\" function!" );
 	}
 }
 
@@ -373,7 +372,17 @@ void SessionsPlanner::GameEventsHandle()
 
 		if ( !banker.IsGameStarted() )
 		{
-			int t_idx = GetStartTimers().GetTimerIdxById( i );
+			int t_idx;
+
+			try
+			{
+				t_idx = GetStartTimers().GetTimerIdxById( i );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
+
 			bool is_launched_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsLaunched();
 			bool is_alarmed_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsAlarmed();
 
@@ -381,11 +390,18 @@ void SessionsPlanner::GameEventsHandle()
 			{
 				if ( !is_launched_flag )
 				{
-					const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
+					try
+					{
+						const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
 
-					Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-					const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
-					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::INIT_START_EVENT_TOKEN );
+						Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
+						const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::INIT_START_EVENT_TOKEN );
+					}
+					catch ( const std::runtime_error& ex )
+					{
+						throw;
+					}
 				}
 			}
 
@@ -395,7 +411,15 @@ void SessionsPlanner::GameEventsHandle()
 
 				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
-				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::CHECK_START_EVENT_TOKEN );
+
+				try
+				{
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::CHECK_START_EVENT_TOKEN );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
 			}
 		}
 		else
@@ -404,9 +428,17 @@ void SessionsPlanner::GameEventsHandle()
 			{
 				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
-				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::END_GAME_TURN_EVENT_TOKEN );
-				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::REPORT_ON_TURN_EVENT_TOKEN );
-				const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::PREPARE_NEW_TURN_EVENT_TOKEN );
+
+				try
+				{
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::END_GAME_TURN_EVENT_TOKEN );
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::REPORT_ON_TURN_EVENT_TOKEN );
+					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::PREPARE_NEW_TURN_EVENT_TOKEN );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
 			}
 		}
 	}
@@ -428,7 +460,7 @@ bool SessionsPlanner::IsCorrectIdentityMsg( const char* identity_msg )
 	return false;
 }
 
-void SessionsPlanner::QuitAllPlayers( std::list<std::pair<int,std::string>>& players_fds )
+void SessionsPlanner::GetAllPlayersFds( std::list<std::pair<int,std::string>>& players_fds )
 {
 	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
 	{
@@ -452,7 +484,14 @@ void SessionsPlanner::QuitPlayer( int session_id, int player_id )
 	Utility::itoa( player_id, const_cast<char*>( const_cast<MessageTokens&>( msg_tokens ).GetValue()[MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN] ), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
-	const_cast<MulticastActionsExec&>( EMultiActionsExec.GetBroker() ).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
+	try
+	{
+		const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).TakeMessage( MulticastActionsExec::QUIT_PLAYER_TOKEN );
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
 }
 
 void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
@@ -461,10 +500,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 	int uid = player_pos.second;
 
 	if ( ( sid < 0 ) || ( uid < 0 ) )
-	{
-		return;
-		//throw InvalidIdException();
-	}
+		throw std::range_error("Invalid session id or user id in \"SessionsPlanner::PlayerEventHandle\" function!");
 
 	const Banker& banker = *GetSessionById( sid );
 	const Player* p = banker.GetPlayers().GetPlayerByUID( uid );
@@ -472,8 +508,16 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 	int p_fd = p->GetFd();
 	const char* p_addr = p->GetAddr();
 
-	receiver.RecvMessage( p_fd, p_addr );
-	receiver.SetRecvMsgsCount( receiver.GetRecvMsgsCount() + 1 );
+	try
+	{
+		receiver.RecvMessage( p_fd, p_addr );
+		receiver.SetRecvMsgsCount( receiver.GetRecvMsgsCount() + 1 );
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
+
 	receiver.ShowReceivedMessage();
 
 	if ( receiver.GetRecvBytes() > 0 )
@@ -496,36 +540,78 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 				Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[MulticastActionsExec::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<MulticastActionsExec&>(EMultiActionsExec.GetBroker()).PutMessage( msg_tokens.GetValue(), MulticastActionsExec::SESSION_ID_PARAM_TOKEN+1 );
 
-				sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), p_fd, p_addr );
-				sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+				try
+				{
+					sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_NOT_STARTED_TOKEN ), p_fd, p_addr );
+					sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
+
 				sender.ShowSentMessage();
 			}
 		}
 		else
 		{
-			// Обработка данных от игрока, когда игра началась
-			cmds_exec.ProcessCommand( banker.GetId(), p->GetMessageBuffer(), p->GetUID(), EBCbroker.GetBroker() );
-			sender.SendMessage( cmds_exec.GetCmdResultTokens(), cmds_exec.GetCmdResultTokensAmount(), p_fd, p_addr );
-			sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+			try
+			{
+				// Обработка данных(игровых команд) от игрока, когда игра началась
+				cmds_exec.ProcessCommand( banker.GetId(), p->GetMessageBuffer(), p->GetUID(), EBCbroker.GetBroker() );
+				sender.SendMessage( cmds_exec.GetCmdResultTokens(), cmds_exec.GetCmdResultTokensAmount(), p_fd, p_addr );
+				sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
+
 			sender.ShowSentMessage();
 
 			const char* info_token = cmds_exec.GetCmdToken( 0 );
 			if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )
 			{
-				QuitPlayer( sid, uid );
-				throw QuitCommandSuccessException( p_fd, p_addr );
+				try
+				{
+					QuitPlayer( sid, uid );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
+
+				// это не ошибка, просто пока что "костыль"
+				throw QuitCommandException("Player sent 'quit' command and it successfully processed in \"SessionsPlanner::PlayerEventHandle\" function!");
 			}
 			else if ( strcmp(info_token, error_game_messages[INTERNAL_SERVER_ERROR]) == 0 )
 			{
-				QuitPlayer( sid, uid );
-				throw InternalServerErrorException( p_fd, p_addr );
+				try
+				{
+					QuitPlayer( sid, uid );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
+
+				throw InternalCmdExecuteException("Interval error occured while processing player command in \"SessionsPlanner::PlayerEventHandle\" function!");
 			}
 		}
 		return;
 	}
 
-	QuitPlayer( sid, uid );
-	throw LostConnectionException( p_fd, p_addr );
+	try
+	{
+		QuitPlayer( sid, uid );
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
+
+	// это тоже не ошибка, клиент "потерял" соединение с сервером
+	throw PlayerLostConnectionException("Player lost connection from server in \"SessionsPlanner::PlayerEventHandle\" function!");
 }
 
 SessionsPlanner::~SessionsPlanner()

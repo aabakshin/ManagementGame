@@ -3,6 +3,7 @@
 
 
 #include "RegisteredCommands.hpp"
+#include <stdexcept>
 
 
 RegisteredCommands::RegisteredCommands()
@@ -36,10 +37,7 @@ RegisteredCommands::~RegisteredCommands()
 const Command* const RegisteredCommands::operator[]( int idx ) const
 {
 	if ( ( idx < 0 ) || ( idx > QUIT_COMMAND_NUM ) )
-	{
-		return nullptr;
-		// throw IndexOutOfRangeException();
-	}
+		throw std::runtime_error("IndexOutOfRange error in \"RegisteredCommands::operator[]\" function!");
 
 	return const_cast<const Command*>(registered_commands[idx]);
 }

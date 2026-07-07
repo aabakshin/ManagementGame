@@ -9,6 +9,7 @@
 #include "Player.hpp"
 #include <cstring>
 #include <cstdlib>
+#include <stdexcept>
 
 
 // Описаны в модуле MGLib
@@ -328,10 +329,8 @@ BuyCommand::BuyCommand( int tokens_count ) : Command( tokens_count )
 void BuyCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount < 3 )
-	{
-		return;
-		// throw IncorrectCmdArgsException();
-	}
+		throw std::invalid_argument("Invalid arguments amount in \"BuyCommand::PrepareAndProc\" function");
+
 
 	char buy_count_param[100];
 	strcpy(buy_count_param, param1);
@@ -343,7 +342,7 @@ void BuyCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_t
 	Utility::cut_str(buy_price_param, 100, '\n');
 	int sources_price = atoi(buy_price_param);
 
-	SetCmdParams(reinterpret_cast<void*>(&sources_amount), reinterpret_cast<void*>(&sources_price));
+	SetCmdParams( reinterpret_cast<void*>(&sources_amount), reinterpret_cast<void*>(&sources_price) );
 
 	Process( session_id, sender_player_id, GetCmdParams(), BCbroker );
 }
@@ -417,10 +416,8 @@ SellCommand::SellCommand( int tokens_count ) : Command( tokens_count )
 void SellCommand::PrepareAndProc( int session_id, int sender_player_id, int cmd_tokens_amount, const char* param1, const char* param2, const BCBrokerMessages& BCbroker )
 {
 	if ( cmd_tokens_amount < 3 )
-	{
-		return;
-		// throw IncorrectCmdArgsException();
-	}
+		throw std::invalid_argument("Invalid arguments amount in \"SellCommand::PrepareAndProc\" function");
+
 
 	char prods_amount_param[100];
 	strcpy(prods_amount_param, param1);

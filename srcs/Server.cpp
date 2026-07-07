@@ -3,6 +3,8 @@
 
 
 #include "Server.hpp"
+#include "MGExceptions.hpp"
+#include "Banker.hpp"
 #include <errno.h>
 #include <unistd.h>
 #include <cstring>
@@ -17,7 +19,7 @@
 
 enum
 {
-					LISTEN_QUEUE_LEN			=						  5
+					LISTEN_QUEUE_LEN					=						  5
 };
 
 
@@ -57,23 +59,12 @@ void Server::IgnoreUnusedSignals()
 	}
 }
 
-void Server::SetSignalNum( int value )
-{
-	if ( value < 0 )
-	{
-		return;
-		// throw InvalidValueException();
-	}
-
-	Server::sig_number = value;
-}
-
 void Server::SetListenSocket( int socket_value )
 {
 	if ( socket_value < -1 )
 	{
-		return;
-		// throw InvalidValueException();
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	ls = socket_value;
@@ -91,9 +82,9 @@ void Server::SetAddrBuffer( const char* addr, const char* port )
 
 	if ( getaddrinfo(addr, port, &hints, &bind_address) != 0 )
 	{
-		fprintf(stderr, "An error has occured with \"getaddrinfo\" (errno code = %d)\n", errno);
-		return;
-		// throw InvalidGetAddrInfoException();
+		//fprintf( stderr, "An error has occured with \"getaddrinfo\". Message: %s\n", gai_strerror(errno) );
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	getnameinfo(
@@ -112,8 +103,8 @@ void Server::SetMaxFd( int max_value )
 {
 	if ( max_value < 0 )
 	{
-		return;
-		// throw InvalidValueException();
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	max_fd = max_value;
@@ -125,9 +116,9 @@ void Server::ListenSocketInit()
 	SetListenSocket( socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol) );
 	if ( GetListenSocket() == -1 )
 	{
-		fprintf(stderr, "socket() failed. (errno code = %d)\n", errno);
-		return;
-		// throw InvalidSocketException();
+		//fprintf(stderr, "socket() failed. Message: %s\n", strerror(errno) );
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	printf("%s\n", "Setting socket options...");
@@ -137,17 +128,17 @@ void Server::ListenSocketInit()
 	printf("%s\n", "Binding socket to address...");
 	if ( bind(GetListenSocket(), bind_address->ai_addr, bind_address->ai_addrlen) )
 	{
-		fprintf(stderr, "bind() failed. (errno code = %d)\n", errno);
-		return;
-		// throw BindSocketException();
+		//fprintf(stderr, "bind() failed. Message: %s\n", strerror(errno));
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	printf("%s\n", "Enabling listen mode...");
 	if ( listen(GetListenSocket(), LISTEN_QUEUE_LEN) < 0 )
 	{
-		fprintf(stderr, "listen() failed. (errno code = %d\n)", errno);
-		return;
-		// throw ListenSocketException();
+		//fprintf(stderr, "listen() failed. Message: %s\n", strerror(errno));
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 }
 
@@ -198,7 +189,7 @@ void Server::Stop( int forcely )
 		printf("%s", "\n\n========== SERVER IS STOPPING WORK FORCELY ==========\n");
 
 	std::list<std::pair<int, std::string>> players_fds;
-	sessions_planner.QuitAllPlayers( players_fds );
+	sessions_planner.GetAllPlayersFds( players_fds );
 
 	if ( !players_fds.empty() )
 		for ( const auto& close_pair : players_fds )
@@ -228,8 +219,9 @@ void Server::NewClientHandle()
 	int cs = accept( ls, (struct sockaddr*) &client_address, &client_address_len );
 	if ( cs == -1 )
 	{
-		fprintf(stderr, "accept() failed. (errno code = %d)\n", errno);
-		return;
+		//fprintf(stderr, "accept() failed. Message: %s\n", strerror(errno));
+		// логгирование ошибки в файл
+		Stop( 0 );
 	}
 
 	getnameinfo(
@@ -252,6 +244,7 @@ void Server::NewClientHandle()
 	}
 	catch( ... )
 	{
+		// логгирование ошибки в файл и отключение клиента от сервера
 		CloseConnection( cs, new_client_addr );
 	}
 }
@@ -270,8 +263,17 @@ void Server::IncomingEventsHandle()
 
 			if ( sessions_planner.GetStartTimers().IsTimerFd( i )  )
 			{
-				int t_idx = sessions_planner.GetStartTimers().GetTimerIdxByFd( i );
-				const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[t_idx].StopTimer();
+				try
+				{
+					int t_idx = sessions_planner.GetStartTimers().GetTimerIdxByFd( i );
+					const_cast<SessionsPlanner::StartSessionsTimers&>(sessions_planner.GetStartTimers())[t_idx].StopTimer();
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					// логгирование ошибки
+					Stop( 0 );
+				}
+
 				continue;
 			}
 
@@ -282,19 +284,33 @@ void Server::IncomingEventsHandle()
 				{
 					sessions_planner.PlayerEventHandle( player_pos );
 				}
-				catch ( const QuitCommandSuccessException& ex )
+				catch ( const std::range_error& ex )
 				{
-					CloseConnection( ex.GetFd(), ex.GetAddress() );
+					// логгирование ошибки в файл
 					continue;
 				}
-				catch ( const InternalServerErrorException& ex )
+				catch ( const QuitCommandException& ex )
 				{
-					CloseConnection( ex.GetFd(), ex.GetAddress() );
+					// логгирование ошибки в файл и отключение клиента от сервера
+					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
 					continue;
 				}
-				catch ( const LostConnectionException& ex )
+				catch ( const InternalCmdExecuteException& ex )
 				{
-					CloseConnection( ex.GetFd(), ex.GetAddress() );
+					// логгирование ошибки в файл и отключение клиента от сервера
+					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
+					continue;
+				}
+				catch ( const PlayerLostConnectionException& ex )
+				{
+					// логгирование ошибки в файл и отключение клиента от сервера
+					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
+					continue;
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					// логгирование ошибки в файл и остановка сервера
+					Stop( 0 );
 				}
 			}
 		}
@@ -358,7 +374,9 @@ int Server::Run()
 			}
 			else
 			{
-				fprintf( stderr, "\nselect() failed. (errno code = %d)\n", errno );
+				//fprintf( stderr, "\nselect() failed. Message: %s\n", strerror(errno) );
+				// логгирование ошибки в файл
+				Stop( 0 );
 			}
 		}
 		else if ( res > 0 )
@@ -372,9 +390,15 @@ int Server::Run()
 		}
 		catch ( const KickBankrotsException& ex )
 		{
-			if ( !ex.bankrots.empty() )
-				for ( const auto& bankrot : ex.bankrots )
+			if ( !ex.GetBankrots().empty() )
+				for ( const auto& bankrot : ex.GetBankrots() )
 					CloseConnection( bankrot.first, bankrot.second );
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			// логгирование ошибки и остановка сервера
+			//std::cerr << ex.what() << std::endl;
+			Stop(0);
 		}
 	}
 }

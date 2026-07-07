@@ -2,12 +2,14 @@
 #define BROKER_MESSAGES_CPP_SENTINEL
 
 
+#include "Banker.hpp"
 #include "BrokerMessages.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGProto.hpp"
 #include "Utility.hpp"
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
 
 
 static const char* const true_str = "true";
@@ -64,10 +66,7 @@ void BrokerMessages::BrokerActions::Make( int a_count )
 std::function<void()>& BrokerMessages::BrokerActions::operator[]( int idx )
 {
 	if ( ( idx < 0 ) || ( idx > actions_count-1 ) )
-	{
-		return actions[0];
-		//throw IncorrectBrockerActionIdxException();
-	}
+		throw std::range_error("RangeError in \"BrokerMessages::BrokerActions::operator[]\" function!");
 
 	return actions[idx];
 }
@@ -80,9 +79,16 @@ BrokerMessages::BrokerActions::~BrokerActions()
 
 const char* BrokerMessages::TakeMessage( int message_code )
 {
-	CheckMessageCode( message_code );
+	try
+	{
+		CheckMessageCode( message_code );
 
-	broker_actions[message_code]();
+		broker_actions[message_code]();
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
 
 	return result_message;
 }
@@ -127,7 +133,7 @@ void GameEvents::CheckMessageCode( int message_code ) const
 		if ( message_code == i )
 			return;
 
-	// throw IncorrectMessageCodeExc
+	throw std::range_error("RangeError in \"GameEvents::CheckMessageCode\" function!");
 }
 
 void GameEvents::EndGameTurnEvent()
@@ -246,12 +252,13 @@ void MulticastActionsExec::CheckMessageCode( int message_code ) const
 		if ( message_code == i )
 			return;
 
-	// throw IncorrectMessageCodeExc
+	throw std::range_error("RangeError in \"MulticastActionsExec::CheckMessageCode\" function!");
 }
 
 void MulticastActionsExec::SendReportOnTurn()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
+
 	for ( int i = 0; i < MAX_PLAYERS; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
@@ -308,15 +315,22 @@ void MulticastActionsExec::PayCharges()
 				Utility::itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
 
-				int remains = p->GetMoney() - total_charges;
-				if ( remains >= 0 )
+				try
 				{
-					const_cast<Player*>(p)->SetMoney( remains );
-					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SUCCESS_CHARGES_PAY_TOKEN ), p->GetFd(), p->GetAddr() );
+					int remains = p->GetMoney() - total_charges;
+					if ( remains >= 0 )
+					{
+						const_cast<Player*>(p)->SetMoney( remains );
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SUCCESS_CHARGES_PAY_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
+					else
+					{
+						const_cast<Player*>(p)->SetBankrot();
+					}
 				}
-				else
+				catch ( const std::runtime_error& ex )
 				{
-					const_cast<Player*>(p)->SetBankrot();
+					throw;
 				}
 			}
 		}
@@ -334,40 +348,47 @@ void MulticastActionsExec::CheckBuildingFactories()
 		{
 			if ( !p->IsBankrot() )
 			{
-				for ( Item<BuildsData>* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
+				try
 				{
-					if ( node->GetData().GetTurnsLeft() == 1 )
+					for ( Item<BuildsData>* node = p->GetBuildsFactories().GetFirst(); node != nullptr; )
 					{
-						int total_charges = NEW_FACTORY_UNIT_COST / 2;
-
-						Utility::itoa( total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
-
-						int remains = p->GetMoney() - total_charges;
-						if ( remains >= 0 )
+						if ( node->GetData().GetTurnsLeft() == 1 )
 						{
-							const_cast<Player*>(p)->SetMoney( remains );
-							const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PAY_FACTORY_SUCCESS_TOKEN ), p->GetFd(), p->GetAddr() );
+							int total_charges = NEW_FACTORY_UNIT_COST / 2;
+
+							Utility::itoa( total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+							const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
+
+							int remains = p->GetMoney() - total_charges;
+							if ( remains >= 0 )
+							{
+								const_cast<Player*>(p)->SetMoney( remains );
+								const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PAY_FACTORY_SUCCESS_TOKEN ), p->GetFd(), p->GetAddr() );
+							}
+							else
+							{
+								const_cast<Player*>(p)->SetBankrot();
+								break;
+							}
 						}
-						else
+						else if ( node->GetData().GetTurnsLeft() == 0 )
 						{
-							const_cast<Player*>(p)->SetBankrot();
-							break;
+							const_cast<List<Item<BuildsData>>&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
+							const_cast<Player*>(p)->SetBuiltFactories( p->GetBuiltFactories() - 1 );
+							const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+
+							const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::FACTORY_BUILT_TOKEN ), p->GetFd(), p->GetAddr() );
+							node = p->GetBuildsFactories().GetFirst();
+							continue;
 						}
-					}
-					else if ( node->GetData().GetTurnsLeft() == 0 )
-					{
-						const_cast<List<Item<BuildsData>>&>(p->GetBuildsFactories()).Delete( node->GetData().GetBuildNumber() );
-						const_cast<Player*>(p)->SetBuiltFactories( p->GetBuiltFactories() - 1 );
-						const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
 
-						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::FACTORY_BUILT_TOKEN ), p->GetFd(), p->GetAddr() );
-						node = p->GetBuildsFactories().GetFirst();
-						continue;
+						const_cast<BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
+						node = node->GetNext();
 					}
-
-					const_cast<BuildsData&>(node->GetData()).SetTurnsLeft( node->GetData().GetTurnsLeft() - 1 );
-					node = node->GetNext();
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
 				}
 			}
 		}
@@ -377,6 +398,7 @@ void MulticastActionsExec::CheckBuildingFactories()
 void MulticastActionsExec::ShowReportOnTurn()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
+
 	printf( "\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
 	printf( "\n%s\n", "Players statistics:" );
 
@@ -400,8 +422,15 @@ void MulticastActionsExec::CheckStart()
 
 		if ( !banker.IsGameStatePrepared() )
 		{
-			PreparePlayersState();
-			PrepareSessionState();
+			try
+			{
+				PreparePlayersState();
+				PrepareSessionState();
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
 		}
 	}
 }
@@ -421,13 +450,20 @@ void MulticastActionsExec::ChangeMarketState()
 			break;
 	}
 
-	if ( i < MARKET_LEVEL_NUMBER )
-		const_cast<Banker&>(banker).SetCurrentMarketLvl( i+1 );
+	try
+	{
+		if ( i < MARKET_LEVEL_NUMBER )
+			const_cast<Banker&>(banker).SetCurrentMarketLvl( i+1 );
 
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][0] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[banker.GetCurrentMarketLvl()-1][0] );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[banker.GetCurrentMarketLvl()-1][1] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[banker.GetCurrentMarketLvl()-1][1] );
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
 }
 
 void MulticastActionsExec::ShowAuctionInfo()
@@ -453,46 +489,53 @@ void MulticastActionsExec::PrepareNewTurn()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	ChangeMarketState();
-	const_cast<Banker&>( game_session ).SetTurnNumber( game_session.GetTurnNumber() + 1 );
-	const_cast<Banker&>( game_session ).SetReadyPlayers( 0 );
-
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	try
 	{
-		const Player* p = game_session.GetPlayers()[i];
-		if ( !p->IsFree() )
+		ChangeMarketState();
+		const_cast<Banker&>( game_session ).SetTurnNumber( game_session.GetTurnNumber() + 1 );
+		const_cast<Banker&>( game_session ).SetReadyPlayers( 0 );
+
+		for ( int i = 0; i < MAX_PLAYERS; ++i )
 		{
-			if ( !p->IsBankrot() )
+			const Player* p = game_session.GetPlayers()[i];
+			if ( !p->IsFree() )
 			{
-				const_cast<Player*>(p)->UnsetSentSourceRequest();
-				const_cast<Player*>(p)->UnsetSentProductsRequest();
-				const_cast<Player*>(p)->SetProduced( 0 );
-				const_cast<Player*>(p)->UnsetTurn();
-				const_cast<Player*>(p)->SetIncome( p->GetMoney() - p->GetOldMoney() );
-				const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
-
-				Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
-
-				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_TURN_TOKEN ), p->GetFd(), p->GetAddr() );
-
-				while ( p->GetWorkFactories() > 0 )
+				if ( !p->IsBankrot() )
 				{
-					const_cast<Player*>(p)->SetProduced( p->GetProduced() + 1 );
-					const_cast<Player*>(p)->SetProducts( p->GetProducts() + 1 );
-					const_cast<Player*>(p)->SetWorkFactories( p->GetWorkFactories() - 1 );
-					const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
-				}
+					const_cast<Player*>(p)->UnsetSentSourceRequest();
+					const_cast<Player*>(p)->UnsetSentProductsRequest();
+					const_cast<Player*>(p)->SetProduced( 0 );
+					const_cast<Player*>(p)->UnsetTurn();
+					const_cast<Player*>(p)->SetIncome( p->GetMoney() - p->GetOldMoney() );
+					const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
 
-				if ( p->GetProduced() > 0 )
-				{
-					Utility::itoa(p->GetProduced(),const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN+1 );
+					Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
 
-					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PRODUCED_TOKEN ), p->GetFd(), p->GetAddr() );
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_TURN_TOKEN ), p->GetFd(), p->GetAddr() );
+
+					while ( p->GetWorkFactories() > 0 )
+					{
+						const_cast<Player*>(p)->SetProduced( p->GetProduced() + 1 );
+						const_cast<Player*>(p)->SetProducts( p->GetProducts() + 1 );
+						const_cast<Player*>(p)->SetWorkFactories( p->GetWorkFactories() - 1 );
+						const_cast<Player*>(p)->SetWaitFactories( p->GetWaitFactories() + 1 );
+					}
+
+					if ( p->GetProduced() > 0 )
+					{
+						Utility::itoa(p->GetProduced(),const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::PRODUCED_AMOUNT_PARAM_TOKEN+1 );
+
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PRODUCED_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
 				}
 			}
 		}
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
 	}
 }
 
@@ -500,15 +543,22 @@ void MulticastActionsExec::PrepareSessionState()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
 
-	const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
-	const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
-	const_cast<Banker&>(banker).SetTurnNumber( 1 );
-	const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
-	const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
-	const_cast<Banker&>(banker).SetGameStatePrepared();
+	try
+	{
+		const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
+		const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
+		const_cast<Banker&>(banker).SetTurnNumber( 1 );
+		const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+		const_cast<Banker&>(banker).SetGameStatePrepared();
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
+	}
 }
 
 void MulticastActionsExec::PreparePlayersState()
@@ -520,16 +570,23 @@ void MulticastActionsExec::PreparePlayersState()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			const_cast<Player*>(p)->SetMoney( START_MONEY );
-			const_cast<Player*>(p)->SetOldMoney( p->GetMoney() );
-			const_cast<Player*>(p)->SetSources( START_SOURCES );
-			const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
-			const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
+			try
+			{
+				const_cast<Player*>(p)->SetMoney( START_MONEY );
+				const_cast<Player*>(p)->SetOldMoney( START_MONEY );
+				const_cast<Player*>(p)->SetSources( START_SOURCES );
+				const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
+				const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
 
-			Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
+				Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
 
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTING_GAME_INFORMATION_TOKEN ), p->GetFd(), p->GetAddr() );
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTING_GAME_INFORMATION_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
 		}
 	}
 }
@@ -543,7 +600,14 @@ void MulticastActionsExec::SendAuctionsResults()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::AUCTION_RESULTS_TOKEN ), p->GetFd(), p->GetAddr() );
+			try
+			{
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::AUCTION_RESULTS_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
 		}
 	}
 }
@@ -559,7 +623,14 @@ void MulticastActionsExec::SendPlayersBankrot()
 		{
 			if ( p->IsBankrot() )
 			{
-				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PLAYER_BANKROT_TOKEN ), p->GetFd(), p->GetAddr() );
+				try
+				{
+					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::PLAYER_BANKROT_TOKEN ), p->GetFd(), p->GetAddr() );
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
 			}
 		}
 	}
@@ -574,7 +645,14 @@ void MulticastActionsExec::SendNewPlayerConnect()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_PLAYER_CONNECT_TOKEN ), p->GetFd(), p->GetAddr() );
+			try
+			{
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::NEW_PLAYER_CONNECT_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
 		}
 	}
 }
@@ -588,9 +666,16 @@ void MulticastActionsExec::SendStartTime()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			Utility::itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-			const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
+			try
+			{
+				Utility::itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
 		}
 	}
 }
@@ -603,7 +688,16 @@ void MulticastActionsExec::SendStartCancelled()
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTCANCELLED_TOKEN ), p->GetFd(), p->GetAddr() );
+		{
+			try
+			{
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTCANCELLED_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
+		}
 	}
 }
 
@@ -615,7 +709,16 @@ void MulticastActionsExec::SendGameStarted()
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
-			const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
+		{
+			try
+			{
+				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_STARTED_TOKEN ), p->GetFd(), p->GetAddr() );
+			}
+			catch ( const std::runtime_error& ex )
+			{
+				throw;
+			}
+		}
 	}
 }
 
@@ -632,7 +735,16 @@ void MulticastActionsExec::QuitBankrotPlayers()
 			{
 				std::pair<int, std::string> bankrot_record { p->GetFd(), p->GetAddr() };
 				left_player_id = p->GetUID();
-				QuitPlayer();
+
+				try
+				{
+					QuitPlayer();
+				}
+				catch ( const std::runtime_error& ex )
+				{
+					throw;
+				}
+
 				const_cast<Banker::BankrotsList&>(game_session.GetBankrotsList()).push_back(bankrot_record);
 			}
 		}
@@ -650,36 +762,43 @@ void MulticastActionsExec::QuitPlayer()
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 	const Player* left_player = game_session.GetPlayers().GetPlayerByUID( left_player_id );
 
-	const_cast<Player*>( left_player )->SetFree();
-	const_cast<Banker&>( game_session ).SetAlivePlayers( game_session.GetAlivePlayers() - 1 );
-
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	try
 	{
-		const Player* p = game_session.GetPlayers()[i];
-		if ( !p->IsFree() )
+		const_cast<Player*>(left_player)->SetFree();
+		const_cast<Banker&>(game_session).SetAlivePlayers( game_session.GetAlivePlayers() - 1 );
+
+		for ( int i = 0; i < MAX_PLAYERS; ++i )
 		{
-			if ( !p->IsBankrot() )
+			const Player* p = game_session.GetPlayers()[i];
+			if ( !p->IsFree() )
 			{
-				if ( !game_session.IsGameStarted() )
+				if ( !p->IsBankrot() )
 				{
-					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_LOBBY_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
-				}
-				else
-				{
-					if ( game_session.GetAlivePlayers() <= 1 )
+					if ( !game_session.IsGameStarted() )
 					{
-						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
-						printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
-						return;
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_LOBBY_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
 					}
+					else
+					{
+						if ( game_session.GetAlivePlayers() <= 1 )
+						{
+							const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
+							printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
+							return;
+						}
 
-					Utility::itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
-					const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
+						Utility::itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
-					const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
+						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );
+					}
 				}
 			}
 		}
+	}
+	catch ( const std::runtime_error& ex )
+	{
+		throw;
 	}
 }
 
@@ -750,72 +869,79 @@ void MulticastActionsExec::StartAuction()
 		if ( cur_p->IsFree() )
 			continue;
 
-		if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
+		try
 		{
-			if ( node->GetData().GetAmount() > 0 )
+			if ( node->GetData().GetAmount() <= ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products ) )
 			{
-				if ( auction_type == SOURCE_AUCTION )
+				if ( node->GetData().GetAmount() > 0 )
 				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - node->GetData().GetAmount() * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + node->GetData().GetAmount() );
-					max_sources -= node->GetData().GetAmount();
-				}
-				else
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + node->GetData().GetAmount() * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - node->GetData().GetAmount() );
-					max_products -= node->GetData().GetAmount();
-				}
+					if ( auction_type == SOURCE_AUCTION )
+					{
+						const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - node->GetData().GetAmount() * node->GetData().GetPrice() );
+						const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + node->GetData().GetAmount() );
+						max_sources -= node->GetData().GetAmount();
+					}
+					else
+					{
+						const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + node->GetData().GetAmount() * node->GetData().GetPrice() );
+						const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - node->GetData().GetAmount() );
+						max_products -= node->GetData().GetAmount();
+					}
 
-				const_cast<MarketData&>(node->GetData()).SetSuccess();
+					const_cast<MarketData&>(node->GetData()).SetSuccess();
 
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(node->GetData().GetAmount());
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+					if ( auction_type == SOURCE_AUCTION )
+					{
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(node->GetData().GetAmount());
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+					}
+					else
+					{
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(node->GetData().GetAmount());
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+					}
 				}
-				else
+			}
+			else
+			{
+				int saved_max_sources = 0;
+				int saved_max_products = 0;
+
+				if ( ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products) > 0 )
 				{
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(node->GetData().GetAmount());
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+					if ( auction_type == SOURCE_AUCTION )
+					{
+						const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - max_sources * node->GetData().GetPrice() );
+						const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + max_sources );
+					}
+					else
+					{
+						const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + max_products * node->GetData().GetPrice() );
+						const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
+					}
+
+					const_cast<MarketData&>(node->GetData()).SetSuccess();
+
+					if ( auction_type == SOURCE_AUCTION )
+					{
+						saved_max_sources = max_sources;
+						max_sources = 0;
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(saved_max_sources);
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
+					}
+					else
+					{
+						saved_max_products = max_products;
+						max_products = 0;
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(saved_max_products);
+						const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
+					}
 				}
 			}
 		}
-		else
+		catch ( const std::runtime_error& ex )
 		{
-			int saved_max_sources = 0;
-			int saved_max_products = 0;
-
-			if ( ( ( auction_type == SOURCE_AUCTION ) ? max_sources : max_products) > 0 )
-			{
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() - max_sources * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetSources( cur_p->GetSources() + max_sources );
-				}
-				else
-				{
-					const_cast<Player*>(cur_p)->SetMoney( cur_p->GetMoney() + max_products * node->GetData().GetPrice() );
-					const_cast<Player*>(cur_p)->SetProducts( cur_p->GetProducts() - max_products );
-				}
-
-				const_cast<MarketData&>(node->GetData()).SetSuccess();
-
-				if ( auction_type == SOURCE_AUCTION )
-				{
-					saved_max_sources = max_sources;
-					max_sources = 0;
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldSources(saved_max_sources);
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetSoldPrice(node->GetData().GetPrice());
-				}
-				else
-				{
-					saved_max_products = max_products;
-					max_products = 0;
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtProducts(saved_max_products);
-					const_cast<Player::AuctionReport&>(cur_p->GetAuctionReport()).SetBoughtPrice(node->GetData().GetPrice());
-				}
-			}
+			throw;
 		}
 	}
 }
@@ -893,7 +1019,7 @@ void GameMessages::CheckMessageCode( int message_code ) const
 		if ( message_code == i )
 			return;
 
-	// throw IncorrectMessageCodeException();
+	throw std::range_error("RangeError in \"GameMessages::CheckMessageCode\" function!");
 }
 
 void GameMessages::LostLobbyPlayerMessage()
@@ -997,15 +1123,11 @@ void GameMessages::StartGameInfoMessage()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			//throw PlayerRecordIsFreeException();
-		}
 	}
 	else
 	{
-		return;
-		//throw NullPointerException();
+		throw std::runtime_error("Got null pointer of Player object in \"GameMessages::StartGameInfoMessage\" function!");
 	}
 
 	char p_num[10];
@@ -1186,15 +1308,11 @@ void GameMessages::NewTurnMessage()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			//throw PlayerRecordIsFreeException();
-		}
 	}
 	else
 	{
-		return;
-		//throw NullPointerException();
+		throw std::runtime_error("Got null pointer of Player object in \"GameMessages::NewTurnMessage\" function!");
 	}
 
 	char tn[10];
@@ -1403,7 +1521,7 @@ void BCBrokerMessages::CheckMessageCode( int message_code ) const
 		if ( message_code == i )
 			return;
 
-	// throw IncorrectMessageCodeException();
+	throw std::range_error("RangeError in \"BCBrokerMessages::CheckMessageCode\" function!");
 }
 
 void BCBrokerMessages::MarketCmdSourcesAmount()
@@ -1441,7 +1559,8 @@ void BCBrokerMessages::PlayerCmdIsTargetNotFound()
 		strcpy(result_message, false_str);
 		return;
 	}
-	//throw NullPointerException();
+
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdIsTargetNotFound\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetUID()
@@ -1451,16 +1570,13 @@ void BCBrokerMessages::PlayerCmdGetTargetUID()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetUID(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetUID\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetMoney()
@@ -1470,16 +1586,13 @@ void BCBrokerMessages::PlayerCmdGetTargetMoney()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetMoney(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetMoney\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetIncome()
@@ -1489,16 +1602,13 @@ void BCBrokerMessages::PlayerCmdGetTargetIncome()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetIncome(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetIncome\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetSources()
@@ -1508,16 +1618,13 @@ void BCBrokerMessages::PlayerCmdGetTargetSources()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetSources(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetSources\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetProducts()
@@ -1527,16 +1634,13 @@ void BCBrokerMessages::PlayerCmdGetTargetProducts()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetProducts(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetProducts\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
@@ -1546,16 +1650,13 @@ void BCBrokerMessages::PlayerCmdGetTargetWaitFactories()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetWaitFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetWaitFactories\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
@@ -1565,16 +1666,13 @@ void BCBrokerMessages::PlayerCmdGetTargetWorkFactories()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetWorkFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetWorkFactories\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
@@ -1584,16 +1682,13 @@ void BCBrokerMessages::PlayerCmdGetTargetBuiltFactories()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetBuiltFactories(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetBuiltFactories\" function!");
 }
 
 void BCBrokerMessages::PlayerSenderIsBot()
@@ -1603,10 +1698,7 @@ void BCBrokerMessages::PlayerSenderIsBot()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->IsBot() )
 		{
@@ -1618,7 +1710,7 @@ void BCBrokerMessages::PlayerSenderIsBot()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerSenderIsBot\" function!");
 }
 
 void BCBrokerMessages::PlayerCmdGetTargetProduced()
@@ -1628,16 +1720,13 @@ void BCBrokerMessages::PlayerCmdGetTargetProduced()
 	if ( target_p != nullptr )
 	{
 		if ( target_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		Utility::itoa(target_p->GetProduced(), result_message, MESSAGE_SIZE-1);
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerCmdGetTargetProduced\" function!");
 }
 
 void BCBrokerMessages::ListCmdGetAlivePlayers()
@@ -1652,10 +1741,7 @@ void BCBrokerMessages::PlayerSenderIsTurn()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->IsTurn() )
 		{
@@ -1667,7 +1753,7 @@ void BCBrokerMessages::PlayerSenderIsTurn()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::PlayerSenderIsTurn\" function!");
 }
 
 void BCBrokerMessages::ProdCmdSourcesCondition()
@@ -1677,10 +1763,7 @@ void BCBrokerMessages::ProdCmdSourcesCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->GetSources() >= 1 )
 		{
@@ -1692,7 +1775,7 @@ void BCBrokerMessages::ProdCmdSourcesCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::ProdCmdSourcesCondition\" function!");
 }
 
 void BCBrokerMessages::ProdCmdMoneyCondition()
@@ -1702,10 +1785,7 @@ void BCBrokerMessages::ProdCmdMoneyCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->GetMoney() >= PRODUCTION_PRODUCT_COST )
 		{
@@ -1717,7 +1797,7 @@ void BCBrokerMessages::ProdCmdMoneyCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::ProdCmdMoneyCondition\" function!");
 }
 
 void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
@@ -1727,10 +1807,7 @@ void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->GetWaitFactories() > 0 )
 		{
@@ -1742,7 +1819,7 @@ void BCBrokerMessages::ProdCmdWaitFactoriesCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::ProdCmdWaitFactoriesCondition\" function!");
 }
 
 void BCBrokerMessages::ProdCmdUpdateGameState()
@@ -1752,19 +1829,23 @@ void BCBrokerMessages::ProdCmdUpdateGameState()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
+		try
+		{
+			const_cast<Player*>(sender_p)->SetWaitFactories( sender_p->GetWaitFactories() - 1 );
+			const_cast<Player*>(sender_p)->SetWorkFactories( sender_p->GetWorkFactories() + 1 );
+			const_cast<Player*>(sender_p)->SetSources( sender_p->GetSources() - 1 );
+			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - PRODUCTION_PRODUCT_COST );
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			throw;
 		}
 
-		const_cast<Player*>(sender_p)->SetWaitFactories( sender_p->GetWaitFactories() - 1 );
-		const_cast<Player*>(sender_p)->SetWorkFactories( sender_p->GetWorkFactories() + 1 );
-		const_cast<Player*>(sender_p)->SetSources( sender_p->GetSources() - 1 );
-		const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - PRODUCTION_PRODUCT_COST );
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::ProdCmdUpdateGameState\" function!");
 }
 
 void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
@@ -1774,10 +1855,7 @@ void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
 
@@ -1791,7 +1869,7 @@ void BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuildCmdPlayerBuildsListIsEmpty\" function!");
 }
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
@@ -1801,16 +1879,13 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsListSize()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
 		Utility::itoa( player_builds.GetSize(), result_message, MESSAGE_SIZE-1 );
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuildCmdPlayerGetBuildListSize\" function!");
 }
 
 void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
@@ -1820,10 +1895,7 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		const List<Item<BuildsData>>& player_builds = sender_p->GetBuildsFactories();
 
@@ -1842,7 +1914,7 @@ void BCBrokerMessages::BuildCmdPlayerGetBuildsList()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuildCmdPlayerGetBuildsList\" function!");
 }
 
 void BCBrokerMessages::BuildCmdMoneyCondition()
@@ -1852,10 +1924,7 @@ void BCBrokerMessages::BuildCmdMoneyCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->GetMoney() >= NEW_FACTORY_UNIT_COST/2 )
 		{
@@ -1867,7 +1936,7 @@ void BCBrokerMessages::BuildCmdMoneyCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuildCmdMoneyCondition\" function!");
 }
 
 void BCBrokerMessages::BuildCmdUpdateGameState()
@@ -1877,21 +1946,26 @@ void BCBrokerMessages::BuildCmdUpdateGameState()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		BuildsData data;
 		data.MakeData( sender_p->GetBuildsFactories().GetValidNum(), TURNS_TO_BUILD );
 
-		const_cast<List<Item<BuildsData>>&>(sender_p->GetBuildsFactories()).Insert( data );
-		const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - NEW_FACTORY_UNIT_COST/2 );
-		const_cast<Player*>(sender_p)->SetBuiltFactories( sender_p->GetBuiltFactories() + 1 );
+		try
+		{
+			const_cast<List<Item<BuildsData>>&>(sender_p->GetBuildsFactories()).Insert( data );
+			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - NEW_FACTORY_UNIT_COST/2 );
+			const_cast<Player*>(sender_p)->SetBuiltFactories( sender_p->GetBuiltFactories() + 1 );
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			throw;
+		}
+
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuildCmdUpdateGameState\" function!");
 }
 
 void BCBrokerMessages::BuyCmdIsSentSourceRequest()
@@ -1901,10 +1975,7 @@ void BCBrokerMessages::BuyCmdIsSentSourceRequest()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->IsSentSourceRequest() )
 		{
@@ -1916,7 +1987,7 @@ void BCBrokerMessages::BuyCmdIsSentSourceRequest()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuyCmdIsSentSourceRequest\" function!");
 }
 
 void BCBrokerMessages::BuyCmdSourcesCondition()
@@ -1948,10 +2019,7 @@ void BCBrokerMessages::BuyCmdMoneyCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->GetMoney() < source_price * sources_amount )
 		{
@@ -1963,7 +2031,7 @@ void BCBrokerMessages::BuyCmdMoneyCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuyCmdMoneyCondition\" function!");
 }
 
 void BCBrokerMessages::BuyCmdUpdateGameState()
@@ -1973,20 +2041,26 @@ void BCBrokerMessages::BuyCmdUpdateGameState()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		MarketData data;
 		data.MakeData( sender_player_id, sources_amount, source_price );
 
 		const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetSourcesRequests().Insert( data );
-		const_cast<Player*>(sender_p)->SetSentSourceRequest();
+
+		try
+		{
+			const_cast<Player*>(sender_p)->SetSentSourceRequest();
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			throw;
+		}
+
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::BuyCmdUpdateGameState\" function!");
 }
 
 void BCBrokerMessages::SellCmdIsSentProductRequest()
@@ -1996,10 +2070,7 @@ void BCBrokerMessages::SellCmdIsSentProductRequest()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( sender_p->IsSentProductsRequest() )
 		{
@@ -2011,7 +2082,7 @@ void BCBrokerMessages::SellCmdIsSentProductRequest()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::SellCmdIsSentProductRequest\" function!");
 }
 
 void BCBrokerMessages::SellCmdAmountCondition()
@@ -2021,10 +2092,7 @@ void BCBrokerMessages::SellCmdAmountCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( ( products_amount > 0 ) && ( products_amount <= sender_p->GetProducts() ) )
 		{
@@ -2036,7 +2104,7 @@ void BCBrokerMessages::SellCmdAmountCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::SellCmdAmountCondition\" function!");
 }
 
 void BCBrokerMessages::SellCmdPriceCondition()
@@ -2046,10 +2114,7 @@ void BCBrokerMessages::SellCmdPriceCondition()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		if ( ( product_price > 0 ) && ( product_price <= const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetCurrentMarketState().GetProductMaxPrice() ) )
 		{
@@ -2061,7 +2126,7 @@ void BCBrokerMessages::SellCmdPriceCondition()
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::SellCmdPriceCondition\" function!");
 }
 
 void BCBrokerMessages::SellCmdUpdateGameState()
@@ -2071,20 +2136,26 @@ void BCBrokerMessages::SellCmdUpdateGameState()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
-		}
 
 		MarketData data;
 		data.MakeData( sender_player_id, products_amount, product_price );
 
 		const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetProductsRequests().Insert( data );
-		const_cast<Player*>(sender_p)->SetSentProductsRequest();
+
+		try
+		{
+			const_cast<Player*>(sender_p)->SetSentProductsRequest();
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			throw;
+		}
+
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::SellCmdUpdateGameState\" function!");
 }
 
 void BCBrokerMessages::TurnCmdUpdateGameState()
@@ -2095,17 +2166,22 @@ void BCBrokerMessages::TurnCmdUpdateGameState()
 	if ( sender_p != nullptr )
 	{
 		if ( sender_p->IsFree() )
-		{
 			return;
-			// throw PlayerRecordIsFreeException();
+
+		try
+		{
+			const_cast<Player*>(sender_p)->SetTurn();
+			const_cast<Banker&>(game_session).SetReadyPlayers( game_session.GetReadyPlayers() + 1 );
+		}
+		catch ( const std::runtime_error& ex )
+		{
+			throw;
 		}
 
-		const_cast<Player*>(sender_p)->SetTurn();
-		const_cast<Banker&>(game_session).SetReadyPlayers( game_session.GetReadyPlayers() + 1 );
 		return;
 	}
 
-	//throw NullPointerException();
+	throw std::runtime_error("Got null pointer of Player object in \"BCBrokerMessages::TurnCmdUpdateGameState\" function!");
 }
 void BCBrokerMessages::TurnCmdGetWypaToken()
 {
