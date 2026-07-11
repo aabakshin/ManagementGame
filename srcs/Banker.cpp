@@ -3,9 +3,7 @@
 
 
 #include "Banker.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <cstdio>
+#include <iostream>
 #include <stdexcept>
 
 
@@ -249,13 +247,13 @@ void List<Item<MarketData>>::Print() const
 {
 	if ( IsEmpty() )
 	{
-		printf("%s", "\"\"\n");
+		std::cout << "\"\"" << std::endl;
 		return;
 	}
 
 	for ( Item<MarketData>* node = GetFirst(); node != nullptr; node = node->GetNext() )
 	{
-		printf("( %d, %d, %d ),\n", node->GetData().GetPlayerNum(), node->GetData().GetAmount(), node->GetData().GetPrice());
+		std::cout << "( " << node->GetData().GetPlayerNum() << ", " << node->GetData().GetAmount() << ", " << node->GetData().GetPrice() << " )," << std::endl;
 	}
 }
 
@@ -350,7 +348,10 @@ void Banker::CleanPlayer( int player_id )
 
 	const_cast<Player*>(GetPlayers().GetPlayerByUID(player_id))->Reset();
 
-	printf( "[+] Player's #%d record now is free\n", player_id );
+#ifdef DEBUG_MODE
+	std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] Player's #" << player_id << " record now is free" << std::endl;
+#endif
+
 }
 
 #endif

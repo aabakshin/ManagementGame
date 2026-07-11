@@ -49,19 +49,22 @@ void Receiver::SetRecvMsgsCount( int msgs_value )
 
 void Receiver::ShowReceivedMessage() const
 {
-	printf("\n==================== (%d) ====================\n", GetRecvMsgsCount());
+#ifdef DEBUG_MODE
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] ==================== " << "(" << GetRecvMsgsCount() << ")" << "=====================\n"
+	std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] ";
 
 	for ( int i = 0; ( i < Receiver::BUFSIZE ) && ( i < GetMessageLength() ); ++i )
 	{
-		printf("%3d ", GetMessage()[i]);
+		std::cout << std::setw(3) << GetMessage()[i] << " ";
 		if ( ( (i+1) % 10 ) == 0 )
-			putchar('\n');
+			std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] ";
 	}
-	putchar('\n');
+	std::cout << "\n";
 
-	printf("\nmessage: <[ %s ]>\n"
-			"Received from [%s] %d\\%d bytes\n"
-			"==================== (%d) ====================\n\n", GetMessage(), GetTargetAddress(), GetRecvBytes(), GetMessageLength(), GetRecvMsgsCount());
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "message: <[ " << GetMessage() << " ]>\n";
+	std::cout << "[" << Utility::current_time_str() << "] "  << "[DEBUG] " << "Received from [" << GetTargetAddress() << "] " << GetRecvBytes() << "\\" << GetMessageLength << " bytes\n";
+	std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] ==================== " << "(" << GetRecvMsgsCount() << ")" << "=====================\n\n";
+#endif
 }
 
 void Receiver::Reset()

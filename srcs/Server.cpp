@@ -23,7 +23,7 @@ enum
 };
 
 
-/* Ф-я-обработчик сигнала SIGINT */
+// Ф-я-обработчик сигнала SIGINT
 void exit_handler( int sig_no )
 {
 	Server::SetSignalNum( sig_no );
@@ -63,7 +63,7 @@ void Server::SetListenSocket( int socket_value )
 {
 	if ( socket_value < -1 )
 	{
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::SetListenSocket] ", "Invalid socket value: ", socket_value);
 		Stop( 0 );
 	}
 
@@ -72,7 +72,7 @@ void Server::SetListenSocket( int socket_value )
 
 void Server::SetAddrBuffer( const char* addr, const char* port )
 {
-	printf("%s\n", "Configuring local address...");
+	srv_msgs_logger->info("Configuring local address...");
 
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
@@ -82,8 +82,7 @@ void Server::SetAddrBuffer( const char* addr, const char* port )
 
 	if ( getaddrinfo(addr, port, &hints, &bind_address) != 0 )
 	{
-		//fprintf( stderr, "An error has occured with \"getaddrinfo\". Message: %s\n", gai_strerror(errno) );
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::SetAddrBuffer] ", "An error has occured with \"getaddrinfo\". Message: ", gai_strerror(errno));
 		Stop( 0 );
 	}
 
@@ -103,7 +102,7 @@ void Server::SetMaxFd( int max_value )
 {
 	if ( max_value < 0 )
 	{
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::SetMaxFd] ", "Invalid \"max_fd\": ", max_value);
 		Stop( 0 );
 	}
 
@@ -112,38 +111,37 @@ void Server::SetMaxFd( int max_value )
 
 void Server::ListenSocketInit()
 {
-	printf("%s\n", "Creating listening socket...");
+	srv_msgs_logger->info("Creating listening socket...");
+
 	SetListenSocket( socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol) );
 	if ( GetListenSocket() == -1 )
 	{
-		//fprintf(stderr, "socket() failed. Message: %s\n", strerror(errno) );
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::ListenSocketInit] ", "socket() failed. Message: ", strerror(errno));
 		Stop( 0 );
 	}
 
-	printf("%s\n", "Setting socket options...");
+	srv_msgs_logger->info("Setting socket options...");
 	int opt_value = 1;
 	setsockopt(GetListenSocket(), SOL_SOCKET, SO_REUSEADDR, &opt_value, sizeof(opt_value));
 
-	printf("%s\n", "Binding socket to address...");
+	srv_msgs_logger->info("Binding socket to address...");
 	if ( bind(GetListenSocket(), bind_address->ai_addr, bind_address->ai_addrlen) )
 	{
-		//fprintf(stderr, "bind() failed. Message: %s\n", strerror(errno));
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::ListenSocketInit] ", "bind() failed. Message: ", strerror(errno));
 		Stop( 0 );
 	}
 
-	printf("%s\n", "Enabling listen mode...");
+	srv_msgs_logger->info("Enabling listen mode...");
 	if ( listen(GetListenSocket(), LISTEN_QUEUE_LEN) < 0 )
 	{
-		//fprintf(stderr, "listen() failed. Message: %s\n", strerror(errno));
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::ListenSocketInit] ", "listen() failed. Message: ", strerror(errno));
 		Stop( 0 );
 	}
 }
 
-void Server::Make( const char* addr, const char* port )
+void Server::Make( const char* addr, const char* port, Logger* logger )
 {
+	srv_msgs_logger = logger;
 	UnsetExitFlag();
 	SetSignalNum( 0 );
 	SetAddrBuffer( addr, port );
@@ -152,7 +150,7 @@ void Server::Make( const char* addr, const char* port )
 
 	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT );
 
-	printf("Waiting connections to %s port...\n", port);
+	srv_msgs_logger->info("Waiting connections to", port, " port...");
 }
 
 Server::~Server()
@@ -180,13 +178,16 @@ void Server::CloseConnection( int fd, std::string address )
 			( strcmp( address.c_str(), "start_timers" ) != 0 )	&&
 			( strcmp( address.c_str(), "ls" ) != 0 )
 		)
-		printf("[-] Lost connection from [%s]\n", address.c_str());
+		srv_msgs_logger->info("Lost connection from [", address.c_str(), "]");
 }
 
 void Server::Stop( int forcely )
 {
 	if ( forcely )
-		printf("%s", "\n\n========== SERVER IS STOPPING WORK FORCELY ==========\n");
+	{
+		srv_msgs_logger->info("\n\n");
+		srv_msgs_logger->info("========== SERVER IS STOPPING WORK FORCELY ==========");
+	}
 
 	std::list<std::pair<int, std::string>> players_fds;
 	sessions_planner.GetAllPlayersFds( players_fds );
@@ -204,7 +205,7 @@ void Server::Stop( int forcely )
 	CloseConnection( ls, "ls" );
 
 	if ( forcely )
-		printf("%s", "========== SERVER IS STOPPING WORK FORCELY ==========\n\n");
+		srv_msgs_logger->info("========== SERVER IS STOPPING WORK FORCELY ==========\n");
 
 	exit( 0 );
 }
@@ -219,8 +220,7 @@ void Server::NewClientHandle()
 	int cs = accept( ls, (struct sockaddr*) &client_address, &client_address_len );
 	if ( cs == -1 )
 	{
-		//fprintf(stderr, "accept() failed. Message: %s\n", strerror(errno));
-		// логгирование ошибки в файл
+		srv_msgs_logger->error("[Server::NewClientHandle]", "accept() failed. Message: ", strerror(errno));
 		Stop( 0 );
 	}
 
@@ -236,7 +236,7 @@ void Server::NewClientHandle()
 
 	ConcatAddrPort( Receiver::SERVICE_SIZE );
 
-	printf( "New connection from %s\n", new_client_addr );
+	srv_msgs_logger->info("New connection from ", new_client_addr );
 
 	try
 	{
@@ -244,7 +244,7 @@ void Server::NewClientHandle()
 	}
 	catch( ... )
 	{
-		// логгирование ошибки в файл и отключение клиента от сервера
+		srv_msgs_logger->error("[Server::NewClientHandle] ", "An error occured in \"AddNewClientToSession\" function!");
 		CloseConnection( cs, new_client_addr );
 	}
 }
@@ -270,7 +270,7 @@ void Server::IncomingEventsHandle()
 				}
 				catch ( const std::runtime_error& ex )
 				{
-					// логгирование ошибки
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					Stop( 0 );
 				}
 
@@ -286,30 +286,30 @@ void Server::IncomingEventsHandle()
 				}
 				catch ( const std::range_error& ex )
 				{
-					// логгирование ошибки в файл
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					continue;
 				}
 				catch ( const QuitCommandException& ex )
 				{
-					// логгирование ошибки в файл и отключение клиента от сервера
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
 					continue;
 				}
 				catch ( const InternalCmdExecuteException& ex )
 				{
-					// логгирование ошибки в файл и отключение клиента от сервера
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
 					continue;
 				}
 				catch ( const PlayerLostConnectionException& ex )
 				{
-					// логгирование ошибки в файл и отключение клиента от сервера
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
 					continue;
 				}
 				catch ( const std::runtime_error& ex )
 				{
-					// логгирование ошибки в файл и остановка сервера
+					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
 					Stop( 0 );
 				}
 			}
@@ -374,8 +374,7 @@ int Server::Run()
 			}
 			else
 			{
-				//fprintf( stderr, "\nselect() failed. Message: %s\n", strerror(errno) );
-				// логгирование ошибки в файл
+				srv_msgs_logger->error("[Server::Run] ", "select() failed. Message: ", strerror(errno) );
 				Stop( 0 );
 			}
 		}
@@ -396,8 +395,7 @@ int Server::Run()
 		}
 		catch ( const std::runtime_error& ex )
 		{
-			// логгирование ошибки и остановка сервера
-			//std::cerr << ex.what() << std::endl;
+			srv_msgs_logger->error("[Server::Run] ", ex.what());
 			Stop(0);
 		}
 	}

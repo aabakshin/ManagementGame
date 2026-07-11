@@ -7,7 +7,12 @@
 #include <cstring>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <cstdio>
+
+#ifdef DEBUG_MODE
+	#include <iostream>
+	#include <iomanip>
+#endif
+
 #include <stdexcept>
 
 
@@ -85,19 +90,22 @@ void Sender::SetSentMsgsCount( int msgs_value )
 
 void Sender::ShowSentMessage() const
 {
-	printf("\n==================== (%d) ====================\n", GetSentMsgsCount());
+#ifdef DEBUG_MODE
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] ==================== " << "(" << GetSentMsgsCount() << ")" << "=====================\n"
+	std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] ";
 
 	for ( int i = 0; ( i < Sender::BUFSIZE ) && ( i < GetMessageLength() ); ++i )
 	{
-		printf("%3d ", GetMessage()[i]);
+		std::cout << std::setw(3) << GetMessage()[i] << " ";
 		if ( ( (i+1) % 10 ) == 0 )
-			putchar('\n');
+			std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] ";
 	}
-	putchar('\n');
+	std::cout << "\n";
 
-	printf("\nmessage: <[ %s ]>\n"
-			"Sent to [%s] %d\\%d bytes\n"
-			"==================== (%d) ====================\n\n", GetMessage(), GetTargetAddress(), GetSentBytes(), GetMessageLength(), GetSentMsgsCount());
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "message: <[ " << GetMessage() << " ]>\n";
+	std::cout << "[" << Utility::current_time_str() << "] "  << "[DEBUG] " << "Sent to [" << GetTargetAddress() << "] " << GetSentBytes() << "\\" << GetMessageLength << " bytes\n";
+	std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] ==================== " << "(" << GetSentMsgsCount() << ")" << "=====================\n\n";
+#endif
 }
 
 void Sender::Reset()

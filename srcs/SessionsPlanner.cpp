@@ -80,18 +80,6 @@ void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartTimer( uint64
 
 	SetLaunched();
 	UnsetAlarmed();
-
-	/*printf("\n-----------------\n"
-			"StartTimer[%d] has launched.\n"
-			"Timer settings:\n"
-			"\tValue settings: sec(%lu), nsec(%lu)\n"
-			"\tInterval settings: sec(%lu), nsec(%lu)\n"
-			"-----------------\n",
-			timerfd,
-			timer_settings.it_value.tv_sec,
-			timer_settings.it_value.tv_nsec,
-			timer_settings.it_interval.tv_sec,
-			timer_settings.it_interval.tv_nsec);*/
 }
 
 void SessionsPlanner::StartSessionsTimers::StartSessionTimer::StopTimer()
@@ -299,7 +287,9 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 		{
 			sender.SendMessage( error_game_messages[INTERNAL_SERVER_ERROR], cs, new_client_addr );
 			sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+#ifdef DEBUG_MODE
 			sender.ShowSentMessage();
+#endif
 			throw;
 		}
 
@@ -310,7 +300,9 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 	{
 		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::GAME_ALREADY_STARTED_TOKEN ), cs, new_client_addr );
 		sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+#ifdef DEBUG_MODE
 		sender.ShowSentMessage();
+#endif
 		throw AllGamesAlreadyStartedException( "All games already started in \"SessionsPlanner::AddNewClientToSession\" function!" );
 	}
 
@@ -318,7 +310,9 @@ void SessionsPlanner::AddNewClientToSession( int cs, const char* new_client_addr
 	{
 		sender.SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::SERVER_FULL_TOKEN ), cs, new_client_addr );
 		sender.SetSentMsgsCount( sender.GetSentMsgsCount() + 1 );
+#ifdef DEBUG_MODE
 		sender.ShowSentMessage();
+#endif
 		throw ServerFullException( "Server full in \"SessionsPlanner::AddNewClientToSession\" function!" );
 	}
 }
@@ -432,7 +426,9 @@ void SessionsPlanner::GameEventsHandle()
 				try
 				{
 					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::END_GAME_TURN_EVENT_TOKEN );
+#ifdef DEBUG_MODE
 					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::REPORT_ON_TURN_EVENT_TOKEN );
+#endif
 					const_cast<GameEvents&>(EGameEvents.GetBroker()).TakeMessage( GameEvents::PREPARE_NEW_TURN_EVENT_TOKEN );
 				}
 				catch ( const std::runtime_error& ex )
@@ -518,7 +514,9 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 		throw;
 	}
 
+#ifdef DEBUG_MODE
 	receiver.ShowReceivedMessage();
+#endif
 
 	if ( receiver.GetRecvBytes() > 0 )
 	{
@@ -550,7 +548,9 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 					throw;
 				}
 
+#ifdef DEBUG_MODE
 				sender.ShowSentMessage();
+#endif
 			}
 		}
 		else
@@ -567,7 +567,9 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 				throw;
 			}
 
+#ifdef DEBUG_MODE
 			sender.ShowSentMessage();
+#endif
 
 			const char* info_token = cmds_exec.GetCmdToken( 0 );
 			if ( strcmp(info_token, info_game_messages[QUIT_COMMAND_SUCCESS]) == 0 )

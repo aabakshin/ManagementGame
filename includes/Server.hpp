@@ -3,6 +3,7 @@
 
 
 #include "SessionsPlanner.hpp"
+#include "Logger.hpp"
 #include <csignal>
 
 
@@ -17,6 +18,7 @@ private:
 	char service_buffer[Sender::SERVICE_SIZE];
 	int max_fd;
 	fd_set readfds;
+	Logger* srv_msgs_logger { nullptr };
 	SessionsPlanner sessions_planner;
 public:
 	Server() {}
@@ -26,7 +28,7 @@ public:
 	static bool IsExitFlag() { return exit_flag; }
 	static int GetSignalNum() { return sig_number; }
 	static void SetSignalNum( int value ) { sig_number = value; }
-	void Make( const char*, const char* );
+	void Make( const char*, const char*, Logger* );
 	int Run();
 private:
 	Server( const Server& ) = delete;

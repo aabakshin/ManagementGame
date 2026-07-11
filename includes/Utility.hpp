@@ -1,6 +1,10 @@
 #ifndef UTILITY_HPP_SENTINEL
 #define UTILITY_HPP_SENTINEL
 
+
+#include <string>
+
+
 class Utility
 {
 public:
@@ -13,6 +17,7 @@ public:
 	static int cut_str( char* s, int s_size, int ch );
 	static void concat_to_str( int number, char* number_buf, int number_len, char* str, int* str_offset );
 	static int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count );
+	static std::string current_time_str();
 private:
 	Utility( const Utility& ) = delete;
 	Utility( Utility&& ) = delete;

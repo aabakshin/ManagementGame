@@ -8,7 +8,11 @@
 #include "MGProto.hpp"
 #include "Utility.hpp"
 #include <cstring>
-#include <cstdio>
+
+#ifdef DEBUG_MODE
+	#include <iostream>
+#endif
+
 #include <stdexcept>
 
 
@@ -264,7 +268,9 @@ void MulticastActionsExec::SendReportOnTurn()
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
-			printf("\tPlayer #%d:   money: %dР   produced products: %d\n", p->GetUID(), p->GetMoney(), p->GetProduced());
+#ifdef DEBUG_MODE
+			std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] "<< "\tPlayer #" << p->GetUID() << ":\t\tmoney: " << p->GetMoney() << "P\t\tproduced products: " << p->GetProduced() << std::endl;
+#endif
 		}
 	}
 }
@@ -356,7 +362,7 @@ void MulticastActionsExec::CheckBuildingFactories()
 						{
 							int total_charges = NEW_FACTORY_UNIT_COST / 2;
 
-							Utility::itoa( total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+							Utility::itoa(total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1);
 							const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
 
 							int remains = p->GetMoney() - total_charges;
@@ -398,13 +404,14 @@ void MulticastActionsExec::CheckBuildingFactories()
 void MulticastActionsExec::ShowReportOnTurn()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
-
-	printf( "\n\n\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
-	printf( "\n%s\n", "Players statistics:" );
+#ifdef DEBUG_MODE
+	std::cout << "\n\n\n" << "[" << Utility::current_time_str() << "]" << " [DEBUG] <<<<<<<<<< Report on Month #" << banker.GetTurnNumber() << " >>>>>>>>>>\n";
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] Players statistics:" << "\n";
 
 	ShowAuctionInfo();
 
-	printf( "\n<<<<<<<<<< Report on Month #%d >>>>>>>>>>\n", banker.GetTurnNumber() );
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] <<<<<<<<<< Report on Month #" << banker.GetTurnNumber() << " >>>>>>>>>>\n";
+#endif
 }
 
 void MulticastActionsExec::CheckStart()
@@ -470,18 +477,22 @@ void MulticastActionsExec::ShowAuctionInfo()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
 
-	printf("\n%s\n", ( auction_type == SOURCE_AUCTION ) ? "Sources auction" : "Products auction" );
+#ifdef DEBUG_MODE
+	std::cout << "\n" << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << (( auction_type == SOURCE_AUCTION ) ? "Sources auction" : "Products auction") << "\n";
+#endif
 
 	Item<MarketData>* node = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(banker).GetSourcesRequests().GetFirst() : const_cast<Banker&>(banker).GetProductsRequests().GetFirst();
 
 	for ( ; node != nullptr; node = node->GetNext() )
 	{
 		const Player* p = banker.GetPlayers().GetPlayerByUID(node->GetData().GetPlayerNum());
-		printf("Request of Player #%d:\n", p->GetUID());
-		printf("\tPrice: %d\n\tAmount: %d\n\tIs proceed: %s\n\n",
-				node->GetData().GetPrice(),
-				(node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount(),
-				node->GetData().IsSuccess() ? "yes" : "no");
+#ifdef DEBUG_MODE
+		std::cout	<< "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "Request of Player #" << p->GetUID() << ":" << std::endl;
+		std::cout	<< "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "\tPrice: " << node->GetData().GetPrice() << "\n";
+					<< "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "\tAmount: " << ((node->GetData().IsSuccess()) ? p->GetAuctionReport().GetSoldSources() : node->GetData().GetAmount()) << "\n"
+					<< "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "\tIs proceed: " << (node->GetData().IsSuccess() ? "yes" : "no")
+					<< std::endl;
+#endif
 	}
 }
 
@@ -783,11 +794,13 @@ void MulticastActionsExec::QuitPlayer()
 						if ( game_session.GetAlivePlayers() <= 1 )
 						{
 							const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::VICTORY_MESSAGE_TOKEN ), p->GetFd(), p->GetAddr() );
-							printf("\n\n<<<<< GAME IS FINISHED. PLAYER #%d IS WINNER! >>>>>\n\n", p->GetUID());
+#ifdef DEBUG_MODE
+							std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "\n\n" << "<<<<< GAME IS FINISHED. PLAYER #" << p->GetUID() << " IS WINNER! >>>>>" << "\n\n";
+#endif
 							return;
 						}
 
-						Utility::itoa( left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+						Utility::itoa(left_player_id, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1);
 						const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::LEFT_PLAYER_ID_PARAM_TOKEN+1 );
 
 						const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::LOST_ALIVE_PLAYER_TOKEN ), p->GetFd(), p->GetAddr() );

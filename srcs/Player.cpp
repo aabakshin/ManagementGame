@@ -3,7 +3,11 @@
 
 
 #include "Player.hpp"
-#include <cstdio>
+
+#ifdef DEBUG_MODE
+	#include <iostream>
+#endif
+
 #include <cstring>
 #include <stdexcept>
 
@@ -155,16 +159,16 @@ int List<Item<BuildsData>>::GetSize() const
 
 void List<Item<BuildsData>>::Print() const
 {
+#ifdef DEBUG_MODE
 	if ( IsEmpty() )
 	{
-		printf("%s", "\"\"\n");
+		std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "\"\"" << std::endl;
 		return;
 	}
 
 	for ( Item<BuildsData>* node = GetFirst(); node != nullptr; node = node->GetNext() )
-	{
-		printf("( %d, %d ), \n", node->GetData().GetBuildNumber(), node->GetData().GetTurnsLeft());
-	}
+		std::cout << "[" << Utility::current_time_str() << "] " << "[DEBUG] " << "( " << node->GetData().GetBuildNumber() << ", " << node->GetData().GetTurnsLeft() << ")," << std::endl;
+#endif
 }
 
 int List<Item<BuildsData>>::GetMaxNum() const

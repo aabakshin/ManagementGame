@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 
 int Utility::cut_str( char* s, int s_size, int ch )
@@ -310,6 +313,22 @@ int Utility::concat_tokens( char* buffer, int buffer_size, const char** tokens, 
 	buffer[j-1] = '\0';
 
 	return j-1;
+}
+
+std::string Utility::current_time_str()
+{
+	auto now = std::chrono::system_clock::now();
+	std::time_t t = std::chrono::system_clock::to_time_t(now);
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+	std::tm tm {};
+	localtime_r( &t, &tm ); // Для Linux/MacOS
+	
+	std::ostringstream oss;
+	oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
+		<< "." << std::setfill('0') << std::setw(3) << ms.count();
+
+	return oss.str();
 }
 
 #endif
