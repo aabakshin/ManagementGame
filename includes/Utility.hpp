@@ -8,6 +8,8 @@
 class Utility
 {
 public:
+	using sig_hndl_func = void (*)(int);
+
 	Utility() {}
 	static void heap_sort( int* values, int size, int ascending );
 	static void delete_spaces( char* buffer, int* bufsize );
@@ -18,6 +20,8 @@ public:
 	static void concat_to_str( int number, char* number_buf, int number_len, char* str, int* str_offset );
 	static int concat_tokens( char* buffer, int buffer_size, const char** tokens, int tokens_count );
 	static std::string current_time_str();
+	static void ignore_unused_signals();
+	static void set_signal_disposition( struct sigaction&, int, sig_hndl_func, int );
 private:
 	Utility( const Utility& ) = delete;
 	Utility( Utility&& ) = delete;

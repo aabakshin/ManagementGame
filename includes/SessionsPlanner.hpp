@@ -6,11 +6,11 @@
 #include "BrokerMessages.hpp"
 #include "Sender.hpp"
 #include "Receiver.hpp"
+#include "Config.hpp"
 #include <sys/timerfd.h>
-#include <cstdint>
-#include <utility>
 #include <list>
 #include <stdexcept>
+#include <memory>
 
 
 class Banker;
@@ -93,6 +93,7 @@ private:
 	static int next_session_id;
 	Banker** game_sessions { nullptr };
 	int current_sessions_count { };
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 	StartSessionsTimers start_timers;
 	CommandExecutor cmds_exec;
 	EncapsulatedBrokerMessages<BCBrokerMessages,SessionsPlanner> EBCbroker;
@@ -106,7 +107,8 @@ private:
 public:
 	SessionsPlanner();
 	~SessionsPlanner();
-	void Make( int );
+	void Make( int, std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	const Banker* operator[]( int );
 	const Banker* GetSessionById( int ) const;
 	int GetSessionsCount() const { return current_sessions_count; }

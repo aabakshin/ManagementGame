@@ -3,18 +3,14 @@
 
 
 #include "Server.hpp"
+#include "Utility.hpp"
 #include "MGExceptions.hpp"
-#include "Banker.hpp"
-#include <errno.h>
+#include "Logger.hpp"
 #include <unistd.h>
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <ctime>
-#include <list>
-#include <string>
+#include <iostream>
+#include <csignal>
 
 
 enum
@@ -30,34 +26,13 @@ void exit_handler( int sig_no )
 	Server::SetExitFlag();
 }
 
-void Server::IgnoreUnusedSignals()
+// Ф-я обработчик сигнала SIGUSR1
+void g_cfg_handler( int sig_no )
 {
-	struct sigaction old_act;
-
-	int max_sig = SIGRTMAX;
-
-	for ( int sig = 1; sig <= max_sig; ++sig )
-	{
-		if (
-				sig == SIGKILL			||
-				sig == SIGSTOP			||
-				sig == SIGSEGV
-			)
-			continue;
-
-		if ( sigaction( sig, nullptr, &old_act ) == 0 )
-		{
-			if ( old_act.sa_handler == SIG_DFL )
-			{
-				struct sigaction new_act;
-				new_act.sa_handler = SIG_IGN;
-				sigemptyset(&new_act.sa_mask);
-				new_act.sa_flags = 0;
-				sigaction(sig, &new_act, nullptr);
-			}
-		}
-	}
+	Server::SetSignalNum( sig_no );
+	Server::SetReloadCfgFlag();
 }
+
 
 void Server::SetListenSocket( int socket_value )
 {
@@ -139,16 +114,16 @@ void Server::ListenSocketInit()
 	}
 }
 
-void Server::Make( const char* addr, const char* port, Logger* logger )
+void Server::Make( const char* addr, const char* port, Logger* logger, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
 	srv_msgs_logger = logger;
-	UnsetExitFlag();
 	SetSignalNum( 0 );
 	SetAddrBuffer( addr, port );
 	ListenSocketInit();
 	SetMaxFd( 0 );
 
-	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT );
+	m_game_config_settings = std::move(m_g_sets);
+	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT, m_game_config_settings );
 
 	srv_msgs_logger->info("Waiting connections to", port, " port...");
 }
@@ -292,19 +267,19 @@ void Server::IncomingEventsHandle()
 				catch ( const QuitCommandException& ex )
 				{
 					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
-					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
+					CloseConnection( i, ex.GetAddr() );
 					continue;
 				}
 				catch ( const InternalCmdExecuteException& ex )
 				{
 					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
-					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
+					CloseConnection( i, ex.GetAddr() );
 					continue;
 				}
 				catch ( const PlayerLostConnectionException& ex )
 				{
 					srv_msgs_logger->error("[Server::IncomingEventsHandle] ", ex.what());
-					CloseConnection( i, sessions_planner.GetSessionById(player_pos.first)->GetPlayers().GetPlayerByFd(i)->GetAddr() );
+					CloseConnection( i, ex.GetAddr() );
 					continue;
 				}
 				catch ( const std::runtime_error& ex )
@@ -343,23 +318,64 @@ void Server::RefillReadfds()
 	}
 }
 
+void Server::ReloadGameConfig()
+{
+	Config new_config;
+
+	try
+	{
+		if ( !new_config.Load("config.json") )
+			return;
+
+		auto new_game_settings = std::make_shared<const Config::GameSettings>(std::move(new_config.game_settings));
+
+		{
+			std::lock_guard<std::mutex> lock(m_game_settings_mutex);
+			m_game_config_settings = std::move(new_game_settings);
+		}
+
+		sessions_planner.ApplySettings( m_game_config_settings );
+
+		srv_msgs_logger->info("Config reloaded successfully");
+		std::cout << "[" << Utility::current_time_str() << "] " << "[INFO] " << "Config reloaded successfully" << std::endl;
+	}
+	catch ( const nlohmann::json::parse_error& ex )
+	{
+		throw;
+	}
+}
+
 int Server::Run()
 {
-	struct sigaction sa;
-	sa.sa_handler = exit_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	sigaction(SIGINT, &sa, nullptr);
+	struct sigaction exit;
+	Utility::set_signal_disposition(exit, SIGINT, exit_handler, 0);
 
-	IgnoreUnusedSignals();
+	Utility::ignore_unused_signals();
+
+	struct sigaction g_cfg;
+	Utility::set_signal_disposition(g_cfg, SIGUSR1, g_cfg_handler, SA_RESTART);
 
 	srand(time(0));
 
 
 	while ( 1 )
 	{
-		if ( exit_flag )
+		if ( CheckAndClearExitFlag() )
 			Stop( 0 );
+
+		if ( CheckAndClearCfgFlag() )
+		{
+			try
+			{
+				ReloadGameConfig();
+			}
+			catch ( const nlohmann::json::parse_error& ex )
+			{
+				throw;
+			}
+
+			continue;
+		}
 
 		RefillReadfds();
 

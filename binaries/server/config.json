@@ -1,0 +1,16 @@
+{
+	"min_players_to_start": 2,
+	"max_players": 8,
+	"time_to_start": 10,
+	"start_market_level": 3,
+	"start_money": 10000,
+	"start_sources": 4,
+	"start_products": 2,
+	"start_factories": 2,
+	"source_unit_charge": 300,
+	"product_unit_charge": 500,
+	"factory_unit_charge": 1000,
+	"new_factory_unit_cost": 5000,
+	"production_product_cost": 2000,
+	"turns_to_build_factory": 5
+}

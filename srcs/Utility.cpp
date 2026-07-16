@@ -10,6 +10,7 @@
 #include <chrono>
 #include <sstream>
 #include <iomanip>
+#include <csignal>
 
 
 int Utility::cut_str( char* s, int s_size, int ch )
@@ -323,12 +324,46 @@ std::string Utility::current_time_str()
 
 	std::tm tm {};
 	localtime_r( &t, &tm ); // Для Linux/MacOS
-	
+
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
 		<< "." << std::setfill('0') << std::setw(3) << ms.count();
 
 	return oss.str();
+}
+
+void Utility::ignore_unused_signals()
+{
+	struct sigaction old_act;
+
+	int max_sig = SIGRTMAX;
+
+	for ( int sig = 1; sig <= max_sig; ++sig )
+	{
+		if (
+				sig == SIGKILL			||
+				sig == SIGSTOP			||
+				sig == SIGSEGV
+			)
+			continue;
+
+		if ( sigaction( sig, nullptr, &old_act ) == 0 )
+		{
+			if ( old_act.sa_handler == SIG_DFL )
+			{
+				struct sigaction new_act;
+				set_signal_disposition(new_act, sig, SIG_IGN, 0);
+			}
+		}
+	}
+}
+
+void Utility::set_signal_disposition( struct sigaction& sa, int sig_no, sig_hndl_func shf, int flags )
+{
+	sa.sa_handler = shf;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = flags;
+	sigaction(sig_no, &sa, nullptr);
 }
 
 #endif

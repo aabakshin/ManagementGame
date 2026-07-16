@@ -19,39 +19,40 @@
 static const char* const true_str = "true";
 static const char* const false_str = "false";
 
-// Описан в модуле MGLib
-extern const char* info_game_messages[];
-
-// Описаны в модуле Banker
-extern const double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
-extern const int price_table[MARKET_LEVEL_NUMBER][2];
-extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
-
 
 template <class T, class U>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object )
+void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
-	brokerPTR = new T( context_object );
+	m_game_settings = std::move(m_g_sets);
+	brokerPTR = new T( context_object, m_game_settings );
 }
 
 template <class T, class U>
 template <class X, class Y, class Z>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4 )
+void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4, std::shared_ptr<const Config::GameSettings> m_g_sets  )
 {
-	brokerPTR = new T( context_object1, context_object2, context_object3, context_object4 );
+	m_game_settings = std::move(m_g_sets);
+	brokerPTR = new T( context_object1, context_object2, context_object3, context_object4, m_game_settings );
 }
 
 template <class T, class U>
 template <class X, class Y>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3 )
+void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, std::shared_ptr<const Config::GameSettings> m_g_sets  )
 {
-	brokerPTR = new T( context_object1, context_object2, context_object3 );
+	m_game_settings = std::move(m_g_sets);
+	brokerPTR = new T( context_object1, context_object2, context_object3, m_game_settings );
 }
 
 template <class T, class U>
 const T& EncapsulatedBrokerMessages<T,U>::GetBroker() const
 {
 	return const_cast<const T&>(*brokerPTR);
+}
+
+template <class T, class U>
+void EncapsulatedBrokerMessages<T,U>::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )
+{
+	m_game_settings = std::move(m_g_sets);
 }
 
 template <class T, class U>
@@ -98,8 +99,8 @@ const char* BrokerMessages::TakeMessage( int message_code )
 }
 
 
-GameEvents::GameEvents( const SessionsPlanner& sessions, const MessageTokens& mt, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& emae )
-	: game_sessions( sessions ), msg_tokens( mt ), EMultiActionsExec( emae )
+GameEvents::GameEvents( const SessionsPlanner& sessions, const MessageTokens& mt, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& emae, std::shared_ptr<const Config::GameSettings> m_g_sets )
+	: BrokerMessages( m_g_sets ), game_sessions( sessions ), msg_tokens( mt ), EMultiActionsExec( emae )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.Make( GameEvents::BROKER_ACTIONS_COUNT );
@@ -195,8 +196,8 @@ void GameEvents::PrepareNewTurnEvent()
 }
 
 
-MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& egm )
-	: game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
+MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& egm, std::shared_ptr<const Config::GameSettings> m_g_sets )
+	: BrokerMessages( m_g_sets ), game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.Make( MulticastActionsExec::BROKER_ACTIONS_COUNT );
@@ -263,7 +264,7 @@ void MulticastActionsExec::SendReportOnTurn()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -281,7 +282,7 @@ void MulticastActionsExec::AddEmptyAuctionRequest()
 
 	List<Item<MarketData>>& requests = ( auction_type == SOURCE_AUCTION ) ? const_cast<Banker&>(game_session).GetSourcesRequests() : const_cast<Banker&>(game_session).GetProductsRequests();
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -294,7 +295,7 @@ void MulticastActionsExec::AddEmptyAuctionRequest()
 			if ( node == nullptr )
 			{
 				MarketData data;
-				data.MakeData( p->GetUID(), 0, 0 );
+				data.Make( p->GetUID(), 0, 0, m_game_settings->max_players );
 				requests.Insert( data );
 			}
 		}
@@ -305,7 +306,7 @@ void MulticastActionsExec::PayCharges()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -313,10 +314,10 @@ void MulticastActionsExec::PayCharges()
 			if ( !p->IsBankrot() )
 			{
 				int total_charges = 0;
-				total_charges = p->GetSources() * SOURCE_UNIT_CHARGE;
-				total_charges += p->GetProducts() * PRODUCT_UNIT_CHARGE;
-				total_charges += p->GetWaitFactories() * FACTORY_UNIT_CHARGE;
-				total_charges += p->GetWorkFactories() * FACTORY_UNIT_CHARGE;
+				total_charges = p->GetSources() * m_game_settings->source_unit_charge;
+				total_charges += p->GetProducts() * m_game_settings->product_unit_charge;
+				total_charges += p->GetWaitFactories() * m_game_settings->factory_unit_charge;
+				total_charges += p->GetWorkFactories() * m_game_settings->factory_unit_charge;
 
 				Utility::itoa( total_charges, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]), MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
@@ -347,7 +348,7 @@ void MulticastActionsExec::CheckBuildingFactories()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -360,7 +361,7 @@ void MulticastActionsExec::CheckBuildingFactories()
 					{
 						if ( node->GetData().GetTurnsLeft() == 1 )
 						{
-							int total_charges = NEW_FACTORY_UNIT_COST / 2;
+							int total_charges = m_game_settings->new_factory_unit_cost / 2;
 
 							Utility::itoa(total_charges,const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TOTAL_CHARGES_PARAM_TOKEN]),MessageTokens::MESSAGE_TOKEN_SIZE-1);
 							const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TOTAL_CHARGES_PARAM_TOKEN+1 );
@@ -418,7 +419,7 @@ void MulticastActionsExec::CheckStart()
 {
 	const Banker& banker = *game_sessions.GetSessionById( session_id );
 
-	if (  banker.GetLobbyPlayers() < MIN_PLAYERS_TO_START )
+	if (  banker.GetLobbyPlayers() < m_game_settings->min_players_to_start )
 	{
 		SendStartCancelled();
 	}
@@ -506,7 +507,7 @@ void MulticastActionsExec::PrepareNewTurn()
 		const_cast<Banker&>( game_session ).SetTurnNumber( game_session.GetTurnNumber() + 1 );
 		const_cast<Banker&>( game_session ).SetReadyPlayers( 0 );
 
-		for ( int i = 0; i < MAX_PLAYERS; ++i )
+		for ( int i = 0; i < m_game_settings->max_players; ++i )
 		{
 			const Player* p = game_session.GetPlayers()[i];
 			if ( !p->IsFree() )
@@ -559,11 +560,11 @@ void MulticastActionsExec::PrepareSessionState()
 		const_cast<Banker&>(banker).SetAlivePlayers( banker.GetLobbyPlayers() );
 		const_cast<Banker&>(banker).SetLobbyPlayers( 0 );
 		const_cast<Banker&>(banker).SetTurnNumber( 1 );
-		const_cast<Banker&>(banker).SetCurrentMarketLvl( START_MARKET_LEVEL );
-		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[START_MARKET_LEVEL-1][0] * banker.GetAlivePlayers() );
-		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[START_MARKET_LEVEL-1][0] );
-		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[START_MARKET_LEVEL-1][1] * banker.GetAlivePlayers() );
-		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[START_MARKET_LEVEL-1][1] );
+		const_cast<Banker&>(banker).SetCurrentMarketLvl( m_game_settings->start_market_level );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourcesAmount( amount_multiplier_table[m_game_settings->start_market_level-1][0] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetSourceMinPrice( price_table[m_game_settings->start_market_level-1][0] );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductsAmount( amount_multiplier_table[m_game_settings->start_market_level-1][1] * banker.GetAlivePlayers() );
+		const_cast<Banker&>(banker).GetCurrentMarketState().SetProductMaxPrice( price_table[m_game_settings->start_market_level-1][1] );
 		const_cast<Banker&>(banker).SetGameStatePrepared();
 	}
 	catch ( const std::runtime_error& ex )
@@ -576,18 +577,18 @@ void MulticastActionsExec::PreparePlayersState()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
 			try
 			{
-				const_cast<Player*>(p)->SetMoney( START_MONEY );
-				const_cast<Player*>(p)->SetOldMoney( START_MONEY );
-				const_cast<Player*>(p)->SetSources( START_SOURCES );
-				const_cast<Player*>(p)->SetProducts( START_PRODUCTS );
-				const_cast<Player*>(p)->SetWaitFactories( START_FACTORIES );
+				const_cast<Player*>(p)->SetMoney( m_game_settings->start_money );
+				const_cast<Player*>(p)->SetOldMoney( m_game_settings->start_money );
+				const_cast<Player*>(p)->SetSources( m_game_settings->start_sources );
+				const_cast<Player*>(p)->SetProducts( m_game_settings->start_products );
+				const_cast<Player*>(p)->SetWaitFactories( m_game_settings->start_factories );
 
 				Utility::itoa( p->GetUID(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::SENDER_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::SENDER_ID_PARAM_TOKEN+1 );
@@ -606,7 +607,7 @@ void MulticastActionsExec::SendAuctionsResults()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -627,7 +628,7 @@ void MulticastActionsExec::SendPlayersBankrot()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -651,7 +652,7 @@ void MulticastActionsExec::SendNewPlayerConnect()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -672,14 +673,14 @@ void MulticastActionsExec::SendStartTime()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
 		{
 			try
 			{
-				Utility::itoa( TIME_TO_START, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
+				Utility::itoa( m_game_settings->time_to_start, const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameMessages::TIME_TO_START_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 				const_cast<GameMessages&>(EGameMessages.GetBroker()).PutMessage( msg_tokens.GetValue(), GameMessages::TIME_TO_START_PARAM_TOKEN+1 );
 				const_cast<Sender&>(sender).SendMessage( const_cast<GameMessages&>(EGameMessages.GetBroker()).TakeMessage( GameMessages::STARTINSECONDS_TOKEN ), p->GetFd(), p->GetAddr() );
 			}
@@ -695,7 +696,7 @@ void MulticastActionsExec::SendStartCancelled()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -716,7 +717,7 @@ void MulticastActionsExec::SendGameStarted()
 {
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -737,7 +738,7 @@ void MulticastActionsExec::QuitBankrotPlayers()
 {
 	Banker& game_session = const_cast<Banker&>(*game_sessions.GetSessionById( session_id ));
 
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = game_session.GetPlayers()[i];
 		if ( !p->IsFree() )
@@ -778,7 +779,7 @@ void MulticastActionsExec::QuitPlayer()
 		const_cast<Player*>(left_player)->SetFree();
 		const_cast<Banker&>(game_session).SetAlivePlayers( game_session.GetAlivePlayers() - 1 );
 
-		for ( int i = 0; i < MAX_PLAYERS; ++i )
+		for ( int i = 0; i < m_game_settings->max_players; ++i )
 		{
 			const Player* p = game_session.GetPlayers()[i];
 			if ( !p->IsFree() )
@@ -835,12 +836,12 @@ void MulticastActionsExec::SortRequestsByPrice( const List<Item<MarketData>>& re
 	Utility::heap_sort(prices, ready_players, ( auction_type == SOURCE_AUCTION ) ? 1 : 0 );
 
 	int j = 0;
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
 		{
 			MarketData data;
-			data.MakeData( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice() );
+			data.Make( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice(), m_game_settings->max_players );
 
 			sorted_requests.Insert( data );
 			reqs_checked[i] = true;
@@ -960,7 +961,7 @@ void MulticastActionsExec::StartAuction()
 }
 
 
-GameMessages::GameMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
+GameMessages::GameMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) : BrokerMessages( m_g_sets ), game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.Make( GameMessages::BROKER_ACTIONS_COUNT );
@@ -1043,7 +1044,7 @@ void GameMessages::LostLobbyPlayerMessage()
 	Utility::itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
-	Utility::itoa(MAX_PLAYERS, max_pl_buf, 9);
+	Utility::itoa(m_game_settings->max_players, max_pl_buf, 9);
 
 
 	const char* message_tokens[] =
@@ -1224,7 +1225,7 @@ void GameMessages::NewPlayerConnectMessage()
 	Utility::itoa(game_session.GetLobbyPlayers(), lp_buf, 9);
 
 	char max_pl_buf[10];
-	Utility::itoa(MAX_PLAYERS, max_pl_buf, 9);
+	Utility::itoa(m_game_settings->max_players, max_pl_buf, 9);
 
 
 	const char* message_tokens[] =
@@ -1272,12 +1273,16 @@ void GameMessages::AuctionResultsMessage()
 		char bprnum[BOUGHT_PRICE_SIZE];
 	};
 
-	player_report pr[MAX_PLAYERS];
-	memset(pr, 0, sizeof(player_report) * MAX_PLAYERS);
+	player_report pr[m_game_settings->max_players];
+	memset(pr, 0, sizeof(player_report) * m_game_settings->max_players);
 
 	const Banker& game_session = *game_sessions.GetSessionById( session_id );
 
-	const char* message_tokens[ PL_REP_FIELDS_NUM * MAX_PLAYERS + 1 ] { nullptr };
+	const int msg_tokens_size = PL_REP_FIELDS_NUM * m_game_settings->max_players + 1;
+	const char* message_tokens[ msg_tokens_size ];
+
+	for ( int i = 0; i < msg_tokens_size; ++i )
+		message_tokens[i] = nullptr;
 
 
 	message_tokens[0] = info_game_messages[AUCTION_RESULTS];
@@ -1440,7 +1445,7 @@ void GameMessages::ServerFullMessage()
 }
 
 
-BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions ) : game_sessions( sessions )
+BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) : BrokerMessages( m_g_sets ), game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
 	br_acts.Make( BCBrokerMessages::BROKER_ACTIONS_COUNT );
@@ -1800,7 +1805,7 @@ void BCBrokerMessages::ProdCmdMoneyCondition()
 		if ( sender_p->IsFree() )
 			return;
 
-		if ( sender_p->GetMoney() >= PRODUCTION_PRODUCT_COST )
+		if ( sender_p->GetMoney() >= m_game_settings->production_product_cost )
 		{
 			strcpy(result_message, true_str);
 			return;
@@ -1848,7 +1853,7 @@ void BCBrokerMessages::ProdCmdUpdateGameState()
 			const_cast<Player*>(sender_p)->SetWaitFactories( sender_p->GetWaitFactories() - 1 );
 			const_cast<Player*>(sender_p)->SetWorkFactories( sender_p->GetWorkFactories() + 1 );
 			const_cast<Player*>(sender_p)->SetSources( sender_p->GetSources() - 1 );
-			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - PRODUCTION_PRODUCT_COST );
+			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - m_game_settings->production_product_cost );
 		}
 		catch ( const std::runtime_error& ex )
 		{
@@ -1939,7 +1944,7 @@ void BCBrokerMessages::BuildCmdMoneyCondition()
 		if ( sender_p->IsFree() )
 			return;
 
-		if ( sender_p->GetMoney() >= NEW_FACTORY_UNIT_COST/2 )
+		if ( sender_p->GetMoney() >= m_game_settings->new_factory_unit_cost/2 )
 		{
 			strcpy(result_message, true_str);
 			return;
@@ -1962,12 +1967,12 @@ void BCBrokerMessages::BuildCmdUpdateGameState()
 			return;
 
 		BuildsData data;
-		data.MakeData( sender_p->GetBuildsFactories().GetValidNum(), TURNS_TO_BUILD );
+		data.Make( sender_p->GetBuildsFactories().GetValidNum(), m_game_settings->turns_to_build_factory, m_game_settings->max_players );
 
 		try
 		{
 			const_cast<List<Item<BuildsData>>&>(sender_p->GetBuildsFactories()).Insert( data );
-			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - NEW_FACTORY_UNIT_COST/2 );
+			const_cast<Player*>(sender_p)->SetMoney( sender_p->GetMoney() - m_game_settings->new_factory_unit_cost/2 );
 			const_cast<Player*>(sender_p)->SetBuiltFactories( sender_p->GetBuiltFactories() + 1 );
 		}
 		catch ( const std::runtime_error& ex )
@@ -2057,7 +2062,7 @@ void BCBrokerMessages::BuyCmdUpdateGameState()
 			return;
 
 		MarketData data;
-		data.MakeData( sender_player_id, sources_amount, source_price );
+		data.Make( sender_player_id, sources_amount, source_price, m_game_settings->max_players );
 
 		const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetSourcesRequests().Insert( data );
 
@@ -2152,7 +2157,7 @@ void BCBrokerMessages::SellCmdUpdateGameState()
 			return;
 
 		MarketData data;
-		data.MakeData( sender_player_id, products_amount, product_price );
+		data.Make( sender_player_id, products_amount, product_price, m_game_settings->max_players );
 
 		const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetProductsRequests().Insert( data );
 

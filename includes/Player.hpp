@@ -3,29 +3,27 @@
 
 
 #include "List.hpp"
-
-
-enum
-{
-		TURNS_TO_BUILD		=		 5,
-		MAX_PLAYERS			=		 8
-};
+#include "Config.hpp"
+#include <memory>
 
 
 class BuildsData
 {
 	int build_number;
 	int turns_left;
+	int max_players;
 public:
-	BuildsData( int num_value = 0, int turns_left_value = 0 );
+	BuildsData( int num_value = 0, int turns_left_value = 0, int max_p = 0 );
 	BuildsData( const BuildsData& );
 	BuildsData( BuildsData&& );
 	void operator=( const BuildsData& );
-	void MakeData( int num_value, int turns_left_value );
+	void Make( int num_value, int turns_left_value, int max_p );
 	int GetBuildNumber() const { return build_number; }
 	int GetTurnsLeft() const { return turns_left; }
+	int GetMaxPlayers() const { return max_players; }
 	void SetBuildNumber( int num_value );
 	void SetTurnsLeft( int turns_left_value );
+	void SetMaxPlayers( int max_p ) { max_players = max_p; }
 };
 
 template <>
@@ -57,15 +55,13 @@ private:
 
 class Player
 {
-private:
+public:
 
 	enum
 	{
 			ADDRESS_SIZE		=		50,
 			BUFSIZE				=	  1024
 	};
-
-public:
 
 	class AuctionReport
 	{
@@ -113,8 +109,10 @@ private:
 	bool sent_products_request;
 	AuctionReport ar;
 	List<Item<BuildsData>> builds_factories;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	Player( int, const char*, int );
+	Player( int, const char*, int, std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	int GetFd() const { return fd; }
 	const char* GetAddr() const { return addr; }
 	const char* GetMessageBuffer() const { return message; }

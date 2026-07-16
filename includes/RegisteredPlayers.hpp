@@ -2,15 +2,20 @@
 #define REGISTERED_PLAYERS_HPP_SENTINEL
 
 
+#include "Config.hpp"
 #include "Player.hpp"
+#include <memory>
 
 
 class RegisteredPlayers
 {
 private:
-	Player* registered_players[MAX_PLAYERS];
+	Player** registered_players;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	RegisteredPlayers();
+	RegisteredPlayers() {}
+	void Make( std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~RegisteredPlayers();
 	const Player* operator[]( unsigned int idx ) const;
 	const Player* GetPlayerByFd( int ) const;

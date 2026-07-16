@@ -2,8 +2,9 @@
 #define BROKER_MESSAGES_HPP_SENTINEL
 
 
-#include <functional>
 #include "List.hpp"
+#include "Config.hpp"
+#include <functional>
 
 
 class MarketData;
@@ -17,14 +18,16 @@ class EncapsulatedBrokerMessages
 {
 private:
 	T* brokerPTR { nullptr };
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
 	EncapsulatedBrokerMessages() {}
-	void Make( const U& );
+	void Make( const U&, std::shared_ptr<const Config::GameSettings> );
 	template <class X, class Y>
-	void Make( const U&, const X&, const Y& );
+	void Make( const U&, const X&, const Y&, std::shared_ptr<const Config::GameSettings> );
 	template <class X, class Y, class Z>
-	void Make( const U&, const X&, const Y&, const Z& );
+	void Make( const U&, const X&, const Y&, const Z&, std::shared_ptr<const Config::GameSettings> );
 	const T& GetBroker() const;
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~EncapsulatedBrokerMessages();
 private:
 	EncapsulatedBrokerMessages( const EncapsulatedBrokerMessages& ) = delete;
@@ -55,8 +58,10 @@ public:
 private:
 	char result_message[0];
 	BrokerActions broker_actions;
+protected:
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	BrokerMessages() {}
+	BrokerMessages( std::shared_ptr<const Config::GameSettings> m_g_sets ) { m_game_settings = std::move(m_g_sets); }
 	const BrokerActions& GetBrokerActions() const { return broker_actions; }
 	virtual void PutMessage( const char**, int ) = 0;
 	const char* TakeMessage( int );
@@ -106,7 +111,7 @@ private:
 
 	char result_message[MESSAGE_SIZE];
 public:
-	GameEvents( const SessionsPlanner&, const MessageTokens&, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& );
+	GameEvents( const SessionsPlanner&, const MessageTokens&, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>&, std::shared_ptr<const Config::GameSettings> );
 	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	const MessageTokens& GetMsgTokens() const { return msg_tokens; }
 	const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& GetEMultiActionsExec() const { return EMultiActionsExec; }
@@ -182,7 +187,7 @@ private:
 
 	char result_message[MESSAGE_SIZE];
 public:
-	MulticastActionsExec( const SessionsPlanner&, const Sender&, const MessageTokens&, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& );
+	MulticastActionsExec( const SessionsPlanner&, const Sender&, const MessageTokens&, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>&, std::shared_ptr<const Config::GameSettings> );
 	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	const Sender& GetSender() const { return sender; }
 	const MessageTokens& GetMsgTokens() const { return msg_tokens; }
@@ -298,7 +303,7 @@ private:
 
 	char result_message[MESSAGE_SIZE];
 public:
-	BCBrokerMessages( const SessionsPlanner& );
+	BCBrokerMessages( const SessionsPlanner&, std::shared_ptr<const Config::GameSettings> );
 	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	virtual void PutMessage( const char**, int ) override;
 	virtual ~BCBrokerMessages() {}
@@ -405,7 +410,7 @@ private:
 
 	char result_message[MESSAGE_SIZE];
 public:
-	GameMessages( const SessionsPlanner& );
+	GameMessages( const SessionsPlanner&, std::shared_ptr<const Config::GameSettings> );
 	const SessionsPlanner& GetGameSessions() const { return game_sessions; }
 	virtual void PutMessage( const char**, int ) override;
 	virtual ~GameMessages() {}

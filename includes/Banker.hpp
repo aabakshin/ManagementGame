@@ -2,38 +2,26 @@
 #define BANKER_HPP
 
 
+#include "Config.hpp"
 #include "RegisteredPlayers.hpp"
 #include "List.hpp"
 #include <list>
 #include <string>
+#include <memory>
 
 
+// Внутренние константы, без надобности не трогать!
 enum
 {
-	MIN_PLAYERS_TO_START			=							   2,
-	TIME_TO_START					=							  10,
 	MARKET_LEVEL_NUMBER				=							   5,
-	START_MARKET_LEVEL				=							   3
-};
-
-enum
-{
-	START_MONEY						=						  100000,
-	START_SOURCES					=						   	   4,
-	START_PRODUCTS					=							   2,
-	START_FACTORIES					=					           2,
-	SOURCE_UNIT_CHARGE				=						     300,
-	PRODUCT_UNIT_CHARGE				=						     500,
-	FACTORY_UNIT_CHARGE				=						    1000,
-	NEW_FACTORY_UNIT_COST			=						    5000,
-	PRODUCTION_PRODUCT_COST			=						    2000
-};
-
-enum
-{
 	SOURCE_AUCTION					=							   0,
 	PRODUCTION_AUCTION				=							   1
 };
+
+
+extern const double amount_multiplier_table[MARKET_LEVEL_NUMBER][2];
+extern const int price_table[MARKET_LEVEL_NUMBER][2];
+extern const int states_market_chance[MARKET_LEVEL_NUMBER][MARKET_LEVEL_NUMBER];
 
 
 class MarketState
@@ -64,19 +52,22 @@ class MarketData
 	int player_id;
 	int amount;
 	int price;
+	int max_players;
 	bool success;
 public:
-	MarketData( int p_num = 0, int amnt = 0, int pr = 0 );
+	MarketData( int p_num = 0, int amnt = 0, int pr = 0, const int max_p = 0 );
 	MarketData( const MarketData& );
 	MarketData( MarketData&& );
 	void operator=( const MarketData& );
-	void MakeData( int p_num, int amnt, int pr );
+	void Make( int p_num, int amnt, int pr, const int );
 	int GetPlayerNum() const { return player_id; }
 	int GetAmount() const { return amount; }
 	int GetPrice() const { return price; }
-	void SetPlayerNum( int value );
-	void SetAmount( int value );
-	void SetPrice( int value );
+	int GetMaxPlayers() const { return max_players; }
+	void SetPlayerNum( int );
+	void SetAmount( int );
+	void SetPrice( int );
+	void SetMaxPlayers( int max_p ) { max_players = max_p; }
 	bool IsSuccess() const { return success; }
 	void SetSuccess() { success = true; }
 	void UnsetSuccess() { success = false; }
@@ -94,8 +85,8 @@ public:
 	Item<MarketData>* GetFirst() const { return first; }
 	Item<MarketData>* GetLast() const { return last; }
 	bool IsEmpty() const { if ( !first && !last ) return true; return false; }
-	void Insert( MarketData data );
-	void Delete( int num_value );
+	void Insert( MarketData );
+	void Delete( int );
 	void Clear();
 	int GetSize() const;
 	void Print() const;
@@ -125,8 +116,10 @@ private:
 	List<Item<MarketData>> sources_requests;
 	List<Item<MarketData>> products_requests;
 	BankrotsList bankrots_on_turn;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	Banker( int );
+	Banker( int, std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	bool IsGameStatePrepared() const { return game_state_prepared; }
 	void SetGameStatePrepared() { game_state_prepared = true; }
 	void UnsetPlayersPrepared() { game_state_prepared = false; }

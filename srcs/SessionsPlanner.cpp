@@ -8,9 +8,7 @@
 #include "Utility.hpp"
 #include "MGExceptions.hpp"
 #include <unistd.h>
-#include <cstdio>
 #include <cstring>
-#include <list>
 #include <stdexcept>
 
 
@@ -22,11 +20,6 @@ static const char* const bot_identity_messages[] = {
 				"./bot_mg_release4\n",
 				nullptr
 };
-
-
-// Описаны в модуле MGProto
-extern const char* info_game_messages[];
-extern const char* error_game_messages[];
 
 
 SessionsPlanner::StartSessionsTimers::StartSessionTimer::StartSessionTimer()
@@ -172,14 +165,16 @@ SessionsPlanner::SessionsPlanner()
 		next_session_id = 1;
 }
 
-void SessionsPlanner::Make( int sessions_count )
+void SessionsPlanner::Make( int sessions_count, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
-	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
+	m_game_settings = std::move(m_g_sets);
 
-	EBCbroker.Make( *this );
-	EGameMessages.Make( *this );
-	EMultiActionsExec.Make( *this, sender, msg_tokens, EGameMessages );
-	EGameEvents.Make( *this, msg_tokens, EMultiActionsExec );
+	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
+	cmds_exec.Make( m_game_settings );
+	EBCbroker.Make( *this, m_game_settings );
+	EGameMessages.Make( *this, m_game_settings );
+	EMultiActionsExec.Make( *this, sender, msg_tokens, EGameMessages, m_game_settings );
+	EGameEvents.Make( *this, msg_tokens, EMultiActionsExec, m_game_settings );
 
 	if ( sessions_count < 1 )
 		current_sessions_count = DEFAULT_START_SESSIONS_COUNT;
@@ -190,9 +185,23 @@ void SessionsPlanner::Make( int sessions_count )
 
 	for ( int i = 0; i < current_sessions_count; ++i )
 	{
-		game_sessions[i] = new Banker( next_session_id );
+		game_sessions[i] = new Banker( next_session_id, m_game_settings );
 		++next_session_id;
 	}
+}
+
+void SessionsPlanner::ApplySettings( std::shared_ptr<const Config::GameSettings> new_m_g_sets )
+{
+	m_game_settings = std::move(new_m_g_sets);
+
+	cmds_exec.ApplySettings( m_game_settings );
+	EBCbroker.ApplySettings( m_game_settings );
+	EGameMessages.ApplySettings( m_game_settings );
+	EMultiActionsExec.ApplySettings( m_game_settings );
+	EGameEvents.ApplySettings( m_game_settings );
+
+	for ( int i = 0; i < current_sessions_count; ++i )
+		game_sessions[i]->ApplySettings( m_game_settings );
 }
 
 void SessionsPlanner::AddSessions()
@@ -213,7 +222,7 @@ void SessionsPlanner::AddSessions()
 		}
 		else
 		{
-			temp[i] = new Banker( next_session_id );
+			temp[i] = new Banker( next_session_id, m_game_settings );
 			++next_session_id;
 		}
 	}
@@ -323,7 +332,7 @@ bool SessionsPlanner::IsPlayerFd( int fd, std::pair<int,int>& player_pos ) const
 	{
 		const Banker& banker = *GetSessionById( i );
 
-		for ( int j = 0; j < MAX_PLAYERS; ++j )
+		for ( int j = 0; j < m_game_settings->max_players; ++j )
 		{
 			const Player* p = banker.GetPlayers()[j];
 			if ( !p->IsFree() )
@@ -347,7 +356,7 @@ std::list<int> SessionsPlanner::GetValidFdsList() const
 
 	for ( int i = DEFAULT_NEXT_SESSION_ID; i <= GetSessionsCount(); ++i )
 	{
-		for ( int j = 0; j < MAX_PLAYERS; ++j )
+		for ( int j = 0; j < m_game_settings->max_players; ++j )
 		{
 			const Player* p = GetSessionById( i )->GetPlayers()[j];
 			if ( !p->IsFree() )
@@ -380,13 +389,13 @@ void SessionsPlanner::GameEventsHandle()
 			bool is_launched_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsLaunched();
 			bool is_alarmed_flag = const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].IsAlarmed();
 
-			if ( ( banker.GetLobbyPlayers() >= MIN_PLAYERS_TO_START ) && ( banker.GetLobbyPlayers() <= MAX_PLAYERS ) )
+			if ( ( banker.GetLobbyPlayers() >= m_game_settings->min_players_to_start ) && ( banker.GetLobbyPlayers() <= m_game_settings->max_players ) )
 			{
 				if ( !is_launched_flag )
 				{
 					try
 					{
-						const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( TIME_TO_START, 0, 0, 0 );
+						const_cast<StartSessionsTimers&>(GetStartTimers())[t_idx].StartTimer( m_game_settings->time_to_start, 0, 0, 0 );
 
 						Utility::itoa( banker.GetId(), const_cast<char*>(const_cast<MessageTokens&>(msg_tokens).GetValue()[GameEvents::SESSION_ID_PARAM_TOKEN]), MessageTokens::MESSAGE_TOKEN_SIZE-1 );
 						const_cast<GameEvents&>(EGameEvents.GetBroker()).PutMessage( msg_tokens.GetValue(), GameEvents::SESSION_ID_PARAM_TOKEN+1 );
@@ -462,7 +471,7 @@ void SessionsPlanner::GetAllPlayersFds( std::list<std::pair<int,std::string>>& p
 	{
 		const Banker& banker = *GetSessionById( i );
 
-		for ( int j = 0; j < MAX_PLAYERS; ++j )
+		for ( int j = 0; j < m_game_settings->max_players; ++j )
 		{
 			const Player* p = banker.GetPlayers()[j];
 			if ( !p->IsFree() )
@@ -584,7 +593,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 				}
 
 				// это не ошибка, просто пока что "костыль"
-				throw QuitCommandException("Player sent 'quit' command and it successfully processed in \"SessionsPlanner::PlayerEventHandle\" function!");
+				throw QuitCommandException("Player sent 'quit' command and it successfully processed in \"SessionsPlanner::PlayerEventHandle\" function!", p_addr);
 			}
 			else if ( strcmp(info_token, error_game_messages[INTERNAL_SERVER_ERROR]) == 0 )
 			{
@@ -597,7 +606,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 					throw;
 				}
 
-				throw InternalCmdExecuteException("Interval error occured while processing player command in \"SessionsPlanner::PlayerEventHandle\" function!");
+				throw InternalCmdExecuteException("Interval error occured while processing player command in \"SessionsPlanner::PlayerEventHandle\" function!", p_addr);
 			}
 		}
 		return;
@@ -613,7 +622,7 @@ void SessionsPlanner::PlayerEventHandle( const std::pair<int,int>& player_pos )
 	}
 
 	// это тоже не ошибка, клиент "потерял" соединение с сервером
-	throw PlayerLostConnectionException("Player lost connection from server in \"SessionsPlanner::PlayerEventHandle\" function!");
+	throw PlayerLostConnectionException("Player lost connection from server in \"SessionsPlanner::PlayerEventHandle\" function!", p_addr);
 }
 
 SessionsPlanner::~SessionsPlanner()

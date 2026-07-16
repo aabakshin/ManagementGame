@@ -6,14 +6,9 @@
 #include "BrokerMessages.hpp"
 #include "MGProto.hpp"
 #include "Utility.hpp"
-#include "Player.hpp"
 #include <cstring>
 #include <cstdlib>
 #include <stdexcept>
-
-
-// Описаны в модуле MGLib
-extern const char* info_game_messages[];
 
 
 static const char* const true_str				=		"true";
@@ -36,9 +31,15 @@ static const char* const valid_commands[] = {
 };
 
 
-Command::Command( int tokens_count )
+Command::Command( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
+	m_game_settings = std::move( m_g_sets );
 	msg_tokens.Make( tokens_count );
+}
+
+void Command::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )
+{
+	m_game_settings = std::move( m_g_sets );
 }
 
 void Command::SetName( const char* cmd_name )
@@ -62,7 +63,7 @@ void Command::SetCmdParams( const void* value1, const void* value2 )
 }
 
 
-HelpCommand::HelpCommand( int tokens_count ) : Command( tokens_count )
+HelpCommand::HelpCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[HELP_COMMAND_NUM]);
 }
@@ -81,7 +82,7 @@ void HelpCommand::Process( int session_id, int sender_player_id, const Command::
 }
 
 
-MarketCommand::MarketCommand( int tokens_count ) : Command( tokens_count )
+MarketCommand::MarketCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[MARKET_COMMAND_NUM]);
 }
@@ -105,7 +106,7 @@ void MarketCommand::Process( int session_id, int sender_player_id, const Command
 }
 
 
-PlayerCommand::PlayerCommand( int tokens_count ) : Command( tokens_count )
+PlayerCommand::PlayerCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[PLAYER_COMMAND_NUM]);
 }
@@ -129,7 +130,7 @@ void PlayerCommand::Process( int session_id, int sender_player_id, const Command
 {
 	int target_player_id = *( reinterpret_cast<int*>(const_cast<void*>(params.GetParam1())) );
 
-	if ( (target_player_id < 1) || (target_player_id > MAX_PLAYERS) )
+	if ( (target_player_id < 1) || (target_player_id > m_game_settings->max_players) )
 	{
 		strncpy( const_cast<char*>(const_cast<MessageTokens&>(GetMessageTokens())[0]), info_game_messages[PLAYER_COMMAND_INCORRECT_ID], MessageTokens::MESSAGE_TOKEN_SIZE-2 );
 		const_cast<MessageTokens&>(GetMessageTokens()).SetMsgTokensCount( 1 );
@@ -177,7 +178,7 @@ void PlayerCommand::Process( int session_id, int sender_player_id, const Command
 }
 
 
-ListCommand::ListCommand( int tokens_count ) : Command( tokens_count )
+ListCommand::ListCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[LIST_COMMAND_NUM]);
 }
@@ -198,7 +199,7 @@ void ListCommand::Process( int session_id, int sender_player_id, const Command::
 }
 
 
-ProdCommand::ProdCommand( int tokens_count ) : Command( tokens_count )
+ProdCommand::ProdCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[PROD_COMMAND_NUM]);
 }
@@ -247,7 +248,7 @@ void ProdCommand::Process( int session_id, int sender_player_id, const Command::
 }
 
 
-BuildCommand::BuildCommand( int tokens_count ) : Command( tokens_count )
+BuildCommand::BuildCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[BUILD_COMMAND_NUM]);
 }
@@ -321,7 +322,7 @@ void BuildCommand::Process( int session_id, int sender_player_id, const Command:
 }
 
 
-BuyCommand::BuyCommand( int tokens_count ) : Command( tokens_count )
+BuyCommand::BuyCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[BUY_COMMAND_NUM]);
 }
@@ -408,7 +409,7 @@ void BuyCommand::Process( int session_id, int sender_player_id, const Command::C
 }
 
 
-SellCommand::SellCommand( int tokens_count ) : Command( tokens_count )
+SellCommand::SellCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[SELL_COMMAND_NUM]);
 }
@@ -488,7 +489,7 @@ void SellCommand::Process( int session_id, int sender_player_id, const Command::
 }
 
 
-TurnCommand::TurnCommand( int tokens_count ) : Command( tokens_count )
+TurnCommand::TurnCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[TURN_COMMAND_NUM]);
 }
@@ -520,7 +521,7 @@ void TurnCommand::Process( int session_id, int sender_player_id, const Command::
 }
 
 
-QuitCommand::QuitCommand( int tokens_count ) : Command( tokens_count )
+QuitCommand::QuitCommand( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : Command( tokens_count, m_g_sets )
 {
 	SetName(valid_commands[QUIT_COMMAND_NUM]);
 }

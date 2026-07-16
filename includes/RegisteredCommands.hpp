@@ -3,6 +3,8 @@
 
 
 #include "Command.hpp"
+#include "Config.hpp"
+#include <memory>
 
 
 enum
@@ -14,11 +16,14 @@ class RegisteredCommands
 {
 private:
 	Command* registered_commands[COMMANDS_COUNT];
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 	int count;
 public:
-	RegisteredCommands();
+	RegisteredCommands() {}
+	void Make( std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~RegisteredCommands();
-	const Command* const operator[]( int idx ) const;
+	const Command* const operator[]( int ) const;
 	int GetCount() const { return count; }
 private:
 	RegisteredCommands( const RegisteredCommands& ) {}

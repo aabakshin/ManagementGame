@@ -3,6 +3,8 @@
 
 
 #include "RegisteredCommands.hpp"
+#include "Config.hpp"
+#include <memory>
 
 
 enum
@@ -20,8 +22,11 @@ private:
 	RegisteredCommands reg_cmds;
 	const char* cmd_result_tokens[MAX_CMD_TOKENS];
 	int cmd_result_tokens_amount;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	CommandExecutor();
+	CommandExecutor() {}
+	void Make( std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	int GetCmdTokensAmount() const { return cmd_tokens_amount; }
 	const char* GetCmdToken( int ) const;
 	int GetCmdResultTokensAmount() const { return cmd_result_tokens_amount; }

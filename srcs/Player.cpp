@@ -12,42 +12,48 @@
 #include <stdexcept>
 
 
-BuildsData::BuildsData( int num_value, int turns_left_value )
+BuildsData::BuildsData( int num_value, int turns_left_value, int max_p )
 {
+	SetMaxPlayers( max_p );
 	SetBuildNumber( num_value );
 	SetTurnsLeft( turns_left_value );
 }
 
 BuildsData::BuildsData( const BuildsData& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetBuildNumber( data.GetBuildNumber() );
 	SetTurnsLeft( data.GetTurnsLeft() );
 }
 
 BuildsData::BuildsData( BuildsData&& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetBuildNumber( data.GetBuildNumber() );
 	SetTurnsLeft( data.GetTurnsLeft() );
 
 	data.SetBuildNumber( 0 );
 	data.SetTurnsLeft( 0 );
+	data.SetMaxPlayers( 0 );
 }
 
 void BuildsData::operator=( const BuildsData& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetBuildNumber( data.GetBuildNumber() );
 	SetTurnsLeft( data.GetTurnsLeft() );
 }
 
-void BuildsData::MakeData( int num_value, int turns_left_value )
+void BuildsData::Make( int num_value, int turns_left_value, int max_p )
 {
+	SetMaxPlayers( max_p );
 	SetBuildNumber( num_value );
 	SetTurnsLeft( turns_left_value );
 }
 
 void BuildsData::SetBuildNumber( int num_value )
 {
-	if ( ( num_value < 1 ) || ( num_value > MAX_PLAYERS ) )
+	if ( ( num_value < 1 ) || ( num_value > GetMaxPlayers() ) )
 		throw std::runtime_error("Invalid 'build number' error in \"BuildsData::SetBuildNumber\" function!");
 
 	build_number = num_value;
@@ -251,13 +257,20 @@ void Player::Reset()
 	UnsetSentProductsRequest();
 }
 
-Player::Player( int p_fd, const char* p_addr, int p_uid )
+Player::Player( int p_fd, const char* p_addr, int p_uid, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
+	m_game_settings = std::move( m_g_sets );
+
 	Reset();
 
 	SetUID( p_uid );
 	SetFd( p_fd );
 	SetAddr( p_addr );
+}
+
+void Player::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )
+{
+	m_game_settings = std::move( m_g_sets );
 }
 
 void Player::SetFd( int p_fd )

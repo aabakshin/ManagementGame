@@ -3,6 +3,8 @@
 
 
 #include "MessageTokens.hpp"
+#include "Config.hpp"
+#include <memory>
 
 
 enum
@@ -67,8 +69,11 @@ private:
 	char name[COMMAND_NAME_SIZE];
 	CommandParams cmd_params;
 	MessageTokens msg_tokens;
+protected:
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	Command( int );
+	Command( int, std::shared_ptr<const Config::GameSettings> );
+	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	const char* GetName() const { return name; }
 	void SetName( const char* cmd_name );
 	const CommandParams& GetCmdParams() const { return cmd_params; }
@@ -86,7 +91,7 @@ private:
 class HelpCommand : public Command
 {
 public:
-	HelpCommand( int );
+	HelpCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~HelpCommand() {}
 private:
@@ -99,7 +104,7 @@ private:
 class MarketCommand : public Command
 {
 public:
-	MarketCommand( int );
+	MarketCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~MarketCommand() {}
 private:
@@ -112,7 +117,7 @@ private:
 class PlayerCommand : public Command
 {
 public:
-	PlayerCommand( int );
+	PlayerCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~PlayerCommand() {}
 private:
@@ -125,7 +130,7 @@ private:
 class ListCommand : public Command
 {
 public:
-	ListCommand( int );
+	ListCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~ListCommand() {}
 private:
@@ -138,7 +143,7 @@ private:
 class ProdCommand : public Command
 {
 public:
-	ProdCommand( int );
+	ProdCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~ProdCommand() {}
 private:
@@ -151,7 +156,7 @@ private:
 class BuildCommand : public Command
 {
 public:
-	BuildCommand( int );
+	BuildCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~BuildCommand() {}
 private:
@@ -164,7 +169,7 @@ private:
 class BuyCommand : public Command
 {
 public:
-	BuyCommand( int );
+	BuyCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~BuyCommand() {}
 private:
@@ -177,7 +182,7 @@ private:
 class SellCommand : public Command
 {
 public:
-	SellCommand( int );
+	SellCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~SellCommand() {}
 private:
@@ -190,7 +195,7 @@ private:
 class TurnCommand : public Command
 {
 public:
-	TurnCommand( int );
+	TurnCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~TurnCommand() {}
 private:
@@ -203,7 +208,7 @@ private:
 class QuitCommand : public Command
 {
 public:
-	QuitCommand( int );
+	QuitCommand( int, std::shared_ptr<const Config::GameSettings> );
 	virtual void PrepareAndProc( int, int, int, const char*, const char*, const BCBrokerMessages& ) override;
 	virtual ~QuitCommand() {}
 private:

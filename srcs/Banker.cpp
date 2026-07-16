@@ -75,16 +75,18 @@ void MarketState::SetProductMaxPrice( int value )
 	product_max_price = value;
 }
 
-void MarketData::MakeData( int p_num, int amnt, int price_value )
+void MarketData::Make( int p_num, int amnt, int price_value, const int max_p )
 {
+	SetMaxPlayers( max_p );
 	SetPlayerNum( p_num );
 	SetAmount( amnt );
 	SetPrice( price_value );
 	UnsetSuccess();
 }
 
-MarketData::MarketData( int p_num, int amnt, int price_value )
+MarketData::MarketData( int p_num, int amnt, int price_value, const int max_p )
 {
+	SetMaxPlayers( max_p );
 	SetPlayerNum( p_num );
 	SetAmount( amnt );
 	SetPrice( price_value );
@@ -93,29 +95,31 @@ MarketData::MarketData( int p_num, int amnt, int price_value )
 
 MarketData::MarketData( const MarketData& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetPlayerNum( data.GetPlayerNum() );
 	SetAmount( data.GetAmount() );
 	SetPrice( data.GetPrice() );
-
 	success = data.success;
 }
 
 MarketData::MarketData( MarketData&& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetPlayerNum( data.GetPlayerNum() );
 	SetAmount( data.GetAmount() );
 	SetPrice( data.GetPrice() );
-
 	success = data.success;
 
 	data.SetPlayerNum( 0 );
 	data.SetAmount( 0 );
 	data.SetPrice( 0 );
+	data.SetMaxPlayers( 0 );
 	data.UnsetSuccess();
 }
 
 void MarketData::operator=( const MarketData& data )
 {
+	SetMaxPlayers( data.GetMaxPlayers() );
 	SetPlayerNum( data.GetPlayerNum() );
 	SetAmount( data.GetAmount() );
 	SetPrice( data.GetPrice() );
@@ -125,7 +129,7 @@ void MarketData::operator=( const MarketData& data )
 
 void MarketData::SetPlayerNum( int value )
 {
-	if ( ( value < 1 ) || ( value > MAX_PLAYERS ) )
+	if ( ( value < 1 ) || ( value > GetMaxPlayers() ) )
 		throw std::range_error("RangeError in \"MarketData::SetPlayerNum\" function!");
 
 	player_id = value;
@@ -258,8 +262,11 @@ void List<Item<MarketData>>::Print() const
 }
 
 
-Banker::Banker( int id_value )
+Banker::Banker( int id_value, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
+	m_game_settings = std::move(m_g_sets);
+	registered_players.Make( m_game_settings );
+
 	SetId( id_value );
 	UnsetPlayersPrepared();
 	UnsetGameStarted();
@@ -270,9 +277,15 @@ Banker::Banker( int id_value )
 	SetCurrentMarketLvl(0);
 }
 
+void Banker::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )
+{
+	m_game_settings = std::move(m_g_sets);
+	registered_players.ApplySettings( m_game_settings );
+}
+
 const Player* Banker::GetFree() const
 {
-	for ( int i = 0; i < MAX_PLAYERS; ++i )
+	for ( int i = 0; i < m_game_settings->max_players; ++i )
 	{
 		const Player* p = GetPlayers()[i];
 		if ( p->IsFree() )
@@ -300,7 +313,7 @@ void Banker::SetTurnNumber( int value )
 
 void Banker::SetAlivePlayers( int value )
 {
-	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > m_game_settings->max_players ) )
 		throw std::range_error("RangeError in \"Banker::SetAlivePlayers\" function!");
 
 	alive_players = value;
@@ -308,7 +321,7 @@ void Banker::SetAlivePlayers( int value )
 
 void Banker::SetReadyPlayers( int value )
 {
-	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > m_game_settings->max_players ) )
 		throw std::range_error("RangeError in \"Banker::SetReadyPlayers\" function!");
 
 	ready_players = value;
@@ -316,7 +329,7 @@ void Banker::SetReadyPlayers( int value )
 
 void Banker::SetLobbyPlayers( int value )
 {
-	if ( ( value < 0 ) || ( value > MAX_PLAYERS ) )
+	if ( ( value < 0 ) || ( value > m_game_settings->max_players ) )
 		throw std::range_error("RangeError in \"Banker::SetLobbyPlayers\" function!");
 
 	lobby_players = value;

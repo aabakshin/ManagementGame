@@ -57,4 +57,8 @@ enum
 					INTERNAL_SERVER_ERROR
 };
 
+
+extern const char* info_game_messages[];
+extern const char* error_game_messages[];
+
 #endif
