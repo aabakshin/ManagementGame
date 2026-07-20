@@ -21,7 +21,7 @@ static const char* const false_str = "false";
 
 
 template <class T, class U>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object, std::shared_ptr<const Config::GameSettings> m_g_sets )
+EncapsulatedBrokerMessages<T,U>::EncapsulatedBrokerMessages( const U& context_object, std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
 	m_game_settings = std::move(m_g_sets);
 	brokerPTR = new T( context_object, m_game_settings );
@@ -29,7 +29,7 @@ void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object, std::shared
 
 template <class T, class U>
 template <class X, class Y, class Z>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4, std::shared_ptr<const Config::GameSettings> m_g_sets  )
+EncapsulatedBrokerMessages<T,U>::EncapsulatedBrokerMessages( const U& context_object1, const X& context_object2, const Y& context_object3, const Z& context_object4, std::shared_ptr<const Config::GameSettings> m_g_sets  )
 {
 	m_game_settings = std::move(m_g_sets);
 	brokerPTR = new T( context_object1, context_object2, context_object3, context_object4, m_game_settings );
@@ -37,7 +37,7 @@ void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& c
 
 template <class T, class U>
 template <class X, class Y>
-void EncapsulatedBrokerMessages<T,U>::Make( const U& context_object1, const X& context_object2, const Y& context_object3, std::shared_ptr<const Config::GameSettings> m_g_sets  )
+EncapsulatedBrokerMessages<T,U>::EncapsulatedBrokerMessages( const U& context_object1, const X& context_object2, const Y& context_object3, std::shared_ptr<const Config::GameSettings> m_g_sets  )
 {
 	m_game_settings = std::move(m_g_sets);
 	brokerPTR = new T( context_object1, context_object2, context_object3, m_game_settings );
@@ -61,7 +61,7 @@ EncapsulatedBrokerMessages<T,U>::~EncapsulatedBrokerMessages()
 	delete brokerPTR;
 }
 
-void BrokerMessages::BrokerActions::Make( int a_count )
+BrokerMessages::BrokerActions::BrokerActions( int a_count )
 {
 	actions_count = a_count;
 
@@ -100,10 +100,9 @@ const char* BrokerMessages::TakeMessage( int message_code )
 
 
 GameEvents::GameEvents( const SessionsPlanner& sessions, const MessageTokens& mt, const EncapsulatedBrokerMessages<MulticastActionsExec, SessionsPlanner>& emae, std::shared_ptr<const Config::GameSettings> m_g_sets )
-	: BrokerMessages( m_g_sets ), game_sessions( sessions ), msg_tokens( mt ), EMultiActionsExec( emae )
+	: BrokerMessages( GameEvents::BROKER_ACTIONS_COUNT, m_g_sets ), game_sessions( sessions ), msg_tokens( mt ), EMultiActionsExec( emae )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.Make( GameEvents::BROKER_ACTIONS_COUNT );
 
 	session_id				=			0;
 
@@ -197,10 +196,9 @@ void GameEvents::PrepareNewTurnEvent()
 
 
 MulticastActionsExec::MulticastActionsExec( const SessionsPlanner& sessions, const Sender& s, const MessageTokens& mt, const EncapsulatedBrokerMessages<GameMessages, SessionsPlanner>& egm, std::shared_ptr<const Config::GameSettings> m_g_sets )
-	: BrokerMessages( m_g_sets ), game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
+	: BrokerMessages( MulticastActionsExec::BROKER_ACTIONS_COUNT, m_g_sets ), game_sessions( sessions ), sender( s ), msg_tokens( mt ), EGameMessages( egm )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.Make( MulticastActionsExec::BROKER_ACTIONS_COUNT );
 
 	session_id				=			0;
 	auction_type			=			0;
@@ -294,8 +292,7 @@ void MulticastActionsExec::AddEmptyAuctionRequest()
 
 			if ( node == nullptr )
 			{
-				MarketData data;
-				data.Make( p->GetUID(), 0, 0, m_game_settings->max_players );
+				MarketData data( p->GetUID(), 0, 0, m_game_settings->max_players );
 				requests.Insert( data );
 			}
 		}
@@ -840,9 +837,7 @@ void MulticastActionsExec::SortRequestsByPrice( const List<Item<MarketData>>& re
 	{
 		if ( (arr_reqs[i]->GetData().GetPrice() == prices[j]) && !reqs_checked[i] )
 		{
-			MarketData data;
-			data.Make( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice(), m_game_settings->max_players );
-
+			MarketData data( arr_reqs[i]->GetData().GetPlayerNum(), arr_reqs[i]->GetData().GetAmount(), arr_reqs[i]->GetData().GetPrice(), m_game_settings->max_players );
 			sorted_requests.Insert( data );
 			reqs_checked[i] = true;
 			i = 0;
@@ -961,10 +956,10 @@ void MulticastActionsExec::StartAuction()
 }
 
 
-GameMessages::GameMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) : BrokerMessages( m_g_sets ), game_sessions( sessions )
+GameMessages::GameMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) :
+	BrokerMessages( GameMessages::BROKER_ACTIONS_COUNT, m_g_sets ), game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.Make( GameMessages::BROKER_ACTIONS_COUNT );
 
 	sender_id				=			0;
 	left_player_id			=			0;
@@ -1445,10 +1440,10 @@ void GameMessages::ServerFullMessage()
 }
 
 
-BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) : BrokerMessages( m_g_sets ), game_sessions( sessions )
+BCBrokerMessages::BCBrokerMessages( const SessionsPlanner& sessions, std::shared_ptr<const Config::GameSettings> m_g_sets ) :
+	BrokerMessages( BCBrokerMessages::BROKER_ACTIONS_COUNT, m_g_sets ), game_sessions( sessions )
 {
 	BrokerActions& br_acts = const_cast<BrokerActions&>(GetBrokerActions());
-	br_acts.Make( BCBrokerMessages::BROKER_ACTIONS_COUNT );
 
 	session_id				=			0;
 	sender_player_id		=			0;
@@ -1966,8 +1961,7 @@ void BCBrokerMessages::BuildCmdUpdateGameState()
 		if ( sender_p->IsFree() )
 			return;
 
-		BuildsData data;
-		data.Make( sender_p->GetBuildsFactories().GetValidNum(), m_game_settings->turns_to_build_factory, m_game_settings->max_players );
+		BuildsData data( sender_p->GetBuildsFactories().GetValidNum(), m_game_settings->turns_to_build_factory, m_game_settings->max_players );
 
 		try
 		{
@@ -2061,9 +2055,7 @@ void BCBrokerMessages::BuyCmdUpdateGameState()
 		if ( sender_p->IsFree() )
 			return;
 
-		MarketData data;
-		data.Make( sender_player_id, sources_amount, source_price, m_game_settings->max_players );
-
+		MarketData data( sender_player_id, sources_amount, source_price, m_game_settings->max_players );
 		const_cast<Banker&>(*game_sessions.GetSessionById(session_id)).GetSourcesRequests().Insert( data );
 
 		try
@@ -2156,9 +2148,7 @@ void BCBrokerMessages::SellCmdUpdateGameState()
 		if ( sender_p->IsFree() )
 			return;
 
-		MarketData data;
-		data.Make( sender_player_id, products_amount, product_price, m_game_settings->max_players );
-
+		MarketData data( sender_player_id, products_amount, product_price, m_game_settings->max_players );
 		const_cast<Banker&>((*game_sessions.GetSessionById(session_id))).GetProductsRequests().Insert( data );
 
 		try

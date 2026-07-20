@@ -59,7 +59,6 @@ public:
 	MarketData( const MarketData& );
 	MarketData( MarketData&& );
 	void operator=( const MarketData& );
-	void Make( int p_num, int amnt, int pr, const int );
 	int GetPlayerNum() const { return player_id; }
 	int GetAmount() const { return amount; }
 	int GetPrice() const { return price; }
@@ -111,12 +110,12 @@ private:
 	int ready_players;
 	int lobby_players;
 	int cur_market_lvl;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 	RegisteredPlayers registered_players;
 	MarketState cur_market_state;
 	List<Item<MarketData>> sources_requests;
 	List<Item<MarketData>> products_requests;
 	BankrotsList bankrots_on_turn;
-	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
 	Banker( int, std::shared_ptr<const Config::GameSettings> );
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );

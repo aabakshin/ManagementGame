@@ -75,15 +75,6 @@ void MarketState::SetProductMaxPrice( int value )
 	product_max_price = value;
 }
 
-void MarketData::Make( int p_num, int amnt, int price_value, const int max_p )
-{
-	SetMaxPlayers( max_p );
-	SetPlayerNum( p_num );
-	SetAmount( amnt );
-	SetPrice( price_value );
-	UnsetSuccess();
-}
-
 MarketData::MarketData( int p_num, int amnt, int price_value, const int max_p )
 {
 	SetMaxPlayers( max_p );
@@ -262,11 +253,8 @@ void List<Item<MarketData>>::Print() const
 }
 
 
-Banker::Banker( int id_value, std::shared_ptr<const Config::GameSettings> m_g_sets )
+Banker::Banker( int id_value, std::shared_ptr<const Config::GameSettings> m_g_sets ) : m_game_settings( std::move(m_g_sets) ), registered_players( m_game_settings )
 {
-	m_game_settings = std::move(m_g_sets);
-	registered_players.Make( m_game_settings );
-
 	SetId( id_value );
 	UnsetPlayersPrepared();
 	UnsetGameStarted();

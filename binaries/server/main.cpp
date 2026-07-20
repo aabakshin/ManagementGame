@@ -10,7 +10,7 @@ int main( int argc, char** argv )
 	{
 		std::cerr <<
 			"Incorrect arguments num\n"
-			"Usage: ./" << argv[0] << " <address> <port>\n";
+			"Usage: ./" << argv[0] << " <port>\n";
 
 		return 1;
 	}
@@ -24,8 +24,7 @@ int main( int argc, char** argv )
 		game_config.Load("config.json");
 		auto game_config_settings = std::make_shared<Config::GameSettings>( std::move(game_config.game_settings) );
 
-		Server game_server;
-		game_server.Make( argv[1], argv[2], &logger, std::move(game_config_settings) );
+		Server game_server( nullptr, argv[1], &logger, std::move(game_config_settings) );
 
 		return game_server.Run();
 	}

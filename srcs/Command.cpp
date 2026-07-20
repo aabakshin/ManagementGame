@@ -31,10 +31,9 @@ static const char* const valid_commands[] = {
 };
 
 
-Command::Command( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets )
+Command::Command( int tokens_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : msg_tokens( tokens_count )
 {
 	m_game_settings = std::move( m_g_sets );
-	msg_tokens.Make( tokens_count );
 }
 
 void Command::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )

@@ -17,15 +17,14 @@ template <class T, class U>
 class EncapsulatedBrokerMessages
 {
 private:
-	T* brokerPTR { nullptr };
 	std::shared_ptr<const Config::GameSettings> m_game_settings;
+	T* brokerPTR { nullptr };
 public:
-	EncapsulatedBrokerMessages() {}
-	void Make( const U&, std::shared_ptr<const Config::GameSettings> );
+	EncapsulatedBrokerMessages( const U&, std::shared_ptr<const Config::GameSettings> );
 	template <class X, class Y>
-	void Make( const U&, const X&, const Y&, std::shared_ptr<const Config::GameSettings> );
+	EncapsulatedBrokerMessages( const U&, const X&, const Y&, std::shared_ptr<const Config::GameSettings> );
 	template <class X, class Y, class Z>
-	void Make( const U&, const X&, const Y&, const Z&, std::shared_ptr<const Config::GameSettings> );
+	EncapsulatedBrokerMessages( const U&, const X&, const Y&, const Z&, std::shared_ptr<const Config::GameSettings> );
 	const T& GetBroker() const;
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~EncapsulatedBrokerMessages();
@@ -45,8 +44,7 @@ public:
 		std::function<void()>* actions;
 		int actions_count;
 	public:
-		BrokerActions() {}
-		void Make( int );
+		BrokerActions( int );
 		std::function<void()>& operator[]( int );
 		~BrokerActions();
 	private:
@@ -61,7 +59,7 @@ private:
 protected:
 	std::shared_ptr<const Config::GameSettings> m_game_settings;
 public:
-	BrokerMessages( std::shared_ptr<const Config::GameSettings> m_g_sets ) { m_game_settings = std::move(m_g_sets); }
+	BrokerMessages( int acts_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : broker_actions( acts_count ) { m_game_settings = std::move(m_g_sets); }
 	const BrokerActions& GetBrokerActions() const { return broker_actions; }
 	virtual void PutMessage( const char**, int ) = 0;
 	const char* TakeMessage( int );

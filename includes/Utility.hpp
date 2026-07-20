@@ -22,6 +22,7 @@ public:
 	static std::string current_time_str();
 	static void ignore_unused_signals();
 	static void set_signal_disposition( struct sigaction&, int, sig_hndl_func, int );
+	static void rtrim( std::string& );
 private:
 	Utility( const Utility& ) = delete;
 	Utility( Utility&& ) = delete;

@@ -5,6 +5,7 @@
 #include "Banker.hpp"
 #include "SessionsPlanner.hpp"
 #include "MGProto.hpp"
+#include "MessageTokens.hpp"
 #include "Utility.hpp"
 #include "MGExceptions.hpp"
 #include <unistd.h>
@@ -157,24 +158,13 @@ void SessionsPlanner::StartSessionsTimers::ResetTimers()
 }
 
 
-SessionsPlanner::SessionsPlanner()
+SessionsPlanner::SessionsPlanner( int sessions_count, std::shared_ptr<const Config::GameSettings> m_g_sets ) : m_game_settings( std::move(m_g_sets) ), cmds_exec( m_game_settings ), EBCbroker( *this, m_game_settings ),
+	EGameMessages( *this, m_game_settings ), msg_tokens( MessageTokens::MESSAGE_TOKENS_COUNT ), EMultiActionsExec( *this, sender, msg_tokens, EGameMessages, m_game_settings ), EGameEvents( *this, msg_tokens, EMultiActionsExec, m_game_settings )
 {
 	next_session_id = DEFAULT_NEXT_SESSION_ID;
 
 	if ( next_session_id < 1 )
 		next_session_id = 1;
-}
-
-void SessionsPlanner::Make( int sessions_count, std::shared_ptr<const Config::GameSettings> m_g_sets )
-{
-	m_game_settings = std::move(m_g_sets);
-
-	msg_tokens.Make( MessageTokens::MESSAGE_TOKENS_COUNT );
-	cmds_exec.Make( m_game_settings );
-	EBCbroker.Make( *this, m_game_settings );
-	EGameMessages.Make( *this, m_game_settings );
-	EMultiActionsExec.Make( *this, sender, msg_tokens, EGameMessages, m_game_settings );
-	EGameEvents.Make( *this, msg_tokens, EMultiActionsExec, m_game_settings );
 
 	if ( sessions_count < 1 )
 		current_sessions_count = DEFAULT_START_SESSIONS_COUNT;
@@ -631,8 +621,13 @@ SessionsPlanner::~SessionsPlanner()
 		return;
 
 	for ( int i = 0; i < current_sessions_count; ++i )
+	{
 		if ( game_sessions[i] != nullptr )
+		{
 			delete game_sessions[i];
+			game_sessions[i] = nullptr;
+		}
+	}
 
 	delete[] game_sessions;
 	game_sessions = nullptr;

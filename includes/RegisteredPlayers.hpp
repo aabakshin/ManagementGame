@@ -10,11 +10,10 @@
 class RegisteredPlayers
 {
 private:
-	Player** registered_players;
 	std::shared_ptr<const Config::GameSettings> m_game_settings;
+	Player** registered_players;
 public:
-	RegisteredPlayers() {}
-	void Make( std::shared_ptr<const Config::GameSettings> );
+	RegisteredPlayers( std::shared_ptr<const Config::GameSettings> );
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~RegisteredPlayers();
 	const Player* operator[]( unsigned int idx ) const;

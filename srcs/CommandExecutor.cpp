@@ -9,11 +9,9 @@
 #include <stdexcept>
 
 
-void CommandExecutor::Make( std::shared_ptr<const Config::GameSettings> m_g_sets )
+CommandExecutor::CommandExecutor( std::shared_ptr<const Config::GameSettings> m_g_sets ) : m_game_settings( std::move(m_g_sets) ),
+	reg_cmds( m_game_settings )
 {
-	m_game_settings = std::move(m_g_sets);
-	reg_cmds.Make( m_game_settings );
-
 	for ( int i = 0; i < MAX_CMD_TOKENS_AMOUNT; ++i )
 		SetCmdToken( i, nullptr );
 

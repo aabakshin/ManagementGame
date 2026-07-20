@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 
-void RegisteredPlayers::Make( std::shared_ptr<const Config::GameSettings> m_g_sets )
+RegisteredPlayers::RegisteredPlayers( std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
 	m_game_settings = std::move( m_g_sets );
 

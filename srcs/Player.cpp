@@ -44,13 +44,6 @@ void BuildsData::operator=( const BuildsData& data )
 	SetTurnsLeft( data.GetTurnsLeft() );
 }
 
-void BuildsData::Make( int num_value, int turns_left_value, int max_p )
-{
-	SetMaxPlayers( max_p );
-	SetBuildNumber( num_value );
-	SetTurnsLeft( turns_left_value );
-}
-
 void BuildsData::SetBuildNumber( int num_value )
 {
 	if ( ( num_value < 1 ) || ( num_value > GetMaxPlayers() ) )

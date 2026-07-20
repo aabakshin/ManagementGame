@@ -34,6 +34,16 @@ void g_cfg_handler( int sig_no )
 }
 
 
+Server::Server( const std::string addr, const std::string port, Logger* logger, std::shared_ptr<const Config::GameSettings> m_g_sets ) : m_game_config_settings( std::move( m_g_sets ) ), sessions_planner(SessionsPlanner::DEFAULT_START_SESSIONS_COUNT, m_game_config_settings )
+{
+	srv_msgs_logger = logger;
+	SetSignalNum( 0 );
+	ListenSocketInit( addr, port );
+	SetMaxFd( 0 );
+
+	srv_msgs_logger->info("Waiting connections to", port, " port...");
+}
+
 void Server::SetListenSocket( int socket_value )
 {
 	if ( socket_value < -1 )
@@ -43,34 +53,6 @@ void Server::SetListenSocket( int socket_value )
 	}
 
 	ls = socket_value;
-}
-
-void Server::SetAddrBuffer( const char* addr, const char* port )
-{
-	srv_msgs_logger->info("Configuring local address...");
-
-	struct addrinfo hints;
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family			=		AF_INET;
-	hints.ai_socktype		=		SOCK_STREAM;
-	hints.ai_flags			=		AI_PASSIVE;
-
-	if ( getaddrinfo(addr, port, &hints, &bind_address) != 0 )
-	{
-		srv_msgs_logger->error("[Server::SetAddrBuffer] ", "An error has occured with \"getaddrinfo\". Message: ", gai_strerror(errno));
-		Stop( 0 );
-	}
-
-	getnameinfo(
-			bind_address->ai_addr,
-			bind_address->ai_addrlen,
-			address_buffer,
-			sizeof(address_buffer),
-			service_buffer,
-			sizeof(service_buffer),
-			NI_NUMERICHOST | NI_NUMERICSERV );
-
-	ConcatAddrPort( Sender::SERVICE_SIZE );
 }
 
 void Server::SetMaxFd( int max_value )
@@ -84,11 +66,40 @@ void Server::SetMaxFd( int max_value )
 	max_fd = max_value;
 }
 
-void Server::ListenSocketInit()
+void Server::ListenSocketInit( const std::string addr, const std::string port )
 {
+	srv_msgs_logger->info("Configuring local address...");
+
+	addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family			=		AF_INET;
+	hints.ai_socktype		=		SOCK_STREAM;
+	hints.ai_flags			=		AI_PASSIVE;
+
+	addrinfo* bind_addr_ptr { nullptr };
+
+	if ( getaddrinfo( addr.c_str(), port.c_str(), &hints, &bind_addr_ptr ) != 0 )
+	{
+		srv_msgs_logger->error("[Server::ListenSocketInit] ", "An error has occured with \"getaddrinfo\". Message: ", gai_strerror(errno));
+		Stop( 0 );
+	}
+
+	using AddrInfoPtr = std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>;
+	AddrInfoPtr bind_addr( bind_addr_ptr, &freeaddrinfo);
+	addrinfo* b_a = bind_addr.get();
+
+	getnameinfo(
+			b_a->ai_addr,
+			b_a->ai_addrlen,
+			const_cast<char*>(address.c_str()),
+			NI_MAXHOST,
+			const_cast<char*>(service.c_str()),
+			NI_MAXSERV,
+			NI_NUMERICHOST | NI_NUMERICSERV );
+
 	srv_msgs_logger->info("Creating listening socket...");
 
-	SetListenSocket( socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol) );
+	SetListenSocket( socket(b_a->ai_family, b_a->ai_socktype, b_a->ai_protocol) );
 	if ( GetListenSocket() == -1 )
 	{
 		srv_msgs_logger->error("[Server::ListenSocketInit] ", "socket() failed. Message: ", strerror(errno));
@@ -100,7 +111,7 @@ void Server::ListenSocketInit()
 	setsockopt(GetListenSocket(), SOL_SOCKET, SO_REUSEADDR, &opt_value, sizeof(opt_value));
 
 	srv_msgs_logger->info("Binding socket to address...");
-	if ( bind(GetListenSocket(), bind_address->ai_addr, bind_address->ai_addrlen) )
+	if ( bind(GetListenSocket(), b_a->ai_addr, b_a->ai_addrlen) )
 	{
 		srv_msgs_logger->error("[Server::ListenSocketInit] ", "bind() failed. Message: ", strerror(errno));
 		Stop( 0 );
@@ -112,36 +123,6 @@ void Server::ListenSocketInit()
 		srv_msgs_logger->error("[Server::ListenSocketInit] ", "listen() failed. Message: ", strerror(errno));
 		Stop( 0 );
 	}
-}
-
-void Server::Make( const char* addr, const char* port, Logger* logger, std::shared_ptr<const Config::GameSettings> m_g_sets )
-{
-	srv_msgs_logger = logger;
-	SetSignalNum( 0 );
-	SetAddrBuffer( addr, port );
-	ListenSocketInit();
-	SetMaxFd( 0 );
-
-	m_game_config_settings = std::move(m_g_sets);
-	sessions_planner.Make( SessionsPlanner::DEFAULT_START_SESSIONS_COUNT, m_game_config_settings );
-
-	srv_msgs_logger->info("Waiting connections to", port, " port...");
-}
-
-Server::~Server()
-{
-	freeaddrinfo( bind_address );
-}
-
-void Server::ConcatAddrPort( int service_size )
-{
-	int addr_len = strlen(address_buffer);
-	address_buffer[addr_len] = ':';
-
-	int i = addr_len + 1;
-	for ( int j = 0; ( j < service_size-1 ) && service_buffer[j]; ++j, ++i )
-		address_buffer[i] = service_buffer[j];
-	address_buffer[i] = '\0';
 }
 
 void Server::CloseConnection( int fd, std::string address )
@@ -187,10 +168,11 @@ void Server::Stop( int forcely )
 
 void Server::NewClientHandle()
 {
-	char new_client_addr[Receiver::ADDRESS_SIZE];
-	char new_client_serv[Receiver::SERVICE_SIZE];
-	struct sockaddr_storage client_address;
+	char new_host[NI_MAXHOST];
+	char new_serv[NI_MAXSERV];
+	sockaddr_storage client_address;
 	socklen_t client_address_len = sizeof(client_address);
+	std::string new_client_addr;
 
 	int cs = accept( ls, (struct sockaddr*) &client_address, &client_address_len );
 	if ( cs == -1 )
@@ -199,23 +181,30 @@ void Server::NewClientHandle()
 		Stop( 0 );
 	}
 
-	getnameinfo(
+	int result = getnameinfo(
 			(struct sockaddr*) &client_address,
 			client_address_len,
-			new_client_addr,
-			sizeof(new_client_addr),
-			new_client_serv,
-			sizeof(new_client_serv),
+			new_host,
+			sizeof(new_host),
+			new_serv,
+			sizeof(new_serv),
 			NI_NUMERICHOST | NI_NUMERICSERV
 			);
 
-	ConcatAddrPort( Receiver::SERVICE_SIZE );
+	if ( result == 0 )
+	{
+		new_client_addr = std::string(new_host) + ":" + new_serv;
+	}
+	else
+	{
+		new_client_addr = "(unknown)";
+	}
 
 	srv_msgs_logger->info("New connection from ", new_client_addr );
 
 	try
 	{
-		sessions_planner.AddNewClientToSession( cs, new_client_addr );
+		sessions_planner.AddNewClientToSession( cs, new_client_addr.c_str() );
 	}
 	catch( ... )
 	{
@@ -350,10 +339,10 @@ int Server::Run()
 	struct sigaction exit;
 	Utility::set_signal_disposition(exit, SIGINT, exit_handler, 0);
 
-	Utility::ignore_unused_signals();
-
 	struct sigaction g_cfg;
 	Utility::set_signal_disposition(g_cfg, SIGUSR1, g_cfg_handler, SA_RESTART);
+
+	Utility::ignore_unused_signals();
 
 	srand(time(0));
 

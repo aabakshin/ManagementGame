@@ -11,6 +11,7 @@
 #include <sstream>
 #include <iomanip>
 #include <csignal>
+#include <algorithm>
 
 
 int Utility::cut_str( char* s, int s_size, int ch )
@@ -364,6 +365,13 @@ void Utility::set_signal_disposition( struct sigaction& sa, int sig_no, sig_hndl
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = flags;
 	sigaction(sig_no, &sa, nullptr);
+}
+
+// Убрать пробельные символы в конце строки
+void Utility::rtrim( std::string& s )
+{
+	s.erase( std::find_if(s.rbegin(), s.rend(),
+				[](unsigned char ch) { return !std::isspace(ch); } ).base(), s.end() );
 }
 
 #endif

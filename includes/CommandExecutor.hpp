@@ -19,13 +19,12 @@ class CommandExecutor
 private:
 	const char* cmd_tokens[MAX_CMD_TOKENS_AMOUNT];
 	int cmd_tokens_amount;
-	RegisteredCommands reg_cmds;
 	const char* cmd_result_tokens[MAX_CMD_TOKENS];
 	int cmd_result_tokens_amount;
 	std::shared_ptr<const Config::GameSettings> m_game_settings;
+	RegisteredCommands reg_cmds;
 public:
-	CommandExecutor() {}
-	void Make( std::shared_ptr<const Config::GameSettings> );
+	CommandExecutor( std::shared_ptr<const Config::GameSettings> );
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	int GetCmdTokensAmount() const { return cmd_tokens_amount; }
 	const char* GetCmdToken( int ) const;

@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 
-void RegisteredCommands::Make( std::shared_ptr<const Config::GameSettings> m_g_sets )
+RegisteredCommands::RegisteredCommands( std::shared_ptr<const Config::GameSettings> m_g_sets )
 {
 	m_game_settings = std::move( m_g_sets );
 
@@ -22,7 +22,6 @@ void RegisteredCommands::Make( std::shared_ptr<const Config::GameSettings> m_g_s
 	registered_commands[QUIT_COMMAND_NUM]			=			new QuitCommand( MAX_CMD_TOKENS, m_game_settings );
 
 	count = COMMANDS_COUNT;
-
 }
 
 void RegisteredCommands::ApplySettings( std::shared_ptr<const Config::GameSettings> m_g_sets )

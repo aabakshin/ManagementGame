@@ -15,12 +15,11 @@ enum
 class RegisteredCommands
 {
 private:
-	Command* registered_commands[COMMANDS_COUNT];
 	std::shared_ptr<const Config::GameSettings> m_game_settings;
+	Command* registered_commands[COMMANDS_COUNT];
 	int count;
 public:
-	RegisteredCommands() {}
-	void Make( std::shared_ptr<const Config::GameSettings> );
+	RegisteredCommands( std::shared_ptr<const Config::GameSettings> );
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	~RegisteredCommands();
 	const Command* const operator[]( int ) const;

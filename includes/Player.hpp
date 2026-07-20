@@ -17,7 +17,6 @@ public:
 	BuildsData( const BuildsData& );
 	BuildsData( BuildsData&& );
 	void operator=( const BuildsData& );
-	void Make( int num_value, int turns_left_value, int max_p );
 	int GetBuildNumber() const { return build_number; }
 	int GetTurnsLeft() const { return turns_left; }
 	int GetMaxPlayers() const { return max_players; }

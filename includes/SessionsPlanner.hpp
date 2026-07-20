@@ -90,24 +90,23 @@ public:
 	};
 
 private:
-	static int next_session_id;
-	Banker** game_sessions { nullptr };
-	int current_sessions_count { };
-	std::shared_ptr<const Config::GameSettings> m_game_settings;
 	StartSessionsTimers start_timers;
+	Sender sender;
+	Receiver receiver;
+	BankrotsList sessions_bankrots;
+	std::shared_ptr<const Config::GameSettings> m_game_settings;
 	CommandExecutor cmds_exec;
 	EncapsulatedBrokerMessages<BCBrokerMessages,SessionsPlanner> EBCbroker;
 	EncapsulatedBrokerMessages<GameMessages,SessionsPlanner> EGameMessages;
+	MessageTokens msg_tokens;
 	EncapsulatedBrokerMessages<MulticastActionsExec,SessionsPlanner> EMultiActionsExec;
 	EncapsulatedBrokerMessages<GameEvents,SessionsPlanner> EGameEvents;
-	Sender sender;
-	Receiver receiver;
-	MessageTokens msg_tokens;
-	BankrotsList sessions_bankrots;
+	static int next_session_id;
+	int current_sessions_count { };
+	Banker** game_sessions { nullptr };
 public:
-	SessionsPlanner();
+	SessionsPlanner( int, std::shared_ptr<const Config::GameSettings> );
 	~SessionsPlanner();
-	void Make( int, std::shared_ptr<const Config::GameSettings> );
 	void ApplySettings( std::shared_ptr<const Config::GameSettings> );
 	const Banker* operator[]( int );
 	const Banker* GetSessionById( int ) const;
