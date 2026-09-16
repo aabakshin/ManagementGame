@@ -5,6 +5,7 @@
 
 #include "../includes/clientCore.h"
 #include "../includes/CommandsHistoryList.h"
+#include <netdb.h>
 
 /* Буфер предыдущих отпраленных команд */
 CommandsHistoryList* chl_list = NULL;
@@ -15,47 +16,41 @@ static int turn_flag = 0;
 /* Стандартная процедура инициализации клиентского TCP-сокета */
 int client_init(const char* addr, const char* port)
 {
-	printf("%s\n", "Configuring remote address...");
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
-	struct addrinfo* peer_address;
+	hints.ai_protocol = IPPROTO_TCP;
 
-	if ( getaddrinfo(addr, port, &hints, &peer_address) )
+	printf("%s\n", "Creating socket...");
+	int peer_sock = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
+
+	if ( peer_sock < 0 )
 	{
-		freeaddrinfo(peer_address);
+		fprintf(stderr, "socket() failed. (%d)\n", errno);
+		return -1;
+	}
+
+	printf("%s\n", "Configuring peer address...");
+	struct addrinfo* peer_addr;
+	if ( getaddrinfo(addr, port, &hints, &peer_addr) )
+	{
 		fprintf(stderr, "getaddrinfo() failed. (%d)\n", errno);
 		return -1;
 	}
 
-	printf("%s", "Remote address is: ");
-	char address_buffer[ADDRESS_BUFFER_SIZE];
-	char service_buffer[ADDRESS_BUFFER_SIZE];
-
-	getnameinfo(peer_address->ai_addr, peer_address->ai_addrlen, address_buffer, sizeof(address_buffer), service_buffer, sizeof(service_buffer), NI_NUMERICHOST);
-	printf("%s:%s\n", address_buffer, service_buffer);
-	
-	printf("%s\n", "Creating socket...");
-	int socket_peer = socket(peer_address->ai_family, peer_address->ai_socktype, peer_address->ai_protocol);
-
-	if ( socket_peer < 0 )
-	{
-		freeaddrinfo(peer_address);
-		fprintf(stderr, "socket() failed. (%d)\n", errno);
-		return -1;
-	}
-	
 	printf("%s\n", "Connecting...");
-	if ( connect(socket_peer, peer_address->ai_addr, peer_address->ai_addrlen) )
+	if ( connect( peer_sock, peer_addr->ai_addr, peer_addr->ai_addrlen) )
 	{
-		freeaddrinfo(peer_address);
+		freeaddrinfo(peer_addr);
 		fprintf(stderr, "connect() failed. (%d)\n", errno);
 		return -1;
 	}
-	freeaddrinfo(peer_address);
+
+	freeaddrinfo(peer_addr);
 	printf("%s\n", "Connected.");
 
-	return socket_peer;
+	return peer_sock;
 }
 
 /* Обработка полученной информации от сервера в соответствии с протоколом общения */
@@ -192,7 +187,7 @@ int check_server_response(char* buffer)
 		}
 		else if ( strcmp(tokens[1], "BUY_COMMAND_NO_MONEY") == 0 )
 		{
-			printf("%s", "\n[!] You don't have enough money to do request to source auction!\n\n");	
+			printf("%s", "\n[!] You don't have enough money to do request to source auction!\n\n");
 		}
 		else if ( strcmp(tokens[1], "BUY_COMMAND_ALREADY_SENT") == 0 )
 		{
@@ -201,13 +196,13 @@ int check_server_response(char* buffer)
 		else if ( strcmp(tokens[1], "BUY_COMMAND_SUCCESS") == 0 )
 		{
 			printf("\nYou have made a request to source auction:\n"
-				   "\tSource amount: %s\n"
-				   "\tSource price: %sP\n\n", tokens[2], tokens[3]);
+					"\tSource amount: %s\n"
+					"\tSource price: %sP\n\n", tokens[2], tokens[3]);
 		}
 		else if ( strcmp(tokens[1], "BUY_COMMAND_INCORRECT_PRICE") == 0 )
 		{
 			printf("%s", "\n[!] Your price to buy source is less than minimal price for this turn.\n"
-						 "[!] To check information about market enter command \"market\"\n\n");
+					"[!] To check information about market enter command \"market\"\n\n");
 		}
 		else if ( strcmp(tokens[1], "BUY_COMMAND_INCORRECT_AMOUNT") == 0 )
 		{
@@ -220,13 +215,13 @@ int check_server_response(char* buffer)
 		else if ( strcmp(tokens[1], "SELL_COMMAND_SUCCESS") == 0 )
 		{
 			printf("\nYou have made a request to product auction:\n"
-				   "\tProduct amount: %s\n"
-				   "\tProduct price: %sP\n\n", tokens[2], tokens[3]);
+					"\tProduct amount: %s\n"
+					"\tProduct price: %sP\n\n", tokens[2], tokens[3]);
 		}
 		else if ( strcmp(tokens[1], "SELL_COMMAND_INCORRECT_PRICE") == 0 )
 		{
 			printf("%s", "\n[!] Your price to sell product is greater than maximal price for this turn.\n"
-						 "[!] To check information about market enter command \"market\"\n\n");
+					"[!] To check information about market enter command \"market\"\n\n");
 		}
 		else if ( strcmp(tokens[1], "SELL_COMMAND_INCORRECT_AMOUNT") == 0 )
 		{
@@ -257,7 +252,7 @@ int check_server_response(char* buffer)
 		else if ( strcmp(tokens[1], "LOST_ALIVE_PLAYER") == 0 )
 		{
 			printf("\n\t\tOne of players left the game\n"
-				   "\t\tTotal alive players: %s\n\n", tokens[2]);
+					"\t\tTotal alive players: %s\n\n", tokens[2]);
 		}
 		else if ( strcmp(tokens[1], "PRODUCED") == 0 )
 		{
@@ -333,7 +328,7 @@ int check_server_response(char* buffer)
 		else if ( strcmp(tokens[1], "LOST_LOBBY_PLAYER") == 0 )
 		{
 			printf("\n\t\tOne of players left the lobby\n"
-				   "\t\tTotal lobby players: %s/%s\n\n", tokens[2], tokens[3]);
+					"\t\tTotal lobby players: %s/%s\n\n", tokens[2], tokens[3]);
 
 		}
 		else if ( strcmp(tokens[1], "SUCCESS_CHARGES_PAY") == 0 )
@@ -343,12 +338,12 @@ int check_server_response(char* buffer)
 		else if ( strcmp(tokens[1], "PLAYER_BANKROT") == 0 )
 		{
 			printf("\n[!] You couldn't to pay for charges( %sP ) in this month!\n"
-				   "[!] Unfortunately, you are a bankrot. Goodbye ;(\n\n", tokens[2]);
+					"[!] Unfortunately, you are a bankrot. Goodbye ;(\n\n", tokens[2]);
 		}
 		else if ( strcmp(tokens[1], "PAY_FACTORY_SUCCESS") == 0 )
 		{
 			printf("%s", "\n[!] You have successfully paid for your new factory!\n"
-						 "[!] It will occur in the next month\n\n");
+					"[!] It will occur in the next month\n\n");
 		}
 		else if ( strcmp(tokens[1], "FACTORY_BUILT") == 0 )
 		{
@@ -368,7 +363,7 @@ int check_server_response(char* buffer)
 			printf("%s\n", ">");
 
 			printf("\n\n\n\n\n\t\t\t\t\tMONTH #%s\n\n\n\n\n", tokens[2]);
-			
+
 			printf("\n%s", "<");
 			for ( i = 1; i <= 38; i++ )
 				putchar('%');
@@ -392,7 +387,7 @@ int check_server_response(char* buffer)
 		{
 			/*printf("command_tokens_amount = %d\n", command_tokens_amount);*/
 			printf("%s", "\nBuilding factories list:\n");
-			
+
 			int i;
 			for ( i = 3; i < command_tokens_amount; i += 2 )
 			{

@@ -1,18 +1,6 @@
-/*
- * Главный клиентский модуль.
- * Запускает программу, инициирует TCP-соединение с сервером.
- * Обеспечивает взаимодействие с сервером.
- */
-
-
 #include "../../includes/clientCore.h"
 #include "../../includes/Input.h"
-#include "../../includes/CommandsHistoryList.h"
 #include <termios.h>
-
-
-/* Описан в модуле clientCore */
-extern CommandsHistoryList* chl_list;
 
 
 int main(int argc, char** argv)
@@ -29,16 +17,11 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-
-
-
-
-
 	printf("PID = %d\n"
 			"Terminal name: %s\n\n", getpid(), ttyname(0));
 
-	int socket_peer = client_init(argv[1], argv[2]);
-	if ( socket_peer == -1 )
+	int peer_sock = client_init(argv[1], argv[2]);
+	if ( peer_sock == -1 )
 	{
 		fprintf(stderr, "%s", "An error has occured while executing initial procedure\n");
 		return 1;
