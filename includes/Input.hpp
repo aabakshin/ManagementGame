@@ -117,9 +117,9 @@ public:
 	void SetSaveBufFlag() { save_buf_read = true; }
 	void UnsetSaveBufFlag() { save_buf_read = false; }
 	bool IsSaveBufFlag() const { return save_buf_read; }
-	int AsciiSymbolsCount( int = 0);
+	int AsciiSymbolsCount( int = 0 );
 	int AsciiSymbolsCount( const char*, int );
-	int CyrilSymbolsCount( int = 0);
+	int CyrilSymbolsCount( int = 0 );
 	int TotalSymbolsCount( int = 0 );
 	int IsCyrillicSymbol( const char* ) const;
 	void CleanPrintedString( int );

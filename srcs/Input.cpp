@@ -10,16 +10,625 @@
 #include <stdexcept>
 
 
-static int handle_alphabet_key( const Input& );
-static int handle_ctrlw_key( const Input& );
-static int handle_newline_key( const Input& );
-static int handle_backspace_key( const Input& );
-static int handle_arrow_left_key( const Input& );
-static int handle_arrow_right_key( const Input& );
-static int handle_arrow_up_key( const Input& );
-static int handle_arrow_down_key( const Input& );
-static int handle_del_key( const Input& );
+namespace
+{
+	int handle_alphabet_key( const Input& input )
+	{
+		bool cyril_flag = false;
 
+		if ( input.IsCyrillicSymbol( input.GetReadSymbol() ) )
+			cyril_flag = true;
+
+		const_cast<Input&>(input).UnsetSaveBufFlag();
+
+		int save_pos = 0;
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		int& ascii = const_cast<Input&>(input).GetAscii();
+		int& cyril = const_cast<Input&>(input).GetCyril();
+
+
+		if ( left_offset > 0 )
+		{
+			int last_ch = cur_pos - 1;
+			cur_pos -= left_offset;
+			save_pos = cur_pos;
+
+			char remaining_buf[Input::MAX_BUFFER_SIZE];
+			int j = 0;
+			for ( int x = cur_pos; x <= last_ch; ++x, ++j )
+				remaining_buf[j] = buffer[x];
+			remaining_buf[j] = '\0';
+
+			buffer[cur_pos] = input.GetReadSymbol()[0];
+			++cur_pos;
+			++ascii;
+			++last_ch;
+
+			if ( cyril_flag )
+			{
+				buffer[cur_pos] = input.GetReadSymbol()[1];
+				++cur_pos;
+				++last_ch;
+				++cyril;
+				--ascii;
+			}
+
+			for ( int x = 0; remaining_buf[x]; ++x )
+			{
+				buffer[cur_pos] = remaining_buf[x];
+				++cur_pos;
+			}
+			buffer[cur_pos] = '\0';
+
+			// вывод содержимого buffer начиная с вставленного элемента
+			for ( int x = save_pos; x <= last_ch; ++x )
+				write(1, &buffer[x], 1);
+
+
+			// возвращение курсора в прежнее положение после вставки очереднего символа
+			const_cast<Input&>(input).TotalSymbolsCount();
+			for( int x = 1; x <= const_cast<Input&>(input).GetTotal(); ++x )
+				putchar('\b');
+			fflush(stdout);
+
+			++save_pos;
+
+			if ( cyril_flag )
+				++save_pos;
+
+			for ( int x = 0; x < save_pos; ++x )
+				write(1, &buffer[x], 1);
+		}
+		else
+		{
+			buffer[cur_pos] = input.GetReadSymbol()[0];
+			++cur_pos;
+			++ascii;
+
+			if ( cyril_flag )
+			{
+				buffer[cur_pos] = input.GetReadSymbol()[1];
+				++cur_pos;
+				++cyril;
+				--ascii;
+			}
+
+			write(1, &input.GetReadSymbol()[0], 1 );
+			if ( cyril_flag )
+				write( 1, &input.GetReadSymbol()[1], 1 );
+		}
+
+#ifdef DEBUG
+		input.ShowDebugLog( input.GetKeyEventName(Input::KeyEvent::ALPHABET) );
+#endif
+
+		return 1;
+	}
+
+
+	int handle_ctrlw_key( const Input& input )
+	{
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& c_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		int& ascii = const_cast<Input&>(input).GetAscii();
+		int& cyril = const_cast<Input&>(input).GetCyril();
+
+		if ( c_pos < 1 )
+			return 0;
+
+		int last_ch = c_pos - 1;
+		int cur_pos = c_pos - left_offset;
+		int save_pos = cur_pos;
+
+		if ( left_offset < c_pos )
+			const_cast<Input&>(input).UnsetSaveBufFlag();
+
+		if ( cur_pos > 0 )
+		{
+			if ( buffer[cur_pos-1] == ' ' )
+			{
+				while ( (cur_pos > 0) && (buffer[cur_pos-1] == ' ')  )
+					--cur_pos;
+			}
+			else
+			{
+				while ( (cur_pos > 0) && (buffer[cur_pos-1] != ' ') )
+					--cur_pos;
+			}
+
+
+			int del_bytes = save_pos - cur_pos;
+
+			char buf[Input::MAX_BUFFER_SIZE];
+			int x = 0;
+			for ( int k = cur_pos; k < save_pos; ++k, ++x )
+				buf[x] = buffer[k];
+			buf[x] = '\0';
+
+			int buf_len = strlen(buf);
+			int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
+			int cyril_cnt = (buf_len - ascii_cnt) / 2;
+			int buf_cnt = ascii_cnt + cyril_cnt;
+			memset(buf, 0, Input::MAX_BUFFER_SIZE);
+
+			ascii -= ascii_cnt;
+			cyril -= cyril_cnt;
+
+			for ( int k = 1; k <= buf_cnt; ++k )
+			{
+				printf("\b \b");
+				fflush(stdout);
+			}
+
+
+			x = 0;
+			for ( int k = save_pos; k <= last_ch; ++k, ++x )
+				buf[x] = buffer[k];
+			buf[x] = '\0';
+
+			buf_len = strlen(buf);
+			ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
+			cyril_cnt = (buf_len - ascii_cnt) / 2;
+			buf_cnt = ascii_cnt + cyril_cnt;
+
+			int v = cur_pos;
+			for ( x = 0; buf[x]; ++x, ++v )
+			{
+				buffer[v] = buf[x];
+				putchar(buffer[v]);
+			}
+			fflush(stdout);
+
+			for ( x = v; x <= last_ch; ++x )
+			{
+				putchar(' ');
+				buffer[x] = '\0';
+			}
+
+			int total_cnt = last_ch - v + 1 + buf_cnt;
+			for ( x = 1; x <= total_cnt; ++x )
+				putchar('\b');
+			fflush(stdout);
+
+			c_pos -= del_bytes;
+		}
+
+		return 1;
+	}
+
+
+	int handle_newline_key( const Input& input )
+	{
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& ascii = const_cast<Input&>(input).GetAscii();
+		int& cyril = const_cast<Input&>(input).GetCyril();
+		int& total = const_cast<Input&>(input).GetTotal();
+
+		std::array<char, Input::MAX_BUFFER_SIZE>& buffer = const_cast<Input&>(input).GetInput();
+		char* result = const_cast<Input&>(input).GetResult().data();
+		std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
+		std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
+
+		const_cast<Input&>(input).UnsetSaveBufFlag();
+
+		buffer[cur_pos] = '\n';
+		++cur_pos;
+		buffer[cur_pos] = '\0';
+
+		strncpy(result, buffer.data(), Input::MAX_BUFFER_SIZE);
+		buffer[cur_pos-1] = '\0';
+		--cur_pos;
+
+		if ( ( buffer[0] == '\0' ) || ( buffer[0] == '\n' ) || ( buffer[0] == '\r' ) )
+		{
+			ih_iter = input_history.end();
+			return 1;
+		}
+
+		if ( input_history.size() >= Input::MAX_HISTORY_SIZE )
+			input_history.pop_front();
+
+		input_history.push_back( buffer.data() );
+		ih_iter = input_history.end();
+
+		const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
+
+		memset( buffer.data(), 0, Input::MAX_BUFFER_SIZE );
+		cur_pos = 0;
+		left_offset = 0;
+		ascii = 0;
+		cyril = 0;
+		total = 0;
+
+		return 1;
+	}
+
+
+	int handle_backspace_key( const Input& input )
+	{
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& c_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		int& ascii = const_cast<Input&>(input).GetAscii();
+		int& cyril = const_cast<Input&>(input).GetCyril();
+
+
+		if ( (left_offset >= 0) && (left_offset < c_pos) )
+		{
+			const_cast<Input&>(input).UnsetSaveBufFlag();
+
+			char buf[Input::MAX_BUFFER_SIZE];
+			// проверка, является ли удаляемый символ кириллическим
+			bool is_cyril_flag = false;
+			int last_ch_pos = c_pos - 1;
+
+			if ( left_offset <= 0 )
+			{
+				if ( c_pos >= 2 )
+				{
+					char sym[3] = { 0 };
+					sym[0] = buffer[c_pos-2];
+					sym[1] = buffer[c_pos-1];
+					sym[2] = '\0';
+
+					if ( input.IsCyrillicSymbol(sym) )
+						is_cyril_flag = true;
+				}
+
+				printf("%s", "\b \b");
+				fflush(stdout);
+				buffer[c_pos-1] = '\0';
+				if ( is_cyril_flag )
+					buffer[c_pos-2] = '\0';
+
+				--c_pos;
+				--ascii;
+				if ( is_cyril_flag )
+				{
+					--c_pos;
+					--cyril;
+					++ascii;
+				}
+
+				return 1;
+			}
+
+			int cur_pos = c_pos - left_offset;
+
+			if ( cur_pos >= 2 )
+			{
+				char sym[3] = { 0 };
+				sym[0] = buffer[cur_pos-2];
+				sym[1] = buffer[cur_pos-1];
+				sym[2] = '\0';
+
+				if ( input.IsCyrillicSymbol(sym) )
+					is_cyril_flag = true;
+			}
+
+			int x, z = 0;
+			for ( x = cur_pos; x <= last_ch_pos; ++x, ++z )
+				buf[z] = buffer[x];
+			buf[z] = '\0';
+
+
+			x = cur_pos - 1;
+			if ( is_cyril_flag )
+				--x;
+
+			putchar('\b');
+			for ( z = 0; buf[z]; ++z, ++x )
+			{
+				buffer[x] = buf[z];
+				putchar(buffer[x]);
+			}
+			putchar(' ');
+			putchar('\b');
+			buffer[x] = '\0';
+			fflush(stdout);
+
+
+			int buf_len = strlen(buf);
+			int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
+			int cyril_cnt = (buf_len - ascii_cnt) / 2;
+			int total_cnt = ascii_cnt + cyril_cnt;
+
+			for ( x = 1; x <= total_cnt; ++x )
+				putchar('\b');
+			fflush(stdout);
+
+
+			if ( c_pos > 0 )
+			{
+				--c_pos;
+				--ascii;
+
+				if ( is_cyril_flag )
+				{
+					--c_pos;
+					++ascii;
+					--cyril;
+				}
+			}
+		}
+
+		return 1;
+	}
+
+
+	int handle_arrow_left_key( const Input& input )
+	{
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+
+		// если текущая позиция буфера не в начале строки - перемещать курсор влево
+		if ( left_offset < cur_pos )
+		{
+			putchar('\b');
+			fflush(stdout);
+
+			int x = cur_pos - left_offset - 1;
+
+			if ( x > 0 )
+			{
+				char sym[3] =
+				{
+					buffer[x-1],
+					buffer[x],
+					'\0'
+				};
+
+				if ( input.IsCyrillicSymbol(sym) )
+				{
+					left_offset += 2;
+				}
+				else
+				{
+					++left_offset;
+				}
+
+				return 1;
+			}
+
+			if ( x == 0 )
+				++left_offset;
+		}
+
+		return 1;
+	}
+
+
+	int handle_arrow_right_key( const Input& input )
+	{
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+
+		// если не конец строки - перемещать курсор вправо
+		if ( left_offset > 0 )
+		{
+			int x = cur_pos - left_offset;
+
+			if ( left_offset > 1 )
+			{
+				char sym[3] =
+				{
+					buffer[x],
+					buffer[x+1],
+					'\0'
+				};
+
+				if ( input.IsCyrillicSymbol(sym) )
+				{
+					write(1, sym, 2);
+					left_offset -= 2;
+				}
+				else
+				{
+					putchar(buffer[cur_pos - left_offset]);
+					fflush(stdout);
+					--left_offset;
+				}
+
+				return 1;
+			}
+
+			if ( left_offset == 1 )
+			{
+				putchar(buffer[cur_pos - left_offset]);
+				fflush(stdout);
+				--left_offset;
+			}
+		}
+
+		return 1;
+	}
+
+
+	int handle_arrow_up_key( const Input& input )
+	{
+		std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
+		std::array<char, Input::MAX_BUFFER_SIZE>& save_buf = const_cast<Input&>(input).GetSaveBuffer();
+
+
+		if ( input_history.size() > 0 )
+		{
+			if ( !input.IsSaveBufFlag() )
+			{
+				memset(save_buf.data(), 0, Input::MAX_BUFFER_SIZE);
+				strncpy(save_buf.data(), buffer, cur_pos);
+				const_cast<Input&>(input).SetSaveBufFlag();
+			}
+
+			if ( ih_iter != input_history.begin() )
+				ih_iter = std::prev(ih_iter);
+			else
+				return 1;
+
+			const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
+
+			memset(buffer, 0, Input::MAX_BUFFER_SIZE);
+			cur_pos = 0;
+			for ( int j = 0; ih_iter->data()[j]; ++j, ++cur_pos )
+			{
+				buffer[cur_pos] = ih_iter->data()[j];
+				putchar(ih_iter->data()[j]);
+			}
+			fflush(stdout);
+
+			left_offset = 0;
+			const_cast<Input&>(input).AsciiSymbolsCount();
+			const_cast<Input&>(input).CyrilSymbolsCount();
+		}
+
+		return 1;
+	}
+
+
+	int handle_arrow_down_key( const Input& input )
+	{
+		std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
+		int& cur_pos = const_cast<Input&>(input).GetCurPos();
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
+		std::array<char, Input::MAX_BUFFER_SIZE>& save_buf = const_cast<Input&>(input).GetSaveBuffer();
+
+
+		if ( input_history.size() > 0 )
+		{
+			std::string output;
+
+			if ( ih_iter != input_history.end() )
+			{
+				ih_iter = std::next(ih_iter);
+
+				if ( ih_iter != input_history.end() )
+					output = ih_iter->data();
+			}
+
+			if ( ih_iter == input_history.end() )
+				output = save_buf.data();
+
+			const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
+
+			memset(buffer, 0, Input::MAX_BUFFER_SIZE);
+			cur_pos = 0;
+			for ( int j = 0; output[j]; ++j, ++cur_pos )
+			{
+				buffer[cur_pos] = output[j];
+				putchar(output[j]);
+			}
+			fflush(stdout);
+
+			left_offset = 0;
+			const_cast<Input&>(input).AsciiSymbolsCount();
+			const_cast<Input&>(input).CyrilSymbolsCount();
+		}
+
+		return 1;
+	}
+
+
+	int handle_del_key( const Input& input )
+	{
+		int& left_offset = const_cast<Input&>(input).GetLeftOffset();
+		int& c_pos = const_cast<Input&>(input).GetCurPos();
+		char* buffer = const_cast<Input&>(input).GetInput().data();
+		int& ascii = const_cast<Input&>(input).GetAscii();
+		int& cyril = const_cast<Input&>(input).GetCyril();
+
+		// если не конец строки
+		if ( left_offset > 0 )
+		{
+			const_cast<Input&>(input).UnsetSaveBufFlag();
+
+			// проверка, является ли удаляемый символ кириллическим
+			bool is_cyril_flag = false;
+
+			char buf[Input::MAX_BUFFER_SIZE];
+			int last_ch_pos = c_pos - 1;
+			int cur_pos = c_pos - left_offset;
+
+			if ( (cur_pos + 1) < c_pos )
+			{
+				char sym[3] =
+				{
+							buffer[cur_pos],
+							buffer[cur_pos+1],
+							'\0'
+				};
+
+				if ( input.IsCyrillicSymbol(sym) )
+				{
+					is_cyril_flag = true;
+				}
+			}
+
+			int k = cur_pos + 1;
+
+			if ( is_cyril_flag )
+				++k;
+
+			int x = 0;
+			for ( ; k <= last_ch_pos; ++k, ++x )
+				buf[x] = buffer[k];
+			buf[x] = '\0';
+
+
+			x = 0;
+			for ( k = cur_pos; buf[x]; ++x, ++k )
+			{
+				buffer[k] = buf[x];
+				putchar(buffer[k]);
+			}
+			buffer[k] = '\0';
+			putchar(' ');
+			putchar('\b');
+			fflush(stdout);
+
+
+			int buf_len = strlen(buf);
+			int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
+			int cyril_cnt = (buf_len - ascii_cnt) / 2;
+			int total_cnt = ascii_cnt + cyril_cnt;
+
+			for ( x = 1; x <= total_cnt; ++x )
+				putchar('\b');
+			fflush(stdout);
+
+
+			if ( c_pos > 0 )
+			{
+				--c_pos;
+				--ascii;
+
+				if ( is_cyril_flag )
+				{
+					--c_pos;
+					++ascii;
+					--cyril;
+				}
+			}
+
+			--left_offset;
+
+			if ( is_cyril_flag )
+				--left_offset;
+		}
+
+		return 1;
+	}
+};
 
 Input::Input()
 {
@@ -468,615 +1077,6 @@ void Input::CleanPrintedString( int idx )
 		--t;
 	}
 	fflush(stdout);
-}
-
-static int handle_alphabet_key( const Input& input )
-{
-	bool cyril_flag = false;
-
-	if ( input.IsCyrillicSymbol( input.GetReadSymbol() ) )
-		cyril_flag = true;
-
-	const_cast<Input&>(input).UnsetSaveBufFlag();
-
-	int save_pos = 0;
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	int& ascii = const_cast<Input&>(input).GetAscii();
-	int& cyril = const_cast<Input&>(input).GetCyril();
-
-
-	if ( left_offset > 0 )
-	{
-		int last_ch = cur_pos - 1;
-		cur_pos -= left_offset;
-		save_pos = cur_pos;
-
-		char remaining_buf[Input::MAX_BUFFER_SIZE];
-		int j = 0;
-		for ( int x = cur_pos; x <= last_ch; ++x, ++j )
-			remaining_buf[j] = buffer[x];
-		remaining_buf[j] = '\0';
-
-		buffer[cur_pos] = input.GetReadSymbol()[0];
-		++cur_pos;
-		++ascii;
-		++last_ch;
-
-		if ( cyril_flag )
-		{
-			buffer[cur_pos] = input.GetReadSymbol()[1];
-			++cur_pos;
-			++last_ch;
-			++cyril;
-			--ascii;
-		}
-
-		for ( int x = 0; remaining_buf[x]; ++x )
-		{
-			buffer[cur_pos] = remaining_buf[x];
-			++cur_pos;
-		}
-		buffer[cur_pos] = '\0';
-
-		// вывод содержимого buffer начиная с вставленного элемента
-		for ( int x = save_pos; x <= last_ch; ++x )
-			write(1, &buffer[x], 1);
-
-
-		// возвращение курсора в прежнее положение после вставки очереднего символа
-		const_cast<Input&>(input).TotalSymbolsCount();
-		for( int x = 1; x <= const_cast<Input&>(input).GetTotal(); ++x )
-			putchar('\b');
-		fflush(stdout);
-
-		++save_pos;
-
-		if ( cyril_flag )
-			++save_pos;
-
-		for ( int x = 0; x < save_pos; ++x )
-			write(1, &buffer[x], 1);
-	}
-	else
-	{
-		buffer[cur_pos] = input.GetReadSymbol()[0];
-		++cur_pos;
-		++ascii;
-
-		if ( cyril_flag )
-		{
-			buffer[cur_pos] = input.GetReadSymbol()[1];
-			++cur_pos;
-			++cyril;
-			--ascii;
-		}
-
-		write(1, &input.GetReadSymbol()[0], 1 );
-		if ( cyril_flag )
-			write( 1, &input.GetReadSymbol()[1], 1 );
-	}
-
-#ifdef DEBUG
-	input.ShowDebugLog( input.GetKeyEventName(Input::KeyEvent::ALPHABET) );
-#endif
-
-	return 1;
-}
-
-static int handle_ctrlw_key( const Input& input )
-{
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& c_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	int& ascii = const_cast<Input&>(input).GetAscii();
-	int& cyril = const_cast<Input&>(input).GetCyril();
-
-	if ( c_pos < 1 )
-		return 0;
-
-	int last_ch = c_pos - 1;
-	int cur_pos = c_pos - left_offset;
-	int save_pos = cur_pos;
-
-	if ( left_offset < c_pos )
-		const_cast<Input&>(input).UnsetSaveBufFlag();
-
-	if ( cur_pos > 0 )
-	{
-		if ( buffer[cur_pos-1] == ' ' )
-		{
-			while ( (cur_pos > 0) && (buffer[cur_pos-1] == ' ')  )
-				--cur_pos;
-		}
-		else
-		{
-			while ( (cur_pos > 0) && (buffer[cur_pos-1] != ' ') )
-				--cur_pos;
-		}
-
-
-		int del_bytes = save_pos - cur_pos;
-
-		char buf[Input::MAX_BUFFER_SIZE];
-		int x = 0;
-		for ( int k = cur_pos; k < save_pos; ++k, ++x )
-			buf[x] = buffer[k];
-		buf[x] = '\0';
-
-		int buf_len = strlen(buf);
-		int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
-		int cyril_cnt = (buf_len - ascii_cnt) / 2;
-		int buf_cnt = ascii_cnt + cyril_cnt;
-		memset(buf, 0, Input::MAX_BUFFER_SIZE);
-
-		ascii -= ascii_cnt;
-		cyril -= cyril_cnt;
-
-		for ( int k = 1; k <= buf_cnt; ++k )
-		{
-			printf("\b \b");
-			fflush(stdout);
-		}
-
-
-		x = 0;
-		for ( int k = save_pos; k <= last_ch; ++k, ++x )
-			buf[x] = buffer[k];
-		buf[x] = '\0';
-
-		buf_len = strlen(buf);
-		ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
-		cyril_cnt = (buf_len - ascii_cnt) / 2;
-		buf_cnt = ascii_cnt + cyril_cnt;
-
-		int v = cur_pos;
-		for ( x = 0; buf[x]; ++x, ++v )
-		{
-			buffer[v] = buf[x];
-			putchar(buffer[v]);
-		}
-		fflush(stdout);
-
-		for ( x = v; x <= last_ch; ++x )
-		{
-			putchar(' ');
-			buffer[x] = '\0';
-		}
-
-		int total_cnt = last_ch - v + 1 + buf_cnt;
-		for ( x = 1; x <= total_cnt; ++x )
-			putchar('\b');
-		fflush(stdout);
-
-		c_pos -= del_bytes;
-	}
-
-	return 1;
-}
-
-static int handle_newline_key( const Input& input )
-{
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& ascii = const_cast<Input&>(input).GetAscii();
-	int& cyril = const_cast<Input&>(input).GetCyril();
-	int& total = const_cast<Input&>(input).GetTotal();
-
-	std::array<char, Input::MAX_BUFFER_SIZE>& buffer = const_cast<Input&>(input).GetInput();
-	char* result = const_cast<Input&>(input).GetResult().data();
-	std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
-	std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
-
-	const_cast<Input&>(input).UnsetSaveBufFlag();
-
-	buffer[cur_pos] = '\n';
-	++cur_pos;
-	buffer[cur_pos] = '\0';
-
-	strncpy(result, buffer.data(), Input::MAX_BUFFER_SIZE);
-	buffer[cur_pos-1] = '\0';
-	--cur_pos;
-
-	if ( ( buffer[0] == '\0' ) || ( buffer[0] == '\n' ) || ( buffer[0] == '\r' ) )
-	{
-		ih_iter = input_history.end();
-		return 1;
-	}
-
-	if ( input_history.size() >= Input::MAX_HISTORY_SIZE )
-		input_history.pop_front();
-
-	input_history.push_back( buffer.data() );
-	ih_iter = input_history.end();
-
-	const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
-
-	memset( buffer.data(), 0, Input::MAX_BUFFER_SIZE );
-	cur_pos = 0;
-	left_offset = 0;
-	ascii = 0;
-	cyril = 0;
-	total = 0;
-
-	return 1;
-}
-
-static int handle_backspace_key( const Input& input )
-{
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& c_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	int& ascii = const_cast<Input&>(input).GetAscii();
-	int& cyril = const_cast<Input&>(input).GetCyril();
-
-
-	if ( (left_offset >= 0) && (left_offset < c_pos) )
-	{
-		const_cast<Input&>(input).UnsetSaveBufFlag();
-
-		char buf[Input::MAX_BUFFER_SIZE];
-		// проверка, является ли удаляемый символ кириллическим
-		bool is_cyril_flag = false;
-		int last_ch_pos = c_pos - 1;
-
-		if ( left_offset <= 0 )
-		{
-			if ( c_pos >= 2 )
-			{
-				char sym[3] = { 0 };
-				sym[0] = buffer[c_pos-2];
-				sym[1] = buffer[c_pos-1];
-				sym[2] = '\0';
-
-				if ( input.IsCyrillicSymbol(sym) )
-					is_cyril_flag = true;
-			}
-
-			printf("%s", "\b \b");
-			fflush(stdout);
-			buffer[c_pos-1] = '\0';
-			if ( is_cyril_flag )
-				buffer[c_pos-2] = '\0';
-
-			--c_pos;
-			--ascii;
-			if ( is_cyril_flag )
-			{
-				--c_pos;
-				--cyril;
-				++ascii;
-			}
-
-			return 1;
-		}
-
-		int cur_pos = c_pos - left_offset;
-
-		if ( cur_pos >= 2 )
-		{
-			char sym[3] = { 0 };
-			sym[0] = buffer[cur_pos-2];
-			sym[1] = buffer[cur_pos-1];
-			sym[2] = '\0';
-
-			if ( input.IsCyrillicSymbol(sym) )
-				is_cyril_flag = true;
-		}
-
-		int x, z = 0;
-		for ( x = cur_pos; x <= last_ch_pos; ++x, ++z )
-			buf[z] = buffer[x];
-		buf[z] = '\0';
-
-
-		x = cur_pos - 1;
-		if ( is_cyril_flag )
-			--x;
-
-		putchar('\b');
-		for ( z = 0; buf[z]; ++z, ++x )
-		{
-			buffer[x] = buf[z];
-			putchar(buffer[x]);
-		}
-		putchar(' ');
-		putchar('\b');
-		buffer[x] = '\0';
-		fflush(stdout);
-
-
-		int buf_len = strlen(buf);
-		int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
-		int cyril_cnt = (buf_len - ascii_cnt) / 2;
-		int total_cnt = ascii_cnt + cyril_cnt;
-
-		for ( x = 1; x <= total_cnt; ++x )
-			putchar('\b');
-		fflush(stdout);
-
-
-		if ( c_pos > 0 )
-		{
-			--c_pos;
-			--ascii;
-
-			if ( is_cyril_flag )
-			{
-				--c_pos;
-				++ascii;
-				--cyril;
-			}
-		}
-	}
-
-	return 1;
-}
-
-static int handle_arrow_left_key( const Input& input )
-{
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-
-	// если текущая позиция буфера не в начале строки - перемещать курсор влево
-	if ( left_offset < cur_pos )
-	{
-		putchar('\b');
-		fflush(stdout);
-
-		int x = cur_pos - left_offset - 1;
-
-		if ( x > 0 )
-		{
-			char sym[3] =
-			{
-				buffer[x-1],
-				buffer[x],
-				'\0'
-			};
-
-			if ( input.IsCyrillicSymbol(sym) )
-			{
-				left_offset += 2;
-			}
-			else
-			{
-				++left_offset;
-			}
-
-			return 1;
-		}
-
-		if ( x == 0 )
-			++left_offset;
-	}
-
-	return 1;
-}
-
-static int handle_arrow_right_key( const Input& input )
-{
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-
-	// если не конец строки - перемещать курсор вправо
-	if ( left_offset > 0 )
-	{
-		int x = cur_pos - left_offset;
-
-		if ( left_offset > 1 )
-		{
-			char sym[3] =
-			{
-				buffer[x],
-				buffer[x+1],
-				'\0'
-			};
-
-			if ( input.IsCyrillicSymbol(sym) )
-			{
-				write(1, sym, 2);
-				left_offset -= 2;
-			}
-			else
-			{
-				putchar(buffer[cur_pos - left_offset]);
-				fflush(stdout);
-				--left_offset;
-			}
-
-			return 1;
-		}
-
-		if ( left_offset == 1 )
-		{
-			putchar(buffer[cur_pos - left_offset]);
-			fflush(stdout);
-			--left_offset;
-		}
-	}
-
-	return 1;
-}
-
-static int handle_arrow_up_key( const Input& input )
-{
-	std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
-	std::array<char, Input::MAX_BUFFER_SIZE>& save_buf = const_cast<Input&>(input).GetSaveBuffer();
-
-
-	if ( input_history.size() > 0 )
-	{
-		if ( !input.IsSaveBufFlag() )
-		{
-			memset(save_buf.data(), 0, Input::MAX_BUFFER_SIZE);
-			strncpy(save_buf.data(), buffer, cur_pos);
-			const_cast<Input&>(input).SetSaveBufFlag();
-		}
-
-		if ( ih_iter != input_history.begin() )
-			ih_iter = std::prev(ih_iter);
-		else
-			return 1;
-
-		const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
-
-		memset(buffer, 0, Input::MAX_BUFFER_SIZE);
-		cur_pos = 0;
-		for ( int j = 0; ih_iter->data()[j]; ++j, ++cur_pos )
-		{
-			buffer[cur_pos] = ih_iter->data()[j];
-			putchar(ih_iter->data()[j]);
-		}
-		fflush(stdout);
-
-		left_offset = 0;
-		const_cast<Input&>(input).AsciiSymbolsCount();
-		const_cast<Input&>(input).CyrilSymbolsCount();
-	}
-
-	return 1;
-}
-
-static int handle_arrow_down_key( const Input& input )
-{
-	std::list<std::string>& input_history = const_cast<Input&>(input).GetInputHistory();
-	int& cur_pos = const_cast<Input&>(input).GetCurPos();
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	std::list<std::string>::iterator& ih_iter = const_cast<Input&>(input).GetIterator();
-	std::array<char, Input::MAX_BUFFER_SIZE>& save_buf = const_cast<Input&>(input).GetSaveBuffer();
-
-
-	if ( input_history.size() > 0 )
-	{
-		std::string output;
-
-		if ( ih_iter != input_history.end() )
-		{
-			ih_iter = std::next(ih_iter);
-
-			if ( ih_iter != input_history.end() )
-				output = ih_iter->data();
-		}
-
-		if ( ih_iter == input_history.end() )
-			output = save_buf.data();
-
-		const_cast<Input&>(input).CleanPrintedString( cur_pos - left_offset );
-
-		memset(buffer, 0, Input::MAX_BUFFER_SIZE);
-		cur_pos = 0;
-		for ( int j = 0; output[j]; ++j, ++cur_pos )
-		{
-			buffer[cur_pos] = output[j];
-			putchar(output[j]);
-		}
-		fflush(stdout);
-
-		left_offset = 0;
-		const_cast<Input&>(input).AsciiSymbolsCount();
-		const_cast<Input&>(input).CyrilSymbolsCount();
-	}
-
-	return 1;
-}
-
-static int handle_del_key( const Input& input )
-{
-	int& left_offset = const_cast<Input&>(input).GetLeftOffset();
-	int& c_pos = const_cast<Input&>(input).GetCurPos();
-	char* buffer = const_cast<Input&>(input).GetInput().data();
-	int& ascii = const_cast<Input&>(input).GetAscii();
-	int& cyril = const_cast<Input&>(input).GetCyril();
-
-	// если не конец строки
-	if ( left_offset > 0 )
-	{
-		const_cast<Input&>(input).UnsetSaveBufFlag();
-
-		// проверка, является ли удаляемый символ кириллическим
-		bool is_cyril_flag = false;
-
-		char buf[Input::MAX_BUFFER_SIZE];
-		int last_ch_pos = c_pos - 1;
-		int cur_pos = c_pos - left_offset;
-
-		if ( (cur_pos + 1) < c_pos )
-		{
-			char sym[3] =
-			{
-						buffer[cur_pos],
-						buffer[cur_pos+1],
-						'\0'
-			};
-
-			if ( input.IsCyrillicSymbol(sym) )
-			{
-				is_cyril_flag = true;
-			}
-		}
-
-		int k = cur_pos + 1;
-
-		if ( is_cyril_flag )
-			++k;
-
-		int x = 0;
-		for ( ; k <= last_ch_pos; ++k, ++x )
-			buf[x] = buffer[k];
-		buf[x] = '\0';
-
-
-		x = 0;
-		for ( k = cur_pos; buf[x]; ++x, ++k )
-		{
-			buffer[k] = buf[x];
-			putchar(buffer[k]);
-		}
-		buffer[k] = '\0';
-		putchar(' ');
-		putchar('\b');
-		fflush(stdout);
-
-
-		int buf_len = strlen(buf);
-		int ascii_cnt = const_cast<Input&>(input).AsciiSymbolsCount(buf, buf_len+1);
-		int cyril_cnt = (buf_len - ascii_cnt) / 2;
-		int total_cnt = ascii_cnt + cyril_cnt;
-
-		for ( x = 1; x <= total_cnt; ++x )
-			putchar('\b');
-		fflush(stdout);
-
-
-		if ( c_pos > 0 )
-		{
-			--c_pos;
-			--ascii;
-
-			if ( is_cyril_flag )
-			{
-				--c_pos;
-				++ascii;
-				--cyril;
-			}
-		}
-
-		--left_offset;
-
-		if ( is_cyril_flag )
-			--left_offset;
-	}
-
-	return 1;
 }
 
 #endif
